@@ -1,0 +1,4 @@
+# Release manifest for MongoDBPlugin
+data/System/MongoDBPlugin.txt 0644 Documentation
+lib/Foswiki/Plugins/MongoDBPlugin.pm 0644 Perl module
+

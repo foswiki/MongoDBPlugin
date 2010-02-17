@@ -1,0 +1,36 @@
+---+!! !MongoDBPlugin
+<!--
+One line description, required for extensions repository catalog.
+BuildContrib will fill in the SHORTDESCRIPTION with the value of
+$SHORTDESCRIPTION from the .pm module, or you can redefine it here if you
+prefer.
+   * Set SHORTDESCRIPTION = %$SHORTDESCRIPTION%
+-->
+%SHORTDESCRIPTION%
+
+%TOC%
+
+---++ Usage
+
+---++ Examples
+
+---++ Installation Instructions
+
+%$INSTALL_INSTRUCTIONS%
+
+---++ Info
+
+Many thanks to the following sponsors for supporting this work:
+   * Acknowledge any sponsors here
+
+|  Author(s): | |
+|  Copyright: | &copy; |
+|  License: | [[http://www.gnu.org/licenses/gpl.html][GPL (Gnu General Public License)]] |
+|  Release: | %$RELEASE% |
+|  Version: | %$VERSION% |
+|  Change History: | <!-- versions below in reverse order -->&nbsp; |
+|  Dependencies: | %$DEPENDENCIES% |
+|  Home page: | http://foswiki.org/bin/view/Extensions/MongoDBPlugin |
+|  Support: | http://foswiki.org/bin/view/Support/MongoDBPlugin |
+
+<!-- Do _not_ attempt to edit this topic; it is auto-generated. -->
