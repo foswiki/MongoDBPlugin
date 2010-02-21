@@ -11,6 +11,7 @@ prefer.
 %TOC%
 
 ---++ Usage
+This is an experimental attempt to utilise [[http://mongodb.org][MongoDB]] for all aspects of serialisation in foswiki.
 
 ---++ Examples
 
@@ -21,14 +22,15 @@ prefer.
 ---++ Info
 
 Many thanks to the following sponsors for supporting this work:
-   * Acknowledge any sponsors here
+   * fosiki.com
 
-|  Author(s): | |
-|  Copyright: | &copy; |
-|  License: | [[http://www.gnu.org/licenses/gpl.html][GPL (Gnu General Public License)]] |
+|  Author(s): | Foswiki:Main.SvenDowideit |
+|  Copyright: | &copy; 2010 SvenDowideit@fosiki.com |
+|  License: | [[http://www.gnu.org/licenses/gpl.html][GPL 3 (Gnu General Public License)]] |
 |  Release: | %$RELEASE% |
 |  Version: | %$VERSION% |
 |  Change History: | <!-- versions below in reverse order -->&nbsp; |
+|  Feb 2010: | initial implementation spike |
 |  Dependencies: | %$DEPENDENCIES% |
 |  Home page: | http://foswiki.org/bin/view/Extensions/MongoDBPlugin |
 |  Support: | http://foswiki.org/bin/view/Support/MongoDBPlugin |
