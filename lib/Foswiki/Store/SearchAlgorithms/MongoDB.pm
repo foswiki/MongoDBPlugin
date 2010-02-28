@@ -180,20 +180,19 @@ sub doMongoSearch {
     my $collection =
       Foswiki::Plugins::MongoDBPlugin::getMongoDB()->_getCollection('current');
       
-    #don't need the IxHash here, but when we come to use MapReduce we will.
-    #my $mongoQuery = Tie::IxHash->new(
-    #        _web   => $web,
-    #    );
-        
     my %mongoQuery = ();
+    #use IxHash to keep the hash order - leaving the javascript $where function to be called last.
+    my $ixhQuery = tie(%mongoQuery, 'Tie::IxHash');
     my $mongoJavascriptFunc = '';
     my $counter = 1;
     
     #pop off the first query element foreach scope and use that literally
-    foreach my $scope (keys(%{$elements})) {
+    #foreach my $scope (keys(%{$elements})) {
+    #lets order it so that we can reduce the test set quickly.
+    foreach my $scope (qw/_topic _web _text/) {
         foreach my $elem (@{$elements->{$scope}}) {
             if (!defined($mongoQuery{$scope})) {
-                $mongoQuery{$scope} =  $elem;
+                $ixhQuery->Push($scope =>  $elem);
             } else {
                 my $not = $elem->{'$not'};
                 if (defined($not)) {
@@ -215,11 +214,11 @@ sub doMongoSearch {
         $mongoJavascriptFunc = 'function() {'.
                             $mongoJavascriptFunc.
                             'return (1==1);}';
-        $mongoQuery{'$where'} =  $mongoJavascriptFunc;
+        $ixhQuery->Push('$where' =>  $mongoJavascriptFunc);
         print STDERR "------$mongoJavascriptFunc\n";
     }
 
-    my $cursor = $collection->query(\%mongoQuery);
+    my $cursor = $collection->query($ixhQuery);
 
     print STDERR "found " . $cursor->count . "\n";
 
@@ -242,7 +241,7 @@ sub convertQueryToJavascript {
                 $name = /$regex/$regexoptions ; 
                 matched = $name.test(this.$scope);
                 if ($invertedNot(matched)) {
-                    return (1==0); 
+                    return false; 
                 }
              }
 HERE
