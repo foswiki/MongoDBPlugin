@@ -46,25 +46,15 @@ sub search {
     $searchString =~ s/(?<!\\)\\[<>]/\\b/g;
     $searchString =~ s/^(.*)$/\\b$1\\b/go if $options->{'wordboundaries'};
 
-print STDERR "######## Search::MongoDB search ($web) tokens $searchString \n";
-require Foswiki::Plugins::MongoDBPlugin;
-require Foswiki::Plugins::MongoDBPlugin::DB;
-    my $collection = Foswiki::Plugins::MongoDBPlugin::getMongoDB()->_getCollection('current');
-    my $cursor     = $collection->query( {
-                                                    _web => $web,
-#TODO: mmm, i fear this needs to search the META - so I really need a _raw_topic field too
-                                                    _text => ($options->{casesensitive}?
-                                                                                qr/$searchString/ :
-                                                                                qr/$searchString/i )
-                                                        } );
+    my $cursor =
+      doMongoSearch( $web, '_text', $searchString, $options->{casesensitive} );
 
-print STDERR "found ".$cursor->count."\n";                                                        
-
-#TODO: this will go into the custom TopicSet
-    while (my $topic = $cursor->next) {
-        $seen{$topic->{_topic}} = 1;
+    #TODO: this will go into the custom TopicSet
+    while ( my $topic = $cursor->next ) {
+        $seen{ $topic->{_topic} } = 1;
     }
-#TODO: not filtered to theinput  result set.
+
+    #TODO: not filtered to theinput  result set.
     return \%seen;
 }
 
@@ -82,21 +72,25 @@ sub query {
     $options->{'scope'} = 'text'
       unless ( defined( $options->{'scope'} )
         && $options->{'scope'} =~ /^(topic|all)$/ );
-        
+
     my $topicSet = $inputTopicSet;
-    if (!defined($topicSet)) {
-        #then we start with the whole web?
-        #in Mongo, this will be mapped to 
-            #_topic => qr/Foswiki::Search::InfoCache::convertTopicPatternToRegex($options->{topic})/
-            #and
-            #_topic => not => qr/Foswiki::Search::InfoCache::convertTopicPatternToRegex($options->{excludetopics})/
-        my $webObject = Foswiki::Meta->new( $session, $web );
-        $topicSet = Foswiki::Search::InfoCache::getTopicListIterator( $webObject, $options );
+    if ( !defined($inputTopicSet) ) {
+
+#then we start with the whole web?
+#in Mongo, this will be mapped to
+#_topic => qr/Foswiki::Search::InfoCache::convertTopicPatternToRegex($options->{topic})/
+#and
+#_topic => not => qr/Foswiki::Search::InfoCache::convertTopicPatternToRegex($options->{excludetopics})/
+#my $webObject = Foswiki::Meta->new( $session, $web );
+#$topicSet = Foswiki::Search::InfoCache::getTopicListIterator( $webObject, $options );
     }
 
     #ASSERT( UNIVERSAL::isa( $topicSet, 'Foswiki::Iterator' ) ) if DEBUG;
 
-print STDERR "######## Search::MongoDB query ($web) tokens ".scalar(@{$query->{tokens}})." : ".join(',', @{$query->{tokens}})."\n";
+    print STDERR "######## Search::MongoDB query ($web) tokens "
+      . scalar( @{ $query->{tokens} } ) . " : "
+      . join( ',', @{ $query->{tokens} } ) . "\n";
+
 # AND search - search once for each token, ANDing result together
 #TODO: this is stupid. suggested re-impl:
 #               the query & search functions in the query&search algo just _create_ the hash for the query
@@ -114,37 +108,36 @@ print STDERR "######## Search::MongoDB query ($web) tokens ".scalar(@{$query->{t
         my %topicMatches;
         unless ( $options->{'scope'} eq 'text' ) {
             my $searchString = $token;
+            if ( defined( $options->{topic} ) ) {
+                my $select_topic_list =
+                  Foswiki::Search::InfoCache::convertTopicPatternToRegex(
+                    $options->{topic} );
+
+             #mmm, this needs to be ANDed with the results of the toher regex :(
+            }
 
             # FIXME I18N
-            $searchString = quotemeta($searchString)
-              if ( $options->{'type'} ne 'regex' );
-#TODO: mmm, i fear this needs to search the META - so I really need a _raw_topic field too
+            if ( $options->{'type'} ne 'regex' ) {
+                $searchString = quotemeta($searchString);
+            }
 
-            print STDERR "######## Search::MongoDB search ($web) tokens $searchString \n";
-            require Foswiki::Plugins::MongoDBPlugin;
-            require Foswiki::Plugins::MongoDBPlugin::DB;
-                my $collection = Foswiki::Plugins::MongoDBPlugin::getMongoDB()->_getCollection('current');
-                my $cursor     = $collection->query( {
-                                                                _web => $web,
-                                                                _topic => ($options->{casesensitive}?
-                                                                                            qr/$searchString/ :
-                                                                                            qr/$searchString/i )
-                                                                    } );
-
-            print STDERR "found ".$cursor->count."\n";                                                        
+            my $cursor =
+              doMongoSearch( $web, '_topic', $searchString,
+                $options->{casesensitive} );
 
             #TODO: this will go into the custom TopicSet
-                while (my $topic = $cursor->next) {
-                    $topicMatches{$topic->{_topic}} = 1;
-                }
+            while ( my $topic = $cursor->next ) {
+                $topicMatches{ $topic->{_topic} } = 1;
+            }
 
         }
-print STDERR "after topic scope search\n";
+        print STDERR "after topic scope search\n";
+
         # scope='text', e.g. grep search on topic text:
         my $textMatches;
         unless ( $options->{'scope'} eq 'topic' ) {
-            $textMatches = search(
-                $token, $web, $topicSet, $session->{store}, $options );
+            $textMatches =
+              search( $token, $web, $topicSet, $session->{store}, $options );
         }
 
         #bring the text matches into the topicMatch hash
@@ -159,24 +152,52 @@ print STDERR "after topic scope search\n";
                 my $topic = $topicSet->next();
 
                 if ( $topicMatches{$topic} ) {
-                } else {
-                    push( @scopeTextList, $topic );            
+                }
+                else {
+                    push( @scopeTextList, $topic );
                 }
             }
         }
         else {
+
             #TODO: the sad thing about this is we lose info
             @scopeTextList = keys(%topicMatches);
         }
-        
+
         $topicSet =
           new Foswiki::Search::InfoCache( $Foswiki::Plugins::SESSION, $web,
             \@scopeTextList );
     }
 
     return $topicSet;
+}
 
-    #    return \%completeMatch;
+sub doMongoSearch {
+    my $web           = shift;
+    my $scope         = shift;
+    my $searchString  = shift;
+    my $casesensitive = shift || 0;
+
+    print STDERR
+      "######## Search::MongoDB search ($web) tokens $searchString \n";
+    require Foswiki::Plugins::MongoDBPlugin;
+    require Foswiki::Plugins::MongoDBPlugin::DB;
+    my $collection =
+      Foswiki::Plugins::MongoDBPlugin::getMongoDB()->_getCollection('current');
+    my $cursor = $collection->query(
+        {
+            _web   => $web,
+            $scope => (
+                $casesensitive
+                ? qr/$searchString/
+                : qr/$searchString/i
+            )
+        }
+    );
+
+    print STDERR "found " . $cursor->count . "\n";
+
+    return $cursor;
 }
 
 1;
