@@ -47,14 +47,13 @@ sub search {
     $searchString =~ s/^(.*)$/\\b$1\\b/go if $options->{'wordboundaries'};
 
     my $cursor =
-      doMongoSearch( $web, '_text', $searchString, $options->{casesensitive} );
+      doMongoSearch( $web, $options, '_text', $searchString );
 
     #TODO: this will go into the custom TopicSet
     while ( my $topic = $cursor->next ) {
         $seen{ $topic->{_topic} } = 1;
     }
 
-    #TODO: not filtered to theinput  result set.
     return \%seen;
 }
 
@@ -74,18 +73,6 @@ sub query {
         && $options->{'scope'} =~ /^(topic|all)$/ );
 
     my $topicSet = $inputTopicSet;
-    if ( !defined($inputTopicSet) ) {
-
-#then we start with the whole web?
-#in Mongo, this will be mapped to
-#_topic => qr/Foswiki::Search::InfoCache::convertTopicPatternToRegex($options->{topic})/
-#and
-#_topic => not => qr/Foswiki::Search::InfoCache::convertTopicPatternToRegex($options->{excludetopics})/
-#my $webObject = Foswiki::Meta->new( $session, $web );
-#$topicSet = Foswiki::Search::InfoCache::getTopicListIterator( $webObject, $options );
-    }
-
-    #ASSERT( UNIVERSAL::isa( $topicSet, 'Foswiki::Iterator' ) ) if DEBUG;
 
     print STDERR "######## Search::MongoDB query ($web) tokens "
       . scalar( @{ $query->{tokens} } ) . " : "
@@ -108,13 +95,6 @@ sub query {
         my %topicMatches;
         unless ( $options->{'scope'} eq 'text' ) {
             my $searchString = $token;
-            if ( defined( $options->{topic} ) ) {
-                my $select_topic_list =
-                  Foswiki::Search::InfoCache::convertTopicPatternToRegex(
-                    $options->{topic} );
-
-             #mmm, this needs to be ANDed with the results of the toher regex :(
-            }
 
             # FIXME I18N
             if ( $options->{'type'} ne 'regex' ) {
@@ -122,8 +102,7 @@ sub query {
             }
 
             my $cursor =
-              doMongoSearch( $web, '_topic', $searchString,
-                $options->{casesensitive} );
+              doMongoSearch( $web, $options, '_topic', $searchString);
 
             #TODO: this will go into the custom TopicSet
             while ( my $topic = $cursor->next ) {
@@ -174,31 +153,71 @@ sub query {
 
 sub doMongoSearch {
     my $web           = shift;
+    my $options    = shift;
     my $scope         = shift;
     my $searchString  = shift;
-    my $casesensitive = shift || 0;
-
+    my $casesensitive = defined($options->{casesensitive})?$options->{casesensitive}:1;
+    
     print STDERR
       "######## Search::MongoDB search ($web) tokens $searchString \n";
     require Foswiki::Plugins::MongoDBPlugin;
     require Foswiki::Plugins::MongoDBPlugin::DB;
     my $collection =
       Foswiki::Plugins::MongoDBPlugin::getMongoDB()->_getCollection('current');
-    my $cursor = $collection->query(
-        {
+      
+    my $mongoQuery = Tie::IxHash->new(
             _web   => $web,
-            $scope => (
-                $casesensitive
-                ? qr/$searchString/
-                : qr/$searchString/i
-            )
+            $scope => { '$regex' => $searchString, '$options' => ($casesensitive? 'i' : '') }
+        );
+
+#TODO: Mongo advanced query docco indicates taht /^a/ is faster than /^a.*/ and /^a.*$/ so should refactor to that.
+    my $includeTopicsRegex = Foswiki::Search::InfoCache::convertTopicPatternToRegex($options->{topic});
+    my $excludeTopicsRegex = Foswiki::Search::InfoCache::convertTopicPatternToRegex( $options->{excludeTopics} );
+    
+    #Its probably more productive to convert the inc and excl into SearchString bits and pushing it all through the same loops.
+    #in fact, what if I conert it all to javascript - that can be used in mapreduce later too, 
+    # and then 'guess' which term might give the most performance to extract into the non js query portions.
+    if ((($scope eq '_topic')and (($includeTopicsRegex ne '') or ($excludeTopicsRegex ne ''))) or
+        (($includeTopicsRegex ne '') and ($excludeTopicsRegex ne ''))){
+            $mongoQuery->Push('$where' => 'function() { 
+                                            '.convertQueryToJavascript('excludetopics','_topic', $excludeTopicsRegex, '', '!' ).'
+                                            '.convertQueryToJavascript('includetopics','_topic', $includeTopicsRegex, '', '' ).'
+                                            }');
+    } else {
+        if ($includeTopicsRegex ne '') {
+            $mongoQuery->Push( _topic => { '$regex' => "$includeTopicsRegex" } );
+        } elsif ($includeTopicsRegex ne '') {
+            $mongoQuery->Push( _topic => { '$not' => { '$regex' => "$excludeTopicsRegex" } } );
         }
-    );
+    }
+
+    my $cursor = $collection->query($mongoQuery);
 
     print STDERR "found " . $cursor->count . "\n";
 
     return $cursor;
 }
+
+sub convertQueryToJavascript {
+    my $name = shift;
+    my $scope = shift;
+    my $regex = shift;
+    my $regexoptions = shift || '';
+    my $not = shift || '';
+     
+    return '' if ($regex eq '');
+     
+     return <<"HERE";
+            { 
+                $name = /$regex/$regexoptions ; 
+                matched = $name.test(this.$scope);
+                if (matched) {
+                    return $not(matched); 
+                }
+             }
+HERE
+}
+
 
 1;
 __DATA__
