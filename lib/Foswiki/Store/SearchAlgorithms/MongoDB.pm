@@ -78,12 +78,30 @@ sub query {
       . scalar( @{ $query->{tokens} } ) . " : "
       . join( ',', @{ $query->{tokens} } ) . "\n";
 
-# AND search - search once for each token, ANDing result together
-#TODO: this is stupid. suggested re-impl:
+#TODO: 
 #               the query & search functions in the query&search algo just _create_ the hash for the query
 #               and this is stored in the topic Set. When the topic set is 'evaluated' the query is sent (by the topic set)
 #               and from there the cursor is used.
 #nonetheless, the rendering of 2000 results takes much longer than the querying, but as the 2 are on separate servers, everything is golden :)
+
+    my %elements;
+    
+
+    
+#TODO: Mongo advanced query docco indicates taht /^a/ is faster than /^a.*/ and /^a.*$/ so should refactor to that.
+    my $includeTopicsRegex = Foswiki::Search::InfoCache::convertTopicPatternToRegex($options->{topic});
+    my $excludeTopicsRegex = Foswiki::Search::InfoCache::convertTopicPatternToRegex( $options->{excludetopic} );
+    if ($includeTopicsRegex ne '') {
+        push(@{$elements{_topic}}, { '$regex' => "$includeTopicsRegex" } );
+    } 
+    if ($excludeTopicsRegex ne '') {
+        push(@{$elements{_topic}}, { '$not' => { '$regex' => "$excludeTopicsRegex" } } );
+    }
+
+    push(@{$elements{_web}}, $web );
+    
+    my $casesensitive = defined($options->{casesensitive})?$options->{casesensitive}:1;
+
     foreach my $token ( @{ $query->{tokens} } ) {
 
         # flag for AND NOT search
@@ -101,52 +119,51 @@ sub query {
                 $searchString = quotemeta($searchString);
             }
 
-            my $cursor =
-              doMongoSearch( $web, $options, '_topic', $searchString);
-
-            #TODO: this will go into the custom TopicSet
-            while ( my $topic = $cursor->next ) {
-                $topicMatches{ $topic->{_topic} } = 1;
+            if ($invertSearch) {
+                push(@{$elements{_topic}}, { '$not' => { '$regex' => "$searchString", '$options' => ($casesensitive? 'i' : '') } } );
+            } else {
+                push(@{$elements{_topic}}, { '$regex' => "$searchString", '$options' => ($casesensitive? 'i' : '') } );
             }
-
         }
-        print STDERR "after topic scope search\n";
 
         # scope='text', e.g. grep search on topic text:
-        my $textMatches;
         unless ( $options->{'scope'} eq 'topic' ) {
-            $textMatches =
-              search( $token, $web, $topicSet, $session->{store}, $options );
-        }
+            my $searchString = $token;
+            if ( $options->{type} && $options->{type} eq 'regex' ) {
 
-        #bring the text matches into the topicMatch hash
-        if ($textMatches) {
-            @topicMatches{ keys %$textMatches } = values %$textMatches;
-        }
+                # Escape /, used as delimiter. This also blocks any attempt to use
+                # the search string to execute programs on the server.
+                $searchString =~ s!/!\\/!g;
+            }
+            else {
 
-        my @scopeTextList = ();
-        if ($invertSearch) {
-            $topicSet->reset();
-            while ( $topicSet->hasNext() ) {
-                my $topic = $topicSet->next();
+                # Escape non-word chars in search string for plain text search
+                $searchString =~ s/(\W)/\\$1/g;
+            }
 
-                if ( $topicMatches{$topic} ) {
-                }
-                else {
-                    push( @scopeTextList, $topic );
-                }
+            # Convert GNU grep \< \> syntax to \b
+            $searchString =~ s/(?<!\\)\\[<>]/\\b/g;
+            $searchString =~ s/^(.*)$/\\b$1\\b/go if $options->{'wordboundaries'};
+            
+            if ($invertSearch) {
+                push(@{$elements{_text}}, { '$not' => { '$regex' => "$searchString", '$options' => ($casesensitive? 'i' : '') } } );
+            } else {
+                push(@{$elements{_text}}, { '$regex' => "$searchString", '$options' => ($casesensitive? 'i' : '') } );
             }
         }
-        else {
+    } #end foreach
+        
+    my $cursor =
+      doMongoSearch( $web, $options, \%elements);
 
-            #TODO: the sad thing about this is we lose info
-            @scopeTextList = keys(%topicMatches);
-        }
-
-        $topicSet =
-          new Foswiki::Search::InfoCache( $Foswiki::Plugins::SESSION, $web,
-            \@scopeTextList );
+    my @answer;
+    while ( my $topic = $cursor->next ) {
+        push(@answer, $topic->{_topic});
     }
+
+    $topicSet =
+      new Foswiki::Search::InfoCache( $Foswiki::Plugins::SESSION, $web,
+        \@answer );
 
     return $topicSet;
 }
@@ -154,44 +171,55 @@ sub query {
 sub doMongoSearch {
     my $web           = shift;
     my $options    = shift;
-    my $scope         = shift;
-    my $searchString  = shift;
-    my $casesensitive = defined($options->{casesensitive})?$options->{casesensitive}:1;
+    my $elements = shift;
     
     print STDERR
-      "######## Search::MongoDB search ($web) tokens $searchString \n";
+      "######## Search::MongoDB search ($web)  \n";
     require Foswiki::Plugins::MongoDBPlugin;
     require Foswiki::Plugins::MongoDBPlugin::DB;
     my $collection =
       Foswiki::Plugins::MongoDBPlugin::getMongoDB()->_getCollection('current');
       
-    my $mongoQuery = Tie::IxHash->new(
-            _web   => $web,
-            $scope => { '$regex' => $searchString, '$options' => ($casesensitive? 'i' : '') }
-        );
-
-#TODO: Mongo advanced query docco indicates taht /^a/ is faster than /^a.*/ and /^a.*$/ so should refactor to that.
-    my $includeTopicsRegex = Foswiki::Search::InfoCache::convertTopicPatternToRegex($options->{topic});
-    my $excludeTopicsRegex = Foswiki::Search::InfoCache::convertTopicPatternToRegex( $options->{excludeTopics} );
+    #don't need the IxHash here, but when we come to use MapReduce we will.
+    #my $mongoQuery = Tie::IxHash->new(
+    #        _web   => $web,
+    #    );
+        
+    my %mongoQuery = ();
+    my $mongoJavascriptFunc = '';
+    my $counter = 1;
     
-    #Its probably more productive to convert the inc and excl into SearchString bits and pushing it all through the same loops.
-    #in fact, what if I conert it all to javascript - that can be used in mapreduce later too, 
-    # and then 'guess' which term might give the most performance to extract into the non js query portions.
-    if ((($scope eq '_topic')and (($includeTopicsRegex ne '') or ($excludeTopicsRegex ne ''))) or
-        (($includeTopicsRegex ne '') and ($excludeTopicsRegex ne ''))){
-            $mongoQuery->Push('$where' => 'function() { 
-                                            '.convertQueryToJavascript('excludetopics','_topic', $excludeTopicsRegex, '', '!' ).'
-                                            '.convertQueryToJavascript('includetopics','_topic', $includeTopicsRegex, '', '' ).'
-                                            }');
-    } else {
-        if ($includeTopicsRegex ne '') {
-            $mongoQuery->Push( _topic => { '$regex' => "$includeTopicsRegex" } );
-        } elsif ($includeTopicsRegex ne '') {
-            $mongoQuery->Push( _topic => { '$not' => { '$regex' => "$excludeTopicsRegex" } } );
+    #pop off the first query element foreach scope and use that literally
+    foreach my $scope (keys(%{$elements})) {
+        foreach my $elem (@{$elements->{$scope}}) {
+            if (!defined($mongoQuery{$scope})) {
+                $mongoQuery{$scope} =  $elem;
+            } else {
+                my $not = $elem->{'$not'};
+                if (defined($not)) {
+                    $elem = $not;
+                    $not = '!';
+                }
+                my $casesensitive = $elem->{'$options'};
+                my $reg = $elem->{'$regex'};
+                $mongoJavascriptFunc .= convertQueryToJavascript('query'.$counter,
+                                                                                $scope, 
+                                                                                $reg, 
+                                                                                $casesensitive, 
+                                                                                $not );
+                $counter++;
+            }
         }
     }
+    if ($counter > 1) {
+        $mongoJavascriptFunc = 'function() {'.
+                            $mongoJavascriptFunc.
+                            'return (1==1);}';
+        $mongoQuery{'$where'} =  $mongoJavascriptFunc;
+        print STDERR "------$mongoJavascriptFunc\n";
+    }
 
-    my $cursor = $collection->query($mongoQuery);
+    my $cursor = $collection->query(\%mongoQuery);
 
     print STDERR "found " . $cursor->count . "\n";
 
@@ -204,6 +232,8 @@ sub convertQueryToJavascript {
     my $regex = shift;
     my $regexoptions = shift || '';
     my $not = shift || '';
+    my $invertedNot = ($not eq '!')?'' : '!';
+    
      
     return '' if ($regex eq '');
      
@@ -211,8 +241,8 @@ sub convertQueryToJavascript {
             { 
                 $name = /$regex/$regexoptions ; 
                 matched = $name.test(this.$scope);
-                if (matched) {
-                    return $not(matched); 
+                if ($invertedNot(matched)) {
+                    return (1==0); 
                 }
              }
 HERE
