@@ -36,6 +36,15 @@ sub query {
 #SMELL: initialise the mongoDB hack. needed if the mondoPlugin is not enabled, but the algo is selected :/
     Foswiki::Plugins::MongoDBPlugin::getMongoDB();
 
+    require Foswiki::Query::HoistREs;
+    my $hoistedREs = Foswiki::Query::HoistREs::collatedHoist($query);
+    
+    if ((!defined($options->{topic})) and 
+        ($hoistedREs->{name})) {
+            #set the 'includetopic' matcher..
+            #dammit, i have to de-regex it? thats mad.
+    }
+
     my $topicSet = $inputTopicSet;
     if ( !defined($topicSet) ) {
 
@@ -50,21 +59,20 @@ sub query {
     #TODO: howto ask iterator for list length?
     #TODO: once the inputTopicSet isa ResultSet we might have an idea
     #    if ( scalar(@$topics) > 6 ) {
-    require Foswiki::Query::HoistREs;
-    my @filter = Foswiki::Query::HoistREs::hoist($query);
-    if ( scalar(@filter) ) {
+    if ( defined($hoistedREs->{text}) ) {
         my $searchOptions = {
             type                => 'regex',
             casesensitive       => 1,
             files_without_match => 1,
         };
+        my @filter = @{$hoistedREs->{text}};
         my $searchQuery =
           new Foswiki::Search::Node( $query->toString(), \@filter,
             $searchOptions );
+         $topicSet->reset();
         $topicSet =
-          $session->{store}
-          ->searchInWebMetaData( $searchQuery, $web, $topicSet, $session,
-            $searchOptions );
+          $session->{store}->searchInWebMetaData(
+              $searchQuery, $web, $topicSet, $session, $searchOptions );
     }
     else {
 
