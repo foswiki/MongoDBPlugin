@@ -88,9 +88,9 @@ sub query {
     
 
     
-#TODO: Mongo advanced query docco indicates taht /^a/ is faster than /^a.*/ and /^a.*$/ so should refactor to that.
-    my $includeTopicsRegex = Foswiki::Search::InfoCache::convertTopicPatternToRegex($options->{topic});
-    my $excludeTopicsRegex = Foswiki::Search::InfoCache::convertTopicPatternToRegex( $options->{excludetopic} );
+#TODO: Mongo advanced query docco indicates that /^a/ is faster than /^a.*/ and /^a.*$/ so should refactor to that.
+    my $includeTopicsRegex = Foswiki::Search::MongoDBInfoCache::convertTopicPatternToRegex($options->{topic});
+    my $excludeTopicsRegex = Foswiki::Search::MongoDBInfoCache::convertTopicPatternToRegex( $options->{excludetopic} );
     if ($includeTopicsRegex ne '') {
         push(@{$elements{_topic}}, { '$regex' => "$includeTopicsRegex" } );
     } 

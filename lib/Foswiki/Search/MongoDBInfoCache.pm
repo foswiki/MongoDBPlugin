@@ -91,60 +91,20 @@ return;
     my $revSort   = Foswiki::isTrue( $params->{reverse} );
     my $date      = $params->{date} || '';
     my $limit     = $params->{limit} || '';
-
-    #SMELL: duplicated code - removeme
-    # Limit search results
-    if ( $limit =~ /(^\d+$)/o ) {
-
-        # only digits, all else is the same as
-        # an empty string.  "+10" won't work.
-        $limit = $1;
-    }
-    else {
-
-        # change 'all' to 0, then to big number
-        $limit = 0;
-    }
-    $limit = 32000 unless ($limit);
-    #TODO: this is really an ugly hack to get around the rather horrible limit 'performance' hack
-    if (defined($params->{pager_show_results_to}) and
-        $params->{pager_show_results_to} > 0) {
-        $limit = $params->{pager_skip_results_from} + $params->{pager_show_results_to};
-    }
-
+    
+    #TODO: sadly, I can't work out a way to sort on 'TOPICINFO[0].date'
+    # I have the suspicion that mongodb can't do this directly, so it might 
+    #have to happen using a javascript function, or i have to abandon 
+    #the simplicity of using the in-memory data from the Foswiki::Meta obj
+    
+print STDERR "sortResults($sortOrder)\n";
     # sort the topic list by date, author or topic name, and cache the
     # info extracted to do the sorting
     if ( $sortOrder eq 'modified' ) {
-
-        # For performance:
-        #   * sort by approx time (to get a rough list)
-        #   * shorten list to the limit + some slack
-        #   * sort by rev date on shortened list to get the accurate list
-        # SMELL: Cairo had efficient two stage handling of modified sort.
-        # SMELL: In Dakar this seems to be pointless since latest rev
-        # time is taken from topic instead of dir list.
-        my $slack = 10;
-        if ( $limit + 2 * $slack < scalar( @{ $infoCache->{list} } ) ) {
-
-            # sort by approx latest rev time
-            my @tmpList =
-              map  { $_->[1] }
-              sort { $a->[0] <=> $b->[0] }
-              map  { [ $session->getApproxRevTime( $web, $_ ), $_ ] }
-              @{ $infoCache->{list} };
-            @tmpList = reverse(@tmpList) if ($revSort);
-
-            # then shorten list and build the hashes for date and author
-            my $idx = $limit + $slack;
-            @{ $infoCache->{list} } = ();
-            foreach (@tmpList) {
-                push( @{ $infoCache->{list} }, $_ );
-                $idx -= 1;
-                last if $idx <= 0;
-            }
-        }
-
-        $infoCache->sortTopics( $sortOrder, !$revSort );
+print STDERR "okokokokokokokokok\n";
+#        $infoCache->{_cursor}->sort( {
+#                            'TOPICINFO' => ($revSort?-1:1)
+#                            } );
     }
     elsif (
         $sortOrder =~ /^creat/ ||    # topic creation time

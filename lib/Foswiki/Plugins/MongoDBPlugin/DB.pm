@@ -42,6 +42,11 @@ sub update {
     my $hash = shift;
     
     my $collection = $self->_getCollection($collectionName);
+    
+    #TODO: not the most efficient place to create and index, but I want to be sure, to be sure.
+    $collection->ensure_index( { _topic => 1 } );
+    $collection->ensure_index( { _topic => 1, _web => 1 }, {unique => 1 } );
+    
     $collection->update({address=>$address},
                         {address=>$address,%$hash},
                         {'upsert'=>1});
