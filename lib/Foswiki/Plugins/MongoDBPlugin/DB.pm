@@ -18,7 +18,6 @@
 
 =cut
 
-
 package Foswiki::Plugins::MongoDBPlugin::DB;
 
 # Always use strict to enforce variable scoping
@@ -26,72 +25,78 @@ use strict;
 use MongoDB;
 
 sub new {
-    my $class = shift;
+    my $class  = shift;
     my $params = shift;
 
-    my $self = bless({%$params, session => $Foswiki::Func::SESSION}, $class);
+    my $self =
+      bless( { %$params, session => $Foswiki::Func::SESSION }, $class );
 
     $Foswiki::Func::SESSION->{MongoDB} = $self;
     return $self;
 }
 
 sub update {
-    my $self = shift;
+    my $self           = shift;
     my $collectionName = shift;
-    my $address = shift;
-    my $hash = shift;
-    
-    my $collection = $self->_getCollection($collectionName);
-    
-    #TODO: not the most efficient place to create and index, but I want to be sure, to be sure.
-    $collection->ensure_index( { _topic => 1 } );
-    $collection->ensure_index( { _topic => 1, _web => 1 }, {unique => 1 } );
-    
-    $collection->update({address=>$address},
-                        {address=>$address,%$hash},
-                        {'upsert'=>1});
-}
+    my $address        = shift;
+    my $hash           = shift;
 
+    my $collection = $self->_getCollection($collectionName);
+
+#TODO: not the most efficient place to create and index, but I want to be sure, to be sure.
+    $collection->ensure_index( { _topic => 1 } );
+    $collection->ensure_index( { _topic => 1, _web => 1 }, { unique => 1 } );
+
+    $collection->update(
+        { address  => $address },
+        { address  => $address, %$hash },
+        { 'upsert' => 1 }
+    );
+}
 
 #######################################################
 #Webname?
 sub _getCollection {
-    my $self = shift;
+    my $self           = shift;
     my $collectionName = shift;
 
     my $connection = $self->_connect();
-    my $database = $connection->get_database($self->{database});
+    my $database   = $connection->get_database( $self->{database} );
     return $database->get_collection($collectionName);
 }
 
 sub _connect {
     my $self = shift;
-    
-    if (not defined($self->{connection})) {
-        $self->{connection} = MongoDB::Connection->new(host => $self->{host}, port=>$self->{port});
+
+    if ( not defined( $self->{connection} ) ) {
+        $self->{connection} = MongoDB::Connection->new(
+            host => $self->{host},
+            port => $self->{port}
+        );
     }
     return $self->{connection};
 }
 
 #I'm using this to test where i'm up to
 sub _MONGODB {
-    my $self = shift;
+    my $self   = shift;
     my $params = shift;
-    
-    my $web = $params->{web};
+
+    my $web   = $params->{web};
     my $topic = $params->{topic};
-    
+
     my $collection = $self->_getCollection('current');
-    my $data       = $collection->find_one({_web=>$web,_topic=>$topic});
-    
+    my $data = $collection->find_one( { _web => $web, _topic => $topic } );
+
     use Foswiki::Plugins::MongoDBPlugin::Meta;
-    my $meta = new Foswiki::Plugins::MongoDBPlugin::Meta($self, $data->{_web}, $data->{_topic}, $data);
+    my $meta =
+      new Foswiki::Plugins::MongoDBPlugin::Meta( $self, $data->{_web},
+        $data->{_topic}, $data );
 
     return $meta->stringify();
-    
+
     #return join(', ', map { "$_: ".($data->{$_}||'UNDEF')."\n" } keys(%$data));
 }
-
 
 1;
 __END__

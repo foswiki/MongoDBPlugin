@@ -14,7 +14,7 @@ uses the MongoDB cursor, and sorting limiting etc to create a fastpath iterator.
 =cut
 
 use Assert;
-use Foswiki::Meta ();
+use Foswiki::Meta                     ();
 use Foswiki::Iterator::FilterIterator ();
 
 #use Monitor ();
@@ -27,30 +27,29 @@ use Foswiki::Iterator::FilterIterator ();
 
 sub new {
     my ( $class, $session, $defaultWeb, $options, $cursor ) = @_;
-    
+
     #my $this = $class->SUPER::new({});
-    my $this = bless({}, $class);
-    $this->{_session}    = $session;
-    $this->{_defaultWeb} = $defaultWeb;
-    $this->{_SEARCHoptions}    = $options;
-    $this->{_cursor}    = $cursor;
+    my $this = bless( {}, $class );
+    $this->{_session}       = $session;
+    $this->{_defaultWeb}    = $defaultWeb;
+    $this->{_SEARCHoptions} = $options;
+    $this->{_cursor}        = $cursor;
 
     return $this;
 }
 
 sub hasNext {
-    my $this = shift; 
+    my $this = shift;
     return $this->{_cursor}->has_next;
 }
 
-sub next { 
-    my $this = shift; 
-    my $obj = $this->{_cursor}->next;
+sub next {
+    my $this = shift;
+    my $obj  = $this->{_cursor}->next;
     return $obj->{_topic};
 }
 sub reset { return 0; }
-sub all {die 'not implemented';}
-
+sub all   { die 'not implemented'; }
 
 sub isImmutable {
     my $this = shift;
@@ -60,7 +59,7 @@ sub isImmutable {
 sub addTopics {
     my ( $this, $defaultWeb, @list ) = @_;
     ASSERT( !$this->isImmutable() )
-    if DEBUG  ;    #cannot modify list once its being used as an iterator.
+      if DEBUG;    #cannot modify list once its being used as an iterator.
     ASSERT( defined($defaultWeb) ) if DEBUG;
 
     die 'not implemented';
@@ -71,7 +70,7 @@ sub addTopics {
 sub addTopic {
     my ( $this, $meta ) = @_;
     ASSERT( !$this->isImmutable() )
-    if DEBUG  ;    #cannot modify list once its being used as an iterator.
+      if DEBUG;    #cannot modify list once its being used as an iterator.
 
     die 'not implemented';
 }
@@ -86,25 +85,27 @@ IMPLEMENTME
 sub sortResults {
     my ( $infoCache, $web, $params ) = @_;
     my $session = $infoCache->{_session};
-return;
+    return;
     my $sortOrder = $params->{order} || '';
     my $revSort   = Foswiki::isTrue( $params->{reverse} );
     my $date      = $params->{date} || '';
     my $limit     = $params->{limit} || '';
-    
+
     #TODO: sadly, I can't work out a way to sort on 'TOPICINFO[0].date'
-    # I have the suspicion that mongodb can't do this directly, so it might 
-    #have to happen using a javascript function, or i have to abandon 
+    # I have the suspicion that mongodb can't do this directly, so it might
+    #have to happen using a javascript function, or i have to abandon
     #the simplicity of using the in-memory data from the Foswiki::Meta obj
-    
-print STDERR "sortResults($sortOrder)\n";
+
+    print STDERR "sortResults($sortOrder)\n";
+
     # sort the topic list by date, author or topic name, and cache the
     # info extracted to do the sorting
     if ( $sortOrder eq 'modified' ) {
-print STDERR "okokokokokokokokok\n";
-#        $infoCache->{_cursor}->sort( {
-#                            'TOPICINFO' => ($revSort?-1:1)
-#                            } );
+        print STDERR "okokokokokokokokok\n";
+
+        #        $infoCache->{_cursor}->sort( {
+        #                            'TOPICINFO' => ($revSort?-1:1)
+        #                            } );
     }
     elsif (
         $sortOrder =~ /^creat/ ||    # topic creation time
@@ -144,16 +145,16 @@ print STDERR "okokokokokokokokok\n";
     }
 }
 
-
 ######OLD methods
 sub get {
     my ( $this, $topic, $meta ) = @_;
 
-    unless ($this->{$topic}) {
+    unless ( $this->{$topic} ) {
         $this->{$topic} = {};
-        $this->{$topic}->{tom} = $meta || 
-          Foswiki::Meta->load( $this->{_session}, $this->{_defaultWeb},
+        $this->{$topic}->{tom} = $meta
+          || Foswiki::Meta->load( $this->{_session}, $this->{_defaultWeb},
             $topic );
+
         # SMELL: why do this here? Smells of a hack, as AFAICT it is done
         # anyway during output processing. Disable it, and see what happens....
         #my $text = $topicObject->text();
@@ -169,7 +170,8 @@ sub get {
         $this->{$topic}->{modified} = $ri->{date};
         $this->{$topic}->{revNum}   = $ri->{version};
 
-        $this->{$topic}->{allowView} = $this->{$topic}->{tom}->haveAccess('VIEW');
+        $this->{$topic}->{allowView} =
+          $this->{$topic}->{tom}->haveAccess('VIEW');
     }
 
     return $this->{$topic};
@@ -201,12 +203,14 @@ sub getRev1Info {
             $info->{createwikiusername} =
               $this->{_session}->{users}->webDotWikiName( $ri->{author} );
         }
-        elsif ( $attr eq 'createdate' or
-               $attr eq 'createlongdate' or
-               $attr eq 'created' ) {
+        elsif ($attr eq 'createdate'
+            or $attr eq 'createlongdate'
+            or $attr eq 'created' )
+        {
             $info->{created} = $ri->{date};
             require Foswiki::Time;
             $info->{createdate} = Foswiki::Time::formatTime( $ri->{date} );
+
             #TODO: wow thats disgusting.
             $info->{created} = $info->{createlongdate} = $info->{createdate};
         }

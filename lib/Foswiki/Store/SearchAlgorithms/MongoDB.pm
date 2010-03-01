@@ -46,15 +46,9 @@ sub search {
     $searchString =~ s/(?<!\\)\\[<>]/\\b/g;
     $searchString =~ s/^(.*)$/\\b$1\\b/go if $options->{'wordboundaries'};
 
-    my $cursor =
-      doMongoSearch( $web, $options, '_text', $searchString );
-    return new Foswiki::Search::MongoDBInfoCache($Foswiki::Plugins::SESSION, $web, $options, $cursor);
-
-#    while ( my $topic = $cursor->next ) {
-#        $seen{ $topic->{_topic} } = 1;
-#    }
-#
-#    return \%seen;
+    my $cursor = doMongoSearch( $web, $options, '_text', $searchString );
+    return new Foswiki::Search::MongoDBInfoCache( $Foswiki::Plugins::SESSION,
+        $web, $options, $cursor );
 }
 
 =begin TML
@@ -78,29 +72,35 @@ sub query {
       . scalar( @{ $query->{tokens} } ) . " : "
       . join( ',', @{ $query->{tokens} } ) . "\n";
 
-#TODO: 
+#TODO:
 #               the query & search functions in the query&search algo just _create_ the hash for the query
 #               and this is stored in the topic Set. When the topic set is 'evaluated' the query is sent (by the topic set)
 #               and from there the cursor is used.
 #nonetheless, the rendering of 2000 results takes much longer than the querying, but as the 2 are on separate servers, everything is golden :)
 
     my %elements;
-    
 
-    
 #TODO: Mongo advanced query docco indicates that /^a/ is faster than /^a.*/ and /^a.*$/ so should refactor to that.
-    my $includeTopicsRegex = Foswiki::Search::MongoDBInfoCache::convertTopicPatternToRegex($options->{topic});
-    my $excludeTopicsRegex = Foswiki::Search::MongoDBInfoCache::convertTopicPatternToRegex( $options->{excludetopic} );
-    if ($includeTopicsRegex ne '') {
-        push(@{$elements{_topic}}, { '$regex' => "$includeTopicsRegex" } );
-    } 
-    if ($excludeTopicsRegex ne '') {
-        push(@{$elements{_topic}}, { '$not' => { '$regex' => "$excludeTopicsRegex" } } );
+    my $includeTopicsRegex =
+      Foswiki::Search::MongoDBInfoCache::convertTopicPatternToRegex(
+        $options->{topic} );
+    my $excludeTopicsRegex =
+      Foswiki::Search::MongoDBInfoCache::convertTopicPatternToRegex(
+        $options->{excludetopic} );
+    if ( $includeTopicsRegex ne '' ) {
+        push( @{ $elements{_topic} }, { '$regex' => "$includeTopicsRegex" } );
+    }
+    if ( $excludeTopicsRegex ne '' ) {
+        push(
+            @{ $elements{_topic} },
+            { '$not' => { '$regex' => "$excludeTopicsRegex" } }
+        );
     }
 
-    push(@{$elements{_web}}, $web );
-    
-    my $casesensitive = defined($options->{casesensitive})?$options->{casesensitive}:1;
+    push( @{ $elements{_web} }, $web );
+
+    my $casesensitive =
+      defined( $options->{casesensitive} ) ? $options->{casesensitive} : 1;
 
     foreach my $token ( @{ $query->{tokens} } ) {
 
@@ -120,9 +120,24 @@ sub query {
             }
 
             if ($invertSearch) {
-                push(@{$elements{_topic}}, { '$not' => { '$regex' => "$searchString", '$options' => ($casesensitive? 'i' : '') } } );
-            } else {
-                push(@{$elements{_topic}}, { '$regex' => "$searchString", '$options' => ($casesensitive? 'i' : '') } );
+                push(
+                    @{ $elements{_topic} },
+                    {
+                        '$not' => {
+                            '$regex'   => "$searchString",
+                            '$options' => ( $casesensitive ? 'i' : '' )
+                        }
+                    }
+                );
+            }
+            else {
+                push(
+                    @{ $elements{_topic} },
+                    {
+                        '$regex'   => "$searchString",
+                        '$options' => ( $casesensitive ? 'i' : '' )
+                    }
+                );
             }
         }
 
@@ -131,8 +146,8 @@ sub query {
             my $searchString = $token;
             if ( $options->{type} && $options->{type} eq 'regex' ) {
 
-                # Escape /, used as delimiter. This also blocks any attempt to use
-                # the search string to execute programs on the server.
+              # Escape /, used as delimiter. This also blocks any attempt to use
+              # the search string to execute programs on the server.
                 $searchString =~ s!/!\\/!g;
             }
             else {
@@ -143,78 +158,82 @@ sub query {
 
             # Convert GNU grep \< \> syntax to \b
             $searchString =~ s/(?<!\\)\\[<>]/\\b/g;
-            $searchString =~ s/^(.*)$/\\b$1\\b/go if $options->{'wordboundaries'};
-            
+            $searchString =~ s/^(.*)$/\\b$1\\b/go
+              if $options->{'wordboundaries'};
+
             if ($invertSearch) {
-                push(@{$elements{_text}}, { '$not' => { '$regex' => "$searchString", '$options' => ($casesensitive? 'i' : '') } } );
-            } else {
-                push(@{$elements{_text}}, { '$regex' => "$searchString", '$options' => ($casesensitive? 'i' : '') } );
+                push(
+                    @{ $elements{_text} },
+                    {
+                        '$not' => {
+                            '$regex'   => "$searchString",
+                            '$options' => ( $casesensitive ? 'i' : '' )
+                        }
+                    }
+                );
+            }
+            else {
+                push(
+                    @{ $elements{_text} },
+                    {
+                        '$regex'   => "$searchString",
+                        '$options' => ( $casesensitive ? 'i' : '' )
+                    }
+                );
             }
         }
-    } #end foreach
-        
-    my $cursor =
-      doMongoSearch( $web, $options, \%elements);
-    return new Foswiki::Search::MongoDBInfoCache($Foswiki::Plugins::SESSION, $web, $options, $cursor);
+    }    #end foreach
 
-#    my @answer;
-#    while ( my $topic = $cursor->next ) {
-#        push(@answer, $topic->{_topic});
-#    }
-#
-#    $topicSet =
-#      new Foswiki::Search::InfoCache( $Foswiki::Plugins::SESSION, $web,
-#        \@answer );
-#    return $topicSet;
+    my $cursor = doMongoSearch( $web, $options, \%elements );
+    return new Foswiki::Search::MongoDBInfoCache( $Foswiki::Plugins::SESSION,
+        $web, $options, $cursor );
 }
 
 sub doMongoSearch {
-    my $web           = shift;
-    my $options    = shift;
+    my $web      = shift;
+    my $options  = shift;
     my $elements = shift;
-    
-    print STDERR
-      "######## Search::MongoDB search ($web)  \n";
+
+    print STDERR "######## Search::MongoDB search ($web)  \n";
     require Foswiki::Plugins::MongoDBPlugin;
     require Foswiki::Plugins::MongoDBPlugin::DB;
     my $collection =
       Foswiki::Plugins::MongoDBPlugin::getMongoDB()->_getCollection('current');
-      
+
     my %mongoQuery = ();
-    #use IxHash to keep the hash order - leaving the javascript $where function to be called last.
-    my $ixhQuery = tie(%mongoQuery, 'Tie::IxHash');
+
+#use IxHash to keep the hash order - leaving the javascript $where function to be called last.
+    my $ixhQuery            = tie( %mongoQuery, 'Tie::IxHash' );
     my $mongoJavascriptFunc = '';
-    my $counter = 1;
-    
+    my $counter             = 1;
+
     #pop off the first query element foreach scope and use that literally
     #foreach my $scope (keys(%{$elements})) {
     #lets order it so that we can reduce the test set quickly.
     foreach my $scope (qw/_topic _web _text/) {
-        foreach my $elem (@{$elements->{$scope}}) {
-            if (!defined($mongoQuery{$scope})) {
-                $ixhQuery->Push($scope =>  $elem);
-            } else {
+        foreach my $elem ( @{ $elements->{$scope} } ) {
+            if ( !defined( $mongoQuery{$scope} ) ) {
+                $ixhQuery->Push( $scope => $elem );
+            }
+            else {
                 my $not = $elem->{'$not'};
-                if (defined($not)) {
+                if ( defined($not) ) {
                     $elem = $not;
-                    $not = '!';
+                    $not  = '!';
                 }
                 my $casesensitive = $elem->{'$options'};
-                my $reg = $elem->{'$regex'};
-                $mongoJavascriptFunc .= convertQueryToJavascript('query'.$counter,
-                                                                                $scope, 
-                                                                                $reg, 
-                                                                                $casesensitive, 
-                                                                                $not );
+                my $reg           = $elem->{'$regex'};
+                $mongoJavascriptFunc .=
+                  convertQueryToJavascript( 'query' . $counter,
+                    $scope, $reg, $casesensitive, $not );
                 $counter++;
             }
         }
     }
-    if ($counter > 1) {
-        $mongoJavascriptFunc = 'function() {'.
-                            $mongoJavascriptFunc.
-                            'return (1==1);}';
-        $ixhQuery->Push('$where' =>  $mongoJavascriptFunc);
+    if ( $counter > 1 ) {
+        $mongoJavascriptFunc =
+          'function() {' . $mongoJavascriptFunc . 'return true;}';
+        $ixhQuery->Push( '$where' => $mongoJavascriptFunc );
         print STDERR "------$mongoJavascriptFunc\n";
     }
 
@@ -226,17 +245,16 @@ sub doMongoSearch {
 }
 
 sub convertQueryToJavascript {
-    my $name = shift;
-    my $scope = shift;
-    my $regex = shift;
+    my $name         = shift;
+    my $scope        = shift;
+    my $regex        = shift;
     my $regexoptions = shift || '';
-    my $not = shift || '';
-    my $invertedNot = ($not eq '!')?'' : '!';
-    
-     
-    return '' if ($regex eq '');
-     
-     return <<"HERE";
+    my $not          = shift || '';
+    my $invertedNot  = ( $not eq '!' ) ? '' : '!';
+
+    return '' if ( $regex eq '' );
+
+    return <<"HERE";
             { 
                 $name = /$regex/$regexoptions ; 
                 matched = $name.test(this.$scope);
@@ -246,7 +264,6 @@ sub convertQueryToJavascript {
              }
 HERE
 }
-
 
 1;
 __DATA__

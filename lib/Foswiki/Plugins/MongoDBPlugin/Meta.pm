@@ -18,7 +18,6 @@
 
 =cut
 
-
 package Foswiki::Plugins::MongoDBPlugin::Meta;
 use Foswiki::Plugins::MongoDBPlugin::DB;
 
@@ -30,19 +29,19 @@ our @ISA = ('Foswiki::Meta');
 use strict;
 
 sub new {
-    my $class = shift;
+    my $class   = shift;
     my $session = shift;
-    my $web = shift;
-    my $topic = shift;
-    my $data = shift;
-    
+    my $web     = shift;
+    my $topic   = shift;
+    my $data    = shift;
+
     #my $meta = new Foswiki::Meta($session, $web, $topic );
     my $meta = $class->SUPER::new( $session, $web, $topic );
-    
-#TODO: if $data is undef - see if its in mongoDB already, and if so, load it... ((OR... this should happen in the load/reload mess))    
-    
+
+#TODO: if $data is undef - see if its in mongoDB already, and if so, load it... ((OR... this should happen in the load/reload mess))
+
     my @validKeys = keys(%Foswiki::Meta::VALIDATE);
-    push(@validKeys, '_text');
+    push( @validKeys, '_text' );
     @$meta{@validKeys} = @$data{@validKeys};
 
     return $meta;
@@ -76,13 +75,16 @@ sub reload {
     }
     $this->{FILEATTACHMENT} = [];
 
-    my $collection = $Foswiki::Func::SESSION->{MongoDB}->_getCollection('current');
-    my $data       = $collection->find_one( {_web => $this->{_web},_topic=>$this->{_topic}} );
+    my $collection =
+      $Foswiki::Func::SESSION->{MongoDB}->_getCollection('current');
+    my $data = $collection->find_one(
+        { _web => $this->{_web}, _topic => $this->{_topic} } );
     my @validKeys = keys(%Foswiki::Meta::VALIDATE);
-    push(@validKeys, '_text');
+    push( @validKeys, '_text' );
     @$this{@validKeys} = @$data{@validKeys};
-    
-    $this->{_loadedRev} = Foswiki::Store::cleanUpRevID($this->{TOPICINFO}[0]->{version});
+
+    $this->{_loadedRev} =
+      Foswiki::Store::cleanUpRevID( $this->{TOPICINFO}[0]->{version} );
 
     # SMELL: removed see getLoadedRev - should remove any
     # non-numeric rev's (like the $rev stuff from svn)
@@ -91,8 +93,6 @@ sub reload {
 
     $this->addDependency();
 }
-
-
 
 1;
 __END__

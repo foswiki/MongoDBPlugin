@@ -18,22 +18,21 @@
 
 =cut
 
-
 package Foswiki::Plugins::MongoDBPlugin;
 
 # Always use strict to enforce variable scoping
 use strict;
 
-use Foswiki::Func ();       # The plugins API
+use Foswiki::Func    ();    # The plugins API
 use Foswiki::Plugins ();    # For the API version
 our $VERSION = '$Rev: 5771 $';
 our $RELEASE = '1.1.1';
-our $SHORTDESCRIPTION = 'MongoDB is a scalable, high-performance, open source, schema-free, document-oriented database. ';
+our $SHORTDESCRIPTION =
+'MongoDB is a scalable, high-performance, open source, schema-free, document-oriented database. ';
 our $NO_PREFS_IN_TOPIC = 1;
-our $pluginName = 'MongoDBPlugin';
+our $pluginName        = 'MongoDBPlugin';
 
 our $enableOnSaveUpdates = 0;
-
 
 =begin TML
 
@@ -50,108 +49,116 @@ our $enableOnSaveUpdates = 0;
 sub initPlugin {
     my ( $topic, $web, $user, $installWeb ) = @_;
 
-    #$debug = $Foswiki::cfg{Plugins}{KinoSearchPlugin}{Debug} || 0;
-    #$enableOnSaveUpdates = $Foswiki::cfg{Plugins}{KinoSearchPlugin}{EnableOnSaveUpdates} || 0;
+#$debug = $Foswiki::cfg{Plugins}{KinoSearchPlugin}{Debug} || 0;
+#$enableOnSaveUpdates = $Foswiki::cfg{Plugins}{KinoSearchPlugin}{EnableOnSaveUpdates} || 0;
 
     #SMELL: ew
     #TODO: this sets our Global Connextion into the session :(
     getMongoDB();
 
-    Foswiki::Func::registerTagHandler('MONGODB', \&_MONGODB);
-    Foswiki::Func::registerRESTHandler('update', \&_update);
+    Foswiki::Func::registerTagHandler( 'MONGODB', \&_MONGODB );
+    Foswiki::Func::registerRESTHandler( 'update', \&_update );
 
     return 1;
 }
 
 sub afterSaveHandler {
-    return if ($enableOnSaveUpdates != 1);  #disabled - they can make save's take too long
-    
+    return
+      if ( $enableOnSaveUpdates != 1 )
+      ;    #disabled - they can make save's take too long
+
     my ( $text, $topic, $web, $error, $meta ) = @_;
 
-    return getMongoDB()->update('current', "$web.$topic", $meta);
+    return getMongoDB()->update( 'current', "$web.$topic", $meta );
 }
 
 #mmmm
 sub DISABLED_afterRenameHandler {
-    return if ($enableOnSaveUpdates != 1);  #disabled - they can make save's take too long
+    return
+      if ( $enableOnSaveUpdates != 1 )
+      ;    #disabled - they can make save's take too long
 
-    my ( $oldWeb, $oldTopic, $oldAttachment, $newWeb, $newTopic, $newAttachment ) = @_;
+    my ( $oldWeb, $oldTopic, $oldAttachment, $newWeb, $newTopic,
+        $newAttachment ) = @_;
 
     return getMongoDB()->rename();
 }
 
-
 sub DISABLED_afterAttachmentSaveHandler {
-    return if ($enableOnSaveUpdates != 1);  #disabled - they can make save's take too long
+    return
+      if ( $enableOnSaveUpdates != 1 )
+      ;    #disabled - they can make save's take too long
 
-    my( $attrHashRef, $topic, $web ) = @_;
-    
+    my ( $attrHashRef, $topic, $web ) = @_;
+
     return getMongoDB()->udpateAttachment();
 }
 
 ################################################################################################################
 sub getMongoDB {
-    if (not defined($Foswiki::Func::SESSION->{MongoDB})) {
+    if ( not defined( $Foswiki::Func::SESSION->{MongoDB} ) ) {
         require Foswiki::Plugins::MongoDBPlugin::DB;
         my $mongoDB = new Foswiki::Plugins::MongoDBPlugin::DB(
-                                {
-                                    host => $Foswiki::cfg{MongoDBPlugin}{host} || '10.10.10.5',
-                                    port => $Foswiki::cfg{MongoDBPlugin}{port} || '27017',
-                                    username => $Foswiki::cfg{MongoDBPlugin}{username},
-                                    password => $Foswiki::cfg{MongoDBPlugin}{password},
-                                    database => $Foswiki::cfg{MongoDBPlugin}{database} || 'foswiki',
-                                });
+            {
+                host => $Foswiki::cfg{MongoDBPlugin}{host} || '10.10.10.5',
+                port => $Foswiki::cfg{MongoDBPlugin}{port} || '27017',
+                username => $Foswiki::cfg{MongoDBPlugin}{username},
+                password => $Foswiki::cfg{MongoDBPlugin}{password},
+                database => $Foswiki::cfg{MongoDBPlugin}{database} || 'foswiki',
+            }
+        );
     }
     return $Foswiki::Func::SESSION->{MongoDB};
 }
 
-
 sub _update {
     my $session = shift;
-    my $query = Foswiki::Func::getCgiQuery();
-    my $web = $query->param('updateweb') || 'Sandbox';
+    my $query   = Foswiki::Func::getCgiQuery();
+    my $web     = $query->param('updateweb') || 'Sandbox';
 
     my @topicList = Foswiki::Func::getTopicList($web);
-    
+
     my $count = 0;
     foreach my $topic (@topicList) {
-        my ($meta, $text) = Foswiki::Func::readTopic($web, $topic);
-print STDERR "---- $web . $topic \n";
-        getMongoDB()->update('current', "$web.$topic", $meta);
+        my ( $meta, $text ) = Foswiki::Func::readTopic( $web, $topic );
+        print STDERR "---- $web . $topic \n";
+        getMongoDB()->update( 'current', "$web.$topic", $meta );
         $count++;
     }
-    
+
     return $count;
 }
 
 # The function used to handle the %EXAMPLETAG{...}% macro
 # You would have one of these for each macro you want to process.
 sub _MONGODB {
-    my($session, $params, $theTopic, $theWeb) = @_;
-#    # $session  - a reference to the Foswiki session object (if you don't know
-#    #             what this is, just ignore it)
-#    # $params=  - a reference to a Foswiki::Attrs object containing
-#    #             parameters.
-#    #             This can be used as a simple hash that maps parameter names
-#    #             to values, with _DEFAULT being the name for the default
-#    #             (unnamed) parameter.
-#    # $theTopic - name of the topic in the query
-#    # $theWeb   - name of the web in the query
-#    # Return: the result of processing the macro. This will replace the
-#    # macro call in the final text.
-#
-#    # For example, %EXAMPLETAG{'hamburger' sideorder="onions"}%
-#    # $params->{_DEFAULT} will be 'hamburger'
-#    # $params->{sideorder} will be 'onions'
+    my ( $session, $params, $theTopic, $theWeb ) = @_;
+
+ #    # $session  - a reference to the Foswiki session object (if you don't know
+ #    #             what this is, just ignore it)
+ #    # $params=  - a reference to a Foswiki::Attrs object containing
+ #    #             parameters.
+ #    #             This can be used as a simple hash that maps parameter names
+ #    #             to values, with _DEFAULT being the name for the default
+ #    #             (unnamed) parameter.
+ #    # $theTopic - name of the topic in the query
+ #    # $theWeb   - name of the web in the query
+ #    # Return: the result of processing the macro. This will replace the
+ #    # macro call in the final text.
+ #
+ #    # For example, %EXAMPLETAG{'hamburger' sideorder="onions"}%
+ #    # $params->{_DEFAULT} will be 'hamburger'
+ #    # $params->{sideorder} will be 'onions'
 
     return getMongoDB()->_MONGODB(
-                        {
-                            web => 'Sandbox',
-                            #SMELL: ok, so i'm passing all sorts of stuff
-                            %$params            #over-ride the defaults
-                        });
-}
+        {
+            web => 'Sandbox',
 
+            #SMELL: ok, so i'm passing all sorts of stuff
+            %$params    #over-ride the defaults
+        }
+    );
+}
 
 1;
 __END__

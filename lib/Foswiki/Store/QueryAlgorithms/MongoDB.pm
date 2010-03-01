@@ -19,27 +19,32 @@ speed and memory size. It also depends on the complexity of the query.
 
 package Foswiki::Store::QueryAlgorithms::MongoDB;
 use strict;
+
 #@ISA = ( 'Foswiki::Query::QueryAlgorithms' ); # interface
 
 use Foswiki::Search::Node ();
+
 #use Foswiki::Meta         ();
-use Foswiki::Plugins::MongoDBPlugin ();
+use Foswiki::Plugins::MongoDBPlugin       ();
 use Foswiki::Plugins::MongoDBPlugin::Meta ();
 use Foswiki::Search::InfoCache;
 
 # See Foswiki::Query::QueryAlgorithms.pm for details
 sub query {
     my ( $query, $web, $inputTopicSet, $session, $options ) = @_;
-    
-    #SMELL: initialise the mongoDB hack. needed if the mondoPlugin is not enabled, but the algo is selected :/
+
+#SMELL: initialise the mongoDB hack. needed if the mondoPlugin is not enabled, but the algo is selected :/
     Foswiki::Plugins::MongoDBPlugin::getMongoDB();
 
     my $topicSet = $inputTopicSet;
-    if (!defined($topicSet)) {
+    if ( !defined($topicSet) ) {
+
         #then we start with the whole web?
         #TODO: i'm sure that is a flawed assumption
         my $webObject = Foswiki::Meta->new( $session, $web );
-        $topicSet = Foswiki::Search::InfoCache::getTopicListIterator( $webObject, $options );
+        $topicSet =
+          Foswiki::Search::InfoCache::getTopicListIterator( $webObject,
+            $options );
     }
 
     #TODO: howto ask iterator for list length?
@@ -57,34 +62,39 @@ sub query {
           new Foswiki::Search::Node( $query->toString(), \@filter,
             $searchOptions );
         $topicSet =
-          $session->{store}->searchInWebMetaData(
-              $searchQuery, $web, $topicSet, $session, $searchOptions );
+          $session->{store}
+          ->searchInWebMetaData( $searchQuery, $web, $topicSet, $session,
+            $searchOptions );
     }
     else {
 
-
 #TODO: clearly _this_ can be re-written as a FilterIterator, and if we are able to use the sorting hints (ie DB Store) can propogate all the way to FORMAT
 
-        print STDERR "WARNING: couldn't hoistREs on ".$query->toString();
+        print STDERR "WARNING: couldn't hoistREs on " . $query->toString();
     }
-#print STDERR "))))".$query->toString()."((((\n";
-use Data::Dumper;
-print STDERR "--------Query::MongoDB \n".Dumper($query)."\n";
+
+    #print STDERR "))))".$query->toString()."((((\n";
+    use Data::Dumper;
+    print STDERR "--------Query::MongoDB \n" . Dumper($query) . "\n";
     my $resultTopicSet =
-      new Foswiki::Search::InfoCache( $Foswiki::Plugins::SESSION, $web);
+      new Foswiki::Search::InfoCache( $Foswiki::Plugins::SESSION, $web );
     local $/;
     while ( $topicSet->hasNext() ) {
         my $topic = $topicSet->next();
-        #my $meta = Foswiki::Meta->new( $session, $web, $topic );
+
+#my $meta = Foswiki::Meta->new( $session, $web, $topic );
 #GRIN: curiously quick hack to use the MongoDB topics rather than from disk - should have no positive effect on performance :)
 #TODO: will make a Store backend later.
-        my $meta = Foswiki::Plugins::MongoDBPlugin::Meta->new( $session, $web, $topic );
+        my $meta =
+          Foswiki::Plugins::MongoDBPlugin::Meta->new( $session, $web, $topic );
+
         # this 'lazy load' will become useful when @$topics becomes
         # an infoCache
 
         $meta->reload() unless ( $meta->getLoadedRev() );
         next unless ( $meta->getLoadedRev() );
-        print STDERR "Processing $topic\n" if (Foswiki::Query::Node::MONITOR_EVAL());
+        print STDERR "Processing $topic\n"
+          if ( Foswiki::Query::Node::MONITOR_EVAL() );
         my $match = $query->evaluate( tom => $meta, data => $meta );
         if ($match) {
             $resultTopicSet->addTopic($meta);
@@ -166,6 +176,7 @@ sub getField {
         }
     }
     elsif ( ref($data) eq 'ARRAY' ) {
+
         # Array objects are returned during evaluation, e.g. when
         # a subset of an array is matched for further processing.
 
@@ -210,6 +221,7 @@ sub getField {
         }
     }
     elsif ( ref($data) eq 'HASH' ) {
+
         # A hash object may be returned when a sub-object of a Foswiki::Meta
         # object has been matched.
         $result = $data->{ $node->{params}[0] };
@@ -223,7 +235,7 @@ sub getField {
 # Get a referenced topic
 # See Foswiki::Store::QueryAlgorithms.pm for details
 sub getRefTopic {
-    my ($this, $relativeTo, $w, $t) = @_;
+    my ( $this, $relativeTo, $w, $t ) = @_;
     return Foswiki::Meta->load( $relativeTo->session, $w, $t );
 }
 
