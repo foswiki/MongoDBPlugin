@@ -50,7 +50,7 @@ sub initPlugin {
     my ( $topic, $web, $user, $installWeb ) = @_;
 
 #$debug = $Foswiki::cfg{Plugins}{KinoSearchPlugin}{Debug} || 0;
-#$enableOnSaveUpdates = $Foswiki::cfg{Plugins}{KinoSearchPlugin}{EnableOnSaveUpdates} || 0;
+    $enableOnSaveUpdates = $Foswiki::cfg{Plugins}{$pluginName}{EnableOnSaveUpdates} || 0;
 
     #SMELL: ew
     #TODO: this sets our Global Connextion into the session :(
@@ -69,6 +69,7 @@ sub afterSaveHandler {
 
     my ( $text, $topic, $web, $error, $meta ) = @_;
 
+    $meta->{_raw_text} = $meta->getEmbeddedStoreForm();
     return getMongoDB()->update( 'current', "$web.$topic", $meta );
 }
 
@@ -122,6 +123,8 @@ sub _update {
     foreach my $topic (@topicList) {
         my ( $meta, $text ) = Foswiki::Func::readTopic( $web, $topic );
         print STDERR "---- $web . $topic \n";
+        
+        $meta->{_raw_text} = $meta->getEmbeddedStoreForm();
         getMongoDB()->update( 'current', "$web.$topic", $meta );
         $count++;
     }

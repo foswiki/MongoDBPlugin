@@ -25,6 +25,7 @@ DEPRECATED
 
 =cut
 
+
 sub search {
     my ( $searchString, $web, $inputTopicSet, $session, $options ) = @_;
 
@@ -46,7 +47,21 @@ sub search {
     $searchString =~ s/(?<!\\)\\[<>]/\\b/g;
     $searchString =~ s/^(.*)$/\\b$1\\b/go if $options->{'wordboundaries'};
 
-    my $cursor = doMongoSearch( $web, $options, '_text', $searchString );
+    my $casesensitive =
+      defined( $options->{casesensitive} ) ? $options->{casesensitive} : 1;
+
+    my %elements;
+
+    push( @{ $elements{_web} }, $web );
+    push(
+                    @{ $elements{_raw_text} },
+                    {
+                        '$regex'   => $searchString,
+                        '$options' => ( $casesensitive ? '' : 'i' )
+                    }
+                    );
+
+    my $cursor = doMongoSearch( $web, $options, \%elements );
     return new Foswiki::Search::MongoDBInfoCache( $Foswiki::Plugins::SESSION,
         $web, $options, $cursor );
 }
@@ -88,30 +103,36 @@ sub query {
       Foswiki::Search::MongoDBInfoCache::convertTopicPatternToRegex(
         $options->{excludetopic} );
     if ( $includeTopicsRegex ne '' ) {
-        push( @{ $elements{_topic} }, { '$regex' => "$includeTopicsRegex" } );
+        push( @{ $elements{_topic} }, { '$regex' => $includeTopicsRegex } );
     }
     if ( $excludeTopicsRegex ne '' ) {
         push(
             @{ $elements{_topic} },
-            { '$not' => { '$regex' => "$excludeTopicsRegex" } }
+            { '$not' => { '$regex' => $excludeTopicsRegex } }
         );
     }
 
     push( @{ $elements{_web} }, $web );
 
     my $casesensitive =
-      defined( $options->{casesensitive} ) ? $options->{casesensitive} : 1;
+      defined( $options->{casesensitive} ) ? $options->{casesensitive} : 0;
 
     foreach my $token ( @{ $query->{tokens} } ) {
 
         # flag for AND NOT search
         my $invertSearch = 0;
         $invertSearch = ( $token =~ s/^\!//o );
+        
+        #TODO: work out why mongo hates ^%META
+        #TODO: make a few more unit tests with ^ in them
+        $token =~ s/^\^%META//;
+
+#TODO: ** this code is totally broken when scope == all.
+#probably need to reimplement this using the mapreduce querys with temporary collections that can be re-queried.
 
         # scope can be 'topic' (default), 'text' or "all"
         # scope='topic', e.g. Perl search on topic name:
-        my %topicMatches;
-        unless ( $options->{'scope'} eq 'text' ) {
+        if ( $options->{'scope'} ne 'text' ) {
             my $searchString = $token;
 
             # FIXME I18N
@@ -124,8 +145,8 @@ sub query {
                     @{ $elements{_topic} },
                     {
                         '$not' => {
-                            '$regex'   => "$searchString",
-                            '$options' => ( $casesensitive ? 'i' : '' )
+                            '$regex'   => $searchString,
+                            '$options' => ( $casesensitive ? '' : 'i' )
                         }
                     }
                 );
@@ -134,15 +155,15 @@ sub query {
                 push(
                     @{ $elements{_topic} },
                     {
-                        '$regex'   => "$searchString",
-                        '$options' => ( $casesensitive ? 'i' : '' )
+                        '$regex'   => $searchString,
+                        '$options' => ( $casesensitive ? '' : 'i' )
                     }
                 );
             }
         }
 
         # scope='text', e.g. grep search on topic text:
-        unless ( $options->{'scope'} eq 'topic' ) {
+        if ( $options->{'scope'} ne 'topic' ) {
             my $searchString = $token;
             if ( $options->{type} && $options->{type} eq 'regex' ) {
 
@@ -163,21 +184,21 @@ sub query {
 
             if ($invertSearch) {
                 push(
-                    @{ $elements{_text} },
+                    @{ $elements{_raw_text} },
                     {
                         '$not' => {
-                            '$regex'   => "$searchString",
-                            '$options' => ( $casesensitive ? 'i' : '' )
+                            '$regex'   => $searchString,
+                            '$options' => ( $casesensitive ? '' : 'i' )
                         }
                     }
                 );
             }
             else {
                 push(
-                    @{ $elements{_text} },
+                    @{ $elements{_raw_text} },
                     {
-                        '$regex'   => "$searchString",
-                        '$options' => ( $casesensitive ? 'i' : '' )
+                        '$regex'   => $searchString,
+                        '$options' => ( $casesensitive ? '' : 'i' )
                     }
                 );
             }
@@ -210,7 +231,7 @@ sub doMongoSearch {
     #pop off the first query element foreach scope and use that literally
     #foreach my $scope (keys(%{$elements})) {
     #lets order it so that we can reduce the test set quickly.
-    foreach my $scope (qw/_topic _web _text/) {
+    foreach my $scope (qw/_topic _web _text _raw_text/) {
         foreach my $elem ( @{ $elements->{$scope} } ) {
             if ( !defined( $mongoQuery{$scope} ) ) {
                 $ixhQuery->Push( $scope => $elem );

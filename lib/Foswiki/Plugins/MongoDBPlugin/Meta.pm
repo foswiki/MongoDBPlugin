@@ -57,6 +57,8 @@ revision is currently being viewed.
 
 #SMELL: its quite worrying that to over-ride this method, I have to reproduce most of it.
 
+TODO: obviously all I really need to do is push this into the Store imp's readTopic, and make a matching saveTopic and I should be golden enough
+
 =cut
 
 sub reload {
