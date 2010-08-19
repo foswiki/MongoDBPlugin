@@ -99,7 +99,12 @@ sub query {
         # this 'lazy load' will become useful when @$topics becomes
         # an infoCache
 
-        $meta->reload() unless ( $meta->getLoadedRev() );
+        # SMELL: CDot modified this without really understanding how
+        # it's supposed to work. Once loaded, Meta objects are locked to
+        # a specific revision of the topic; it's not clear if the metacache
+        # is intended to include different revisions of the same topic
+        # or not. See BruteForce.pm for analagous code.
+        $meta->loadVersion() unless ( $meta->getLoadedRev() );
         next unless ( $meta->getLoadedRev() );
         print STDERR "Processing $topic\n"
           if ( Foswiki::Query::Node::MONITOR_EVAL() );
