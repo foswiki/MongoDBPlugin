@@ -13,7 +13,15 @@ prefer.
 ---++ Usage
 This is an experimental attempt to utilise [[http://mongodb.org][MongoDB]] for all aspects of serialisation in foswiki.
 
----++ Examples
+At this point the Plugin is used to populate the MongoDB. All user topic Saves are automatically copied into the MongoDB, and you can batch load using the restHandler:
+   * %SCRIPTURL{rest}%/MongoDBPlugin/update?updateweb=Main
+
+---++ Technical details
+This initial version serialises the internal Meta object directly into _one_ collection, using web.name as a unique index.
+
+It was written for an older version of MongoDB, which did not support the =OR= operator, so uses regex's to implement =OR=.
+
+In the process shoing a proof of concept that works (so long as each of your topics (as stored internally in the Meta obj) are all smaller than 4M.
 
 ---++ Installation Instructions
 
@@ -30,6 +38,7 @@ Many thanks to the following sponsors for supporting this work:
 |  Release: | %$RELEASE% |
 |  Version: | %$VERSION% |
 |  Change History: | <!-- versions below in reverse order -->&nbsp; |
+|  Sept 2010: | restart work using foswiki 1.1 |
 |  Feb 2010: | initial implementation spike |
 |  Dependencies: | %$DEPENDENCIES% |
 |  Home page: | http://foswiki.org/bin/view/Extensions/MongoDBPlugin |

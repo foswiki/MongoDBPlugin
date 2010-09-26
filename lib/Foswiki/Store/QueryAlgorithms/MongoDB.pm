@@ -31,6 +31,54 @@ use Foswiki::Search::InfoCache;
 
 # See Foswiki::Query::QueryAlgorithms.pm for details
 sub query {
+    my ( $query, $inputTopicSet, $session, $options ) = @_;
+
+    # Fold constants
+    my $context = Foswiki::Meta->new( $session, $session->{webName} );
+    $query->simplify( tom => $context, data => $context );
+
+    my $webNames = $options->{web}       || '';
+    my $recurse  = $options->{'recurse'} || '';
+    my $isAdmin  = $session->{users}->isAdmin( $session->{user} );
+
+    my $searchAllFlag = ( $webNames =~ /(^|[\,\s])(all|on)([\,\s]|$)/i );
+    my @webs = Foswiki::Search::InfoCache::_getListOfWebs( $webNames, $recurse,
+        $searchAllFlag );
+
+    my @resultCacheList;
+    foreach my $web (@webs) {
+
+        # can't process what ain't thar
+        next unless $session->webExists($web);
+
+        my $webObject = Foswiki::Meta->new( $session, $web );
+        my $thisWebNoSearchAll = Foswiki::isTrue(
+            $webObject->getPreference('NOSEARCHALL') );
+
+        # make sure we can report this web on an 'all' search
+        # DON'T filter out unless it's part of an 'all' search.
+        next
+          if ( $searchAllFlag
+            && !$isAdmin
+            && ( $thisWebNoSearchAll || $web =~ /^[\.\_]/ )
+            && $web ne $session->{webName} );
+
+        #TODO: combine these into one great ResultSet
+        my $infoCache =
+          _webQuery( $query, $web, $inputTopicSet, $session, $options );
+        push( @resultCacheList, $infoCache );
+    }
+    my $resultset =
+      new Foswiki::Search::ResultSet( \@resultCacheList, $options->{groupby},
+        $options->{order}, Foswiki::isTrue( $options->{reverse} ) );
+
+    #TODO: $options should become redundant
+    $resultset->sortResults($options);
+    return $resultset;
+}
+
+# Query over a single web
+sub _webQuery {
     my ( $query, $web, $inputTopicSet, $session, $options ) = @_;
 
 #SMELL: initialise the mongoDB hack. needed if the mondoPlugin is not enabled, but the algo is selected :/

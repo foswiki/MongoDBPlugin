@@ -101,7 +101,7 @@ sub getMongoDB {
         require Foswiki::Plugins::MongoDBPlugin::DB;
         my $mongoDB = new Foswiki::Plugins::MongoDBPlugin::DB(
             {
-                host => $Foswiki::cfg{MongoDBPlugin}{host} || '10.10.10.5',
+                host => $Foswiki::cfg{MongoDBPlugin}{host} || 'quad.home.org.au',
                 port => $Foswiki::cfg{MongoDBPlugin}{port} || '27017',
                 username => $Foswiki::cfg{MongoDBPlugin}{username},
                 password => $Foswiki::cfg{MongoDBPlugin}{password},

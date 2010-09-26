@@ -73,6 +73,54 @@ this is the new way -
 =cut
 
 sub query {
+    my ( $query, $inputTopicSet, $session, $options ) = @_;
+
+    if ( ( @{ $query->{tokens} } ) == 0 ) {
+        return new Foswiki::Search::InfoCache( $session, '' );
+    }
+
+    my $webNames = $options->{web}       || '';
+    my $recurse  = $options->{'recurse'} || '';
+    my $isAdmin  = $session->{users}->isAdmin( $session->{user} );
+
+    my $searchAllFlag = ( $webNames =~ /(^|[\,\s])(all|on)([\,\s]|$)/i );
+    my @webs = Foswiki::Search::InfoCache::_getListOfWebs( $webNames, $recurse,
+        $searchAllFlag );
+
+    my @resultCacheList;
+    foreach my $web (@webs) {
+
+        # can't process what ain't thar
+        next unless $session->webExists($web);
+
+        my $webObject = Foswiki::Meta->new( $session, $web );
+        my $thisWebNoSearchAll =
+          Foswiki::isTrue( $webObject->getPreference('NOSEARCHALL') );
+
+        # make sure we can report this web on an 'all' search
+        # DON'T filter out unless it's part of an 'all' search.
+        next
+          if ( $searchAllFlag
+            && !$isAdmin
+            && ( $thisWebNoSearchAll || $web =~ /^[\.\_]/ )
+            && $web ne $session->{webName} );
+
+        my $infoCache =
+          _webQuery( $query, $web, $inputTopicSet, $session, $options );
+        $infoCache->sortResults($options);
+        push( @resultCacheList, $infoCache );
+    }
+    my $resultset =
+      new Foswiki::Search::ResultSet( \@resultCacheList, $options->{groupby},
+        $options->{order}, Foswiki::isTrue( $options->{reverse} ) );
+
+    #TODO: $options should become redundant
+    $resultset->sortResults($options);
+    return $resultset;
+}
+
+#ok, for initial validation, naively call the code with a web.
+sub _webQuery {
     my ( $query, $web, $inputTopicSet, $session, $options ) = @_;
     ASSERT( scalar( @{ $query->{tokens} } ) > 0 ) if DEBUG;
 
