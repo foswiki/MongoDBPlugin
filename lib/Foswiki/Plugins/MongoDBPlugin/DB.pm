@@ -23,6 +23,7 @@ package Foswiki::Plugins::MongoDBPlugin::DB;
 # Always use strict to enforce variable scoping
 use strict;
 use MongoDB;
+use Assert;
 
 sub new {
     my $class  = shift;
@@ -40,6 +41,9 @@ sub update {
     my $collectionName = shift;
     my $address        = shift;
     my $hash           = shift;
+
+#    use Data::Dumper;
+#print STDERR "+++++ mongo update $address == ".Dumper($hash)."\n";
 
     my $collection = $self->_getCollection($collectionName);
 
@@ -74,6 +78,7 @@ sub _connect {
             host => $self->{host},
             port => $self->{port}
         );
+	ASSERT($self->{connection}) if DEBUG;
     }
     return $self->{connection};
 }

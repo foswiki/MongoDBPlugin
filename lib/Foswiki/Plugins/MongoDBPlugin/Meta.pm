@@ -43,6 +43,7 @@ sub new {
     my @validKeys = keys(%Foswiki::Meta::VALIDATE);
     push( @validKeys, '_text' );
     @$meta{@validKeys} = @$data{@validKeys};
+#print STDERR ": make me a new MongoDB::Meta with $web.$topic \n";
 
     return $meta;
 }

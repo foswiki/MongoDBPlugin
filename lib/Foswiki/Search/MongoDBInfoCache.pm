@@ -38,6 +38,14 @@ sub new {
     return $this;
 }
 
+sub numberOfTopics {
+    my $this = shift;
+
+    #count(1) takes into account the skip and limit settings
+    #TODO: make sure that this is what we want..
+    return $this->{_cursor}->count(1);
+}
+
 sub hasNext {
     my $this = shift;
     return $this->{_cursor}->has_next;
@@ -46,7 +54,8 @@ sub hasNext {
 sub next {
     my $this = shift;
     my $obj  = $this->{_cursor}->next;
-    return $obj->{_topic};
+
+    return $obj->{_web}.'.'.$obj->{_topic};
 }
 sub reset { return 0; }
 sub all   { die 'not implemented'; }

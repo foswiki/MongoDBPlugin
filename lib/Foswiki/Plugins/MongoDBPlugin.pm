@@ -70,7 +70,18 @@ sub afterSaveHandler {
     my ( $text, $topic, $web, $error, $meta ) = @_;
 
     $meta->{_raw_text} = $meta->getEmbeddedStoreForm();
-    return getMongoDB()->update( 'current', "$web.$topic", $meta );
+
+#TODO: WARNING: this needs to be moved up the tree - we're serialising all references in the topic obj, and _session is huge, _indices can contain TOPICPARENT with '' as key
+    my $_sess = $meta->{_session};
+    my $_indices = $meta->{_indices};
+    delete ($meta->{_indices});
+    delete ($meta->{_session});
+
+    my $ret = getMongoDB()->update( 'current', "$web.$topic", $meta );
+    $meta->{_session} = $_sess;
+    $meta->{_indices} = $_indices;
+
+	return $ret;
 }
 
 #mmmm
@@ -122,7 +133,6 @@ sub _update {
     my $count = 0;
     foreach my $topic (@topicList) {
         my ( $meta, $text ) = Foswiki::Func::readTopic( $web, $topic );
-        print STDERR "---- $web . $topic \n";
         
         $meta->{_raw_text} = $meta->getEmbeddedStoreForm();
         getMongoDB()->update( 'current', "$web.$topic", $meta );

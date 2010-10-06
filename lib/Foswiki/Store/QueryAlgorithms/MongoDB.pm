@@ -20,14 +20,20 @@ speed and memory size. It also depends on the complexity of the query.
 package Foswiki::Store::QueryAlgorithms::MongoDB;
 use strict;
 
-#@ISA = ( 'Foswiki::Query::QueryAlgorithms' ); # interface
+BEGIN {
+    #enable the MongoDBPlugin which keeps the mongodb uptodate with topics changes onsave 
+#TODO: make conditional - or figure out how to force this in the MongoDB search and query algo's 
+$Foswiki::cfg{Plugins}{MongoDBPlugin}{Module} = 'Foswiki::Plugins::MongoDBPlugin'; 
+$Foswiki::cfg{Plugins}{MongoDBPlugin}{Enabled} = 1; 
+$Foswiki::cfg{Plugins}{MongoDBPlugin}{EnableOnSaveUpdates} = 1; 
+print STDERR "****** starting MongoDBPlugin..\n";
+}
 
 use Foswiki::Search::Node ();
-
-#use Foswiki::Meta         ();
 use Foswiki::Plugins::MongoDBPlugin       ();
 use Foswiki::Plugins::MongoDBPlugin::Meta ();
 use Foswiki::Search::InfoCache;
+use Data::Dumper;
 
 # See Foswiki::Query::QueryAlgorithms.pm for details
 sub query {
@@ -126,17 +132,18 @@ sub _webQuery {
 
 #TODO: clearly _this_ can be re-written as a FilterIterator, and if we are able to use the sorting hints (ie DB Store) can propogate all the way to FORMAT
 
-        print STDERR "WARNING: couldn't hoistREs on " . $query->toString();
+#        print STDERR "WARNING: couldn't hoistREs on " . Dumper($query);
     }
 
     #print STDERR "))))".$query->toString()."((((\n";
-    use Data::Dumper;
-    print STDERR "--------Query::MongoDB \n" . Dumper($query) . "\n";
+#    print STDERR "--------Query::MongoDB \n" . Dumper($query) . "\n";
     my $resultTopicSet =
       new Foswiki::Search::InfoCache( $Foswiki::Plugins::SESSION, $web );
     local $/;
     while ( $topicSet->hasNext() ) {
-        my $topic = $topicSet->next();
+        my $webtopic = $topicSet->next();
+        my ( $Iweb, $topic ) =
+          Foswiki::Func::normalizeWebTopicName( $web, $webtopic );
 
 #my $meta = Foswiki::Meta->new( $session, $web, $topic );
 #GRIN: curiously quick hack to use the MongoDB topics rather than from disk - should have no positive effect on performance :)
@@ -153,9 +160,9 @@ sub _webQuery {
         # is intended to include different revisions of the same topic
         # or not. See BruteForce.pm for analagous code.
         $meta->loadVersion() unless ( $meta->getLoadedRev() );
-        next unless ( $meta->getLoadedRev() );
         print STDERR "Processing $topic\n"
           if ( Foswiki::Query::Node::MONITOR_EVAL() );
+        next unless ( $meta->getLoadedRev() );
         my $match = $query->evaluate( tom => $meta, data => $meta );
         if ($match) {
             $resultTopicSet->addTopic($meta);

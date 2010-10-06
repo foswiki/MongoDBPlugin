@@ -3,6 +3,7 @@ data/System/MongoDBPlugin.txt 0644 Documentation
 lib/Foswiki/Plugins/MongoDBPlugin.pm 0644 Perl module
 lib/Foswiki/Plugins/MongoDBPlugin/DB.pm 0644 Perl module
 lib/Foswiki/Plugins/MongoDBPlugin/Meta.pm 0644 Perl module
+lib/Foswiki/Plugins/MongoDBPlugin/Config.spec 0644 Config file
 lib/Foswiki/Store/QueryAlgorithms/MongoDB.pm 0644 Perl module
 lib/Foswiki/Store/SearchAlgorithms/MongoDB.pm 0644 Perl module
 lib/Foswiki/Search/MongoDBInfoCache.pm 0644 Perl module

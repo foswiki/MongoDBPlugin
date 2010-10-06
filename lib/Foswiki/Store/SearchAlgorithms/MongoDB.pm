@@ -6,6 +6,15 @@ use strict;
 use Assert;
 use Foswiki::Search::MongoDBInfoCache;
 
+BEGIN {
+    #enable the MongoDBPlugin which keeps the mongodb uptodate with topics changes onsave 
+#TODO: make conditional - or figure out how to force this in the MongoDB search and query algo's 
+$Foswiki::cfg{Plugins}{MongoDBPlugin}{Module} = 'Foswiki::Plugins::MongoDBPlugin'; 
+$Foswiki::cfg{Plugins}{MongoDBPlugin}{Enabled} = 1; 
+$Foswiki::cfg{Plugins}{MongoDBPlugin}{EnableOnSaveUpdates} = 1; 
+print STDERR "****** starting MongoDBPlugin..\n";
+}
+
 =begin TML
 
 ---+ package Foswiki::Store::SearchAlgorithms::MongoDB
@@ -46,6 +55,8 @@ sub search {
     # Convert GNU grep \< \> syntax to \b
     $searchString =~ s/(?<!\\)\\[<>]/\\b/g;
     $searchString =~ s/^(.*)$/\\b$1\\b/go if $options->{'wordboundaries'};
+#$searchString =~ s/\\"/./g;
+#$searchString =~ s/\\b//g;
 
     my $casesensitive =
       defined( $options->{casesensitive} ) ? $options->{casesensitive} : 1;
@@ -131,9 +142,9 @@ sub _webQuery {
 
     my $topicSet = $inputTopicSet;
 
-    print STDERR "######## Search::MongoDB query ($web) tokens "
-      . scalar( @{ $query->{tokens} } ) . " : "
-      . join( ',', @{ $query->{tokens} } ) . "\n";
+    #print STDERR "######## Search::MongoDB query ($web) tokens "
+    #  . scalar( @{ $query->{tokens} } ) . " : "
+    #  . join( ',', @{ $query->{tokens} } ) . "\n";
 
 #TODO:
 #               the query & search functions in the query&search algo just _create_ the hash for the query
@@ -173,7 +184,8 @@ sub _webQuery {
         
         #TODO: work out why mongo hates ^%META
         #TODO: make a few more unit tests with ^ in them
-        $token =~ s/^\^%META//;
+        #(adding 'm' to the options isn't it
+        $token =~ s/\^%META/%META/g;
 
 #TODO: ** this code is totally broken when scope == all.
 #probably need to reimplement this using the mapreduce querys with temporary collections that can be re-queried.
@@ -229,6 +241,9 @@ sub _webQuery {
             $searchString =~ s/(?<!\\)\\[<>]/\\b/g;
             $searchString =~ s/^(.*)$/\\b$1\\b/go
               if $options->{'wordboundaries'};
+#$searchString =~ s/\\"/./g;
+#$searchString =~ s/\\b//g;
+
 
             if ($invertSearch) {
                 push(
@@ -263,7 +278,7 @@ sub doMongoSearch {
     my $options  = shift;
     my $elements = shift;
 
-    print STDERR "######## Search::MongoDB search ($web)  \n";
+    #print STDERR "######## Search::MongoDB search ($web)  \n";
     require Foswiki::Plugins::MongoDBPlugin;
     require Foswiki::Plugins::MongoDBPlugin::DB;
     my $collection =
@@ -308,7 +323,7 @@ sub doMongoSearch {
 
     my $cursor = $collection->query($ixhQuery);
 
-    print STDERR "found " . $cursor->count . "\n";
+    #print STDERR "found " . $cursor->count . "\n";
 
     return $cursor;
 }
@@ -322,7 +337,7 @@ sub convertQueryToJavascript {
     my $invertedNot  = ( $not eq '!' ) ? '' : '!';
 
     return '' if ( $regex eq '' );
-
+    
     return <<"HERE";
             { 
                 $name = /$regex/$regexoptions ; 
