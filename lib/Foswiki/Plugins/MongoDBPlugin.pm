@@ -205,6 +205,21 @@ sub _MONGODB {
     );
 }
 
+# getListOfWebs was moved after 1.1, see Item9814. Should it use Foswiki::Func?
+sub _getListOfWebs {
+    my ( $webNames, $recurse, $searchAllFlag ) = @_;
+
+    if ( defined &Foswiki::Search::InfoCache::_getListOfWebs )  {
+       # Foswiki 1.1
+       return Foswiki::Search::InfoCache::_getListOfWebs( $webNames, $recurse,
+         $searchAllFlag );
+    } else {
+       require Foswiki::Store::Interfaces::SearchAlgorithm;
+       return Foswiki::Store::Interfaces::SearchAlgorithm::getListOfWebs(
+         $webNames, $recurse, $searchAllFlag );
+    }
+}
+
 1;
 __END__
 This copyright information applies to the MongoDBPlugin:
