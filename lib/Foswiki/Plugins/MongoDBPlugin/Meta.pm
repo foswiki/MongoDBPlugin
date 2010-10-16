@@ -37,13 +37,40 @@ sub new {
 
     #my $meta = new Foswiki::Meta($session, $web, $topic );
     my $meta = $class->SUPER::new( $session, $web, $topic );
+#print STDERR ": make me a new MongoDB::Meta with $web.$topic \n";
 
 #TODO: if $data is undef - see if its in mongoDB already, and if so, load it... ((OR... this should happen in the load/reload mess))
 
     my @validKeys = keys(%Foswiki::Meta::VALIDATE);
     push( @validKeys, '_text' );
     @$meta{@validKeys} = @$data{@validKeys};
-#print STDERR ": make me a new MongoDB::Meta with $web.$topic \n";
+    
+#doooooood, shouln't this be in the reload?
+#TODO: as of Oct 2010, mongodb can't sort on an element in an array, so we re-array the TOPICINFO.
+    $meta->{TOPICINFO} = [$meta->{TOPICINFO}];
+    $meta->{TOPICPARENT} = [$meta->{TOPICPARENT}];
+    
+    if (defined($meta->{FIELD})) {
+        my %FIELD = $meta->{FIELD};
+        $meta->{FIELD} = [];
+        foreach my $elem (keys(%FIELD)) {
+            push(@{$meta->{FIELD}}, $FIELD{$elem});
+        }
+    }
+    if (defined($meta->{FILEATTACHMENT})) {
+        my %FILEATTACHMENT = $meta->{FILEATTACHMENT};
+        $meta->{FILEATTACHMENT} = [];
+        foreach my $elem (keys(%FILEATTACHMENT)) {
+            push(@{$meta->{FILEATTACHMENT}}, $FILEATTACHMENT{$elem});
+        }
+    }
+    if (defined($meta->{PREFERENCE})) {
+        my %PREFERENCE = $meta->{PREFERENCE};
+        $meta->{PREFERENCE} = [];
+        foreach my $elem (keys(%PREFERENCE)) {
+            push(@{$meta->{PREFERENCE}}, $PREFERENCE{$elem});
+        }
+    }
 
     return $meta;
 }

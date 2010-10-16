@@ -30,6 +30,7 @@ print STDERR "****** starting MongoDBPlugin..\n";
 }
 
 use Foswiki::Search::Node ();
+use Foswiki::Store::SearchAlgorithms::MongoDB();
 use Foswiki::Plugins::MongoDBPlugin       ();
 use Foswiki::Plugins::MongoDBPlugin::Meta ();
 use Foswiki::Search::InfoCache;
@@ -124,9 +125,10 @@ sub _webQuery {
           new Foswiki::Search::Node( $query->toString(), \@filter,
             $searchOptions );
          $topicSet->reset();
-        $topicSet =
-          $session->{store}->searchInWebMetaData(
-              $searchQuery, $web, $topicSet, $session, $searchOptions );
+
+        #for now we're kicking down to regex to reduce the set we then brute force query.
+        #next itr we start to HoistMongoDB
+        $topicSet = Foswiki::Store::SearchAlgorithms::MongoDB::_webQuery ( $searchQuery, $web, $topicSet, $session, $searchOptions );
     }
     else {
 

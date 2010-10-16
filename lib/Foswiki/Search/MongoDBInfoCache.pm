@@ -85,6 +85,7 @@ sub addTopic {
 }
 
 =begin TML
+
 ---++ sortResults
 
 IMPLEMENTME
@@ -94,7 +95,7 @@ IMPLEMENTME
 sub sortResults {
     my ( $infoCache, $web, $params ) = @_;
     my $session = $infoCache->{_session};
-    return;
+return; #########################NOP
     my $sortOrder = $params->{order} || '';
     my $revSort   = Foswiki::isTrue( $params->{reverse} );
     my $date      = $params->{date} || '';

@@ -19,9 +19,13 @@ At this point the Plugin is used to populate the MongoDB. All user topic Saves a
 ---++ Technical details
 This initial version serialises the internal Meta object directly into _one_ collection, using web.name as a unique index.
 
-It was written for an older version of MongoDB, which did not support the =OR= operator, so uses regex's to implement =OR=.
+In the process showing a proof of concept that works 
 
-In the process shoing a proof of concept that works (so long as each of your topics (as stored internally in the Meta obj) are all smaller than 4M.
+Sorting works for fields that are strings, but doesn't yet manage to autoconvert to numerical sorting if all fields happen to contain only numerical characters.
+
+---+++ Caveats
+   1 Your topics (as stored internally in the Meta obj) must be smaller than 4M.
+   2 the schema is likely to change regularly, so when upgrading, re-importing will probably be necessary
 
 ---++ Installation Instructions
 

@@ -50,13 +50,26 @@ sub update {
 #TODO: not the most efficient place to create and index, but I want to be sure, to be sure.
     $collection->ensure_index( { _topic => 1 } );
     $collection->ensure_index( { _topic => 1, _web => 1 }, { unique => 1 } );
-#TODO: really should use the auto indexed '_id'
+#TODO: really should use the auto indexed '_id' (or maybe we can use this as a tuid - unique foreach rev of each topic..)
 
     $collection->update(
         { address  => $address },
         { address  => $address, %$hash },
         { 'upsert' => 1 }
     );
+}
+
+sub remove {
+    my $self           = shift;
+    my $collectionName = shift;
+    my $hash           = shift;
+
+#    use Data::Dumper;
+#print STDERR "+++++ mongo remove $address == ".Dumper($hash)."\n";
+
+    my $collection = $self->_getCollection($collectionName);
+
+    $collection->remove( $hash );
 }
 
 #######################################################

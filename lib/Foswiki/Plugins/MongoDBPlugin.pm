@@ -68,20 +68,10 @@ sub afterSaveHandler {
       ;    #disabled - they can make save's take too long
 
     my ( $text, $topic, $web, $error, $meta ) = @_;
+#print STDERR "afterSaveHandler ( text, $topic, $web, error )\n";
+    _updateTopic($web, $topic, $meta);
 
-    $meta->{_raw_text} = $meta->getEmbeddedStoreForm();
-
-#TODO: WARNING: this needs to be moved up the tree - we're serialising all references in the topic obj, and _session is huge, _indices can contain TOPICPARENT with '' as key
-    my $_sess = $meta->{_session};
-    my $_indices = $meta->{_indices};
-    delete ($meta->{_indices});
-    delete ($meta->{_session});
-
-    my $ret = getMongoDB()->update( 'current', "$web.$topic", $meta );
-    $meta->{_session} = $_sess;
-    $meta->{_indices} = $_indices;
-
-	return $ret;
+	return;
 }
 
 #mmmm
@@ -93,7 +83,10 @@ sub DISABLED_afterRenameHandler {
     my ( $oldWeb, $oldTopic, $oldAttachment, $newWeb, $newTopic,
         $newAttachment ) = @_;
 
-    return getMongoDB()->rename();
+print STDERR "afterRenameHandler: ( $oldWeb, $oldTopic, $oldAttachment, $newWeb, $newTopic,
+        $newAttachment )\n";
+
+    #eturn getMongoDB()->rename();
 }
 
 sub DISABLED_afterAttachmentSaveHandler {
@@ -103,7 +96,7 @@ sub DISABLED_afterAttachmentSaveHandler {
 
     my ( $attrHashRef, $topic, $web ) = @_;
 
-    return getMongoDB()->udpateAttachment();
+    return getMongoDB()->updateAttachment();
 }
 
 ################################################################################################################
@@ -134,13 +127,52 @@ sub _update {
     foreach my $topic (@topicList) {
         my ( $meta, $text ) = Foswiki::Func::readTopic( $web, $topic );
         
-        $meta->{_raw_text} = $meta->getEmbeddedStoreForm();
-        getMongoDB()->update( 'current', "$web.$topic", $meta );
+        _updateTopic($web, $topic, $meta);
+
         $count++;
     }
 
     return $count;
 }
+
+sub _updateTopic {
+    my $web = shift;
+    my $topic = shift;
+    my $savedMeta = shift;
+    
+    my $meta = {_web => $web,
+                _topic => $topic};
+    
+    foreach my $key (keys(%$savedMeta)) {
+        next if ($key eq '_session');
+        next if ($key eq '_indices');
+        
+        #TODO: as of Oct 2010, mongodb can't sort on an element in an array, so we de-array the ARRAYs.
+        if (
+                ($key eq 'TOPICINFO') or
+                ($key eq 'TOPICPARENT')
+            ) {
+            $meta->{$key} = $savedMeta->{$key}[0];
+        } elsif (    #probably should just 'if ARRAY' but that makes it harder to un-array later.
+                ($key eq 'FILEATTACHMENT') or
+                ($key eq 'FIELD') or
+                ($key eq 'PREFERENCE') 
+            ) {
+            my $FIELD = $savedMeta->{$key};
+            $meta->{$key} = {};
+            foreach my $elem (@$FIELD) {
+                $meta->{$key}{$elem->{name}} = $elem;
+            }
+            next;
+        }
+        
+    }
+    
+    $meta->{_raw_text} = $savedMeta->getEmbeddedStoreForm();
+   
+    my $ret = getMongoDB()->update( 'current', "$web.$topic", $meta );
+}
+
 
 # The function used to handle the %EXAMPLETAG{...}% macro
 # You would have one of these for each macro you want to process.

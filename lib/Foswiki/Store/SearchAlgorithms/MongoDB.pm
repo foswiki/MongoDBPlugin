@@ -4,7 +4,11 @@ package Foswiki::Store::SearchAlgorithms::MongoDB;
 
 use strict;
 use Assert;
+use Foswiki::Plugins::MongoDBPlugin;
+use Foswiki::Plugins::MongoDBPlugin::DB;
 use Foswiki::Search::MongoDBInfoCache;
+use Data::Dumper;
+
 
 BEGIN {
     #enable the MongoDBPlugin which keeps the mongodb uptodate with topics changes onsave 
@@ -117,7 +121,7 @@ sub query {
             && $web ne $session->{webName} );
 
         my $infoCache =
-          _webQuery( $query, $web, $inputTopicSet, $session, $options );
+              _webQuery( $query, $web, $inputTopicSet, $session, $options );
         $infoCache->sortResults($options);
         push( @resultCacheList, $infoCache );
     }
@@ -152,7 +156,11 @@ sub _webQuery {
 #               and from there the cursor is used.
 #nonetheless, the rendering of 2000 results takes much longer than the querying, but as the 2 are on separate servers, everything is golden :)
 
-    my %elements;
+#use IxHash to keep the hash order - _some_ parts of queries are order sensitive
+    my %mongoQuery = ();
+    my $ixhQuery            = tie( %mongoQuery, 'Tie::IxHash' );
+    #    $ixhQuery->Push( $scope => $elem );
+
 
 #TODO: Mongo advanced query docco indicates that /^a/ is faster than /^a.*/ and /^a.*$/ so should refactor to that.
     my $includeTopicsRegex =
@@ -162,21 +170,21 @@ sub _webQuery {
       Foswiki::Search::MongoDBInfoCache::convertTopicPatternToRegex(
         $options->{excludetopic} );
     if ( $includeTopicsRegex ne '' ) {
-        push( @{ $elements{_topic} }, { '$regex' => $includeTopicsRegex } );
+        $ixhQuery->Push( '_topic' => { '$regex' => $includeTopicsRegex } );
     }
     if ( $excludeTopicsRegex ne '' ) {
-        push(
-            @{ $elements{_topic} },
+        $ixhQuery->Push( '_topic' => 
             { '$not' => { '$regex' => $excludeTopicsRegex } }
         );
     }
 
-    push( @{ $elements{_web} }, $web );
+    $ixhQuery->Push( '_web' => $web );
 
     my $casesensitive =
       defined( $options->{casesensitive} ) ? $options->{casesensitive} : 0;
 
-    foreach my $token ( @{ $query->{tokens} } ) {
+    foreach my $raw_token ( @{ $query->{tokens} } ) {
+        my $token = $raw_token;
 
         # flag for AND NOT search
         my $invertSearch = 0;
@@ -186,43 +194,31 @@ sub _webQuery {
         #TODO: make a few more unit tests with ^ in them
         #(adding 'm' to the options isn't it
         $token =~ s/\^%META/%META/g;
-
-#TODO: ** this code is totally broken when scope == all.
-#probably need to reimplement this using the mapreduce querys with temporary collections that can be re-queried.
+        
+        my $raw_text_regex;
+        my $topic_regex;
 
         # scope can be 'topic' (default), 'text' or "all"
         # scope='topic', e.g. Perl search on topic name:
         if ( $options->{'scope'} ne 'text' ) {
             my $searchString = $token;
-
             # FIXME I18N
             if ( $options->{'type'} ne 'regex' ) {
                 $searchString = quotemeta($searchString);
             }
 
+            my $theRe = ( $casesensitive ? qr/$searchString/ : qr/$searchString/i );
+    
             if ($invertSearch) {
-                push(
-                    @{ $elements{_topic} },
-                    {
-                        '$not' => {
-                            '$regex'   => $searchString,
-                            '$options' => ( $casesensitive ? '' : 'i' )
-                        }
-                    }
-                );
-            }
-            else {
-                push(
-                    @{ $elements{_topic} },
-                    {
-                        '$regex'   => $searchString,
-                        '$options' => ( $casesensitive ? '' : 'i' )
-                    }
-                );
+                #push(@ORed, { '_topic' => {'$not' => $theRe }});
+                $ixhQuery->Push( '_topic' => {'$not' => $theRe } );
+            } else {
+                $topic_regex = $theRe;
             }
         }
 
         # scope='text', e.g. grep search on topic text:
+        #TODO: this is actually incorrect for scope="both", as we need to OR the _topic and _topic_raw results SOOO, we fake it further up
         if ( $options->{'scope'} ne 'topic' ) {
             my $searchString = $token;
             if ( $options->{type} && $options->{type} eq 'regex' ) {
@@ -244,31 +240,57 @@ sub _webQuery {
 #$searchString =~ s/\\"/./g;
 #$searchString =~ s/\\b//g;
 
-
+            my $theRe = ( $casesensitive ? qr/$searchString/ : qr/$searchString/i );
+        
             if ($invertSearch) {
-                push(
-                    @{ $elements{_raw_text} },
-                    {
-                        '$not' => {
-                            '$regex'   => $searchString,
-                            '$options' => ( $casesensitive ? '' : 'i' )
-                        }
-                    }
-                );
+                #push(@ORed, { '_raw_text' => {'$not' => $theRe }});
+                $ixhQuery->Push( '_raw_text' => {'$not' => $theRe } );
+            } else {
+                $raw_text_regex = $theRe;
             }
-            else {
-                push(
-                    @{ $elements{_raw_text} },
-                    {
-                        '$regex'   => $searchString,
-                        '$options' => ( $casesensitive ? '' : 'i' )
-                    }
-                );
+            
+            if ($invertSearch) {
+            } else {
+                if (defined($topic_regex) and defined($raw_text_regex)) {
+                    #$ixhQuery->Push( '$or' => [$ORed[0], $ORed[1]] );
+                    $ixhQuery->Push( '$or' => [{'_topic' => $topic_regex}, {_raw_text => $raw_text_regex}] );
+                } else {
+                    $ixhQuery->Push( '_topic' => $topic_regex ) if defined($topic_regex);
+                    $ixhQuery->Push( '_raw_text' => $raw_text_regex ) if defined($raw_text_regex);
+                }
             }
         }
+        
     }    #end foreach
+    
+    #limit, skip, sort_by
+    my $SortDirection   = Foswiki::isTrue( $options->{reverse} )? -1 : 1;
+#ME bets casesensitive Sorting has no unit tests..
+#order="topic"
+#order="created"
+#order="modified"
+#order="editby"
+#order="formfield(name)"    
+#reverse="on"
+    my %sortKeys = (
+        topic => '_topic',
+        #created => ,   #TODO: don't yet have topic histories in mongo
+        modified => 'TOPICINFO.date',
+        editby => 'TOPICINFO.author', 
+    );
 
-    my $cursor = doMongoSearch( $web, $options, \%elements );
+    my $queryAttrs = {};
+    my $orderBy = $sortKeys{$options->{order}||'topic'}; 
+    if (defined($orderBy)) {
+        $queryAttrs = { sort_by => {$orderBy => $SortDirection } };
+    } else {
+        if ($options->{order} =~ /formfield\((.*)\)/) {
+            $orderBy = 'FIELD.'.$1;
+            $queryAttrs = { sort_by => {$orderBy => $SortDirection } };
+        }
+    }
+
+    my $cursor = doMongoSearch( $web, $options, $ixhQuery, $queryAttrs );
     return new Foswiki::Search::MongoDBInfoCache( $Foswiki::Plugins::SESSION,
         $web, $options, $cursor );
 }
@@ -276,54 +298,16 @@ sub _webQuery {
 sub doMongoSearch {
     my $web      = shift;
     my $options  = shift;
-    my $elements = shift;
-
-    #print STDERR "######## Search::MongoDB search ($web)  \n";
-    require Foswiki::Plugins::MongoDBPlugin;
-    require Foswiki::Plugins::MongoDBPlugin::DB;
+    my $ixhQuery = shift;
+    my $queryAttrs = shift;
+    
+#print STDERR "######## Search::MongoDB search ($web)  \n";
+#print STDERR "querying mongo: ".Dumper($ixhQuery)." , ".Dumper($queryAttrs)."\n";
     my $collection =
       Foswiki::Plugins::MongoDBPlugin::getMongoDB()->_getCollection('current');
+    my $cursor = $collection->query($ixhQuery, $queryAttrs);
 
-    my %mongoQuery = ();
-
-#use IxHash to keep the hash order - leaving the javascript $where function to be called last.
-    my $ixhQuery            = tie( %mongoQuery, 'Tie::IxHash' );
-    my $mongoJavascriptFunc = '';
-    my $counter             = 1;
-
-    #pop off the first query element foreach scope and use that literally
-    #foreach my $scope (keys(%{$elements})) {
-    #lets order it so that we can reduce the test set quickly.
-    foreach my $scope (qw/_topic _web _text _raw_text/) {
-        foreach my $elem ( @{ $elements->{$scope} } ) {
-            if ( !defined( $mongoQuery{$scope} ) ) {
-                $ixhQuery->Push( $scope => $elem );
-            }
-            else {
-                my $not = $elem->{'$not'};
-                if ( defined($not) ) {
-                    $elem = $not;
-                    $not  = '!';
-                }
-                my $casesensitive = $elem->{'$options'};
-                my $reg           = $elem->{'$regex'};
-                $mongoJavascriptFunc .=
-                  convertQueryToJavascript( 'query' . $counter,
-                    $scope, $reg, $casesensitive, $not );
-                $counter++;
-            }
-        }
-    }
-    if ( $counter > 1 ) {
-        $mongoJavascriptFunc =
-          'function() {' . $mongoJavascriptFunc . 'return true;}';
-        $ixhQuery->Push( '$where' => $mongoJavascriptFunc );
-        print STDERR "------$mongoJavascriptFunc\n";
-    }
-
-    my $cursor = $collection->query($ixhQuery);
-
-    #print STDERR "found " . $cursor->count . "\n";
+#print STDERR "found " . $cursor->count . "\n";
 
     return $cursor;
 }
