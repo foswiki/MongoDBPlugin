@@ -1,0 +1,75 @@
+%META:TOPICPARENT{name="MongoDBPlugin"}%
+
+---++ MongoDBPlugin load webs utility
+
+<a id="mongoloadall" href="#">Load all</a>, or load individually:
+
+| *Web* | *Action* |
+%SEARCH{
+  "name='WebPreferences'"
+  type="query"
+  web="all"
+  recurse="on"
+  nonoise="on"
+  format="| [[$web.$topic][$web]] | <span class='mongoweb'><a class='mongoloadone' href='#'>load</a>\
+    <span class='mongowebname' style='display: none;'><literal>$web</literal></span>\
+    <span class='mongowebresult'></span></span>|"
+}%
+
+<!--
+%ADDTOZONE{
+  "script"
+  requires="JQUERYPLUGIN"
+  topic="%TOPIC%"
+  section="js"
+}%
+%STARTSECTION{"js"}%<script type="text/javascript">
+jQuery(document).ready(
+  function ($) {
+    var doWeb = function (element) {
+      var webname = $(element).children('.mongowebname').text();
+      $(element).children('.mongowebresult').load('%SCRIPTURLPATH{"rest"}%/MongoDBPlugin/update?updateweb=' + webname);
+
+      return;
+    },
+    webIndex = 0,
+    webs = $('.mongoweb'),
+    doNextWeb = function () {
+      var webname, element;
+      
+      if (webIndex < webs.length) {
+        element = webs[webIndex];
+        webIndex = webIndex + 1;
+        webname = $(element).children('.mongowebname').text();
+        $(element).children('.mongowebresult').load(
+          '%SCRIPTURLPATH{"rest"}%/MongoDBPlugin/update?updateweb=' + webname,
+          doNextWeb
+        );
+      }
+
+      return;
+    };
+
+    $('.mongoloadone').each(
+      function (index, element) {
+        $(element).click(
+          function () {
+            doWeb($(element).parent());
+
+            return false;
+          }
+        );
+      }
+    );
+
+    $('#mongoloadall').click(
+      function () {
+        doNextWeb();
+
+        return false;
+      }
+    );
+  }
+);
+</script>%ENDSECTION{"js"}%
+-->

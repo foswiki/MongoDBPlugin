@@ -1,3 +1,4 @@
+%META:TOPICPARENT{name="Plugins"}%
 ---+!! !MongoDBPlugin
 <!--
 One line description, required for extensions repository catalog.
