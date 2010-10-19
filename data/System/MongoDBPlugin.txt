@@ -27,6 +27,8 @@ Sorting works for fields that are strings, but doesn't yet manage to autoconvert
 ---+++ Caveats
    1 Your topics (as stored internally in the Meta obj) must be smaller than 4M.
    2 the schema is likely to change regularly, so when upgrading, re-importing will probably be necessary
+   3 tested with foswiki 1.1.0, _not_ trunk
+   4 the query SEARCH =~ operator is currently not Hoisted to a regex, so is un-necessarily slow (both with and without mongodb)
 
 ---++ Installation Instructions
 

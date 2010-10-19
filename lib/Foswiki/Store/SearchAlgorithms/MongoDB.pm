@@ -166,15 +166,19 @@ sub _webQuery {
     my $includeTopicsRegex =
       Foswiki::Search::MongoDBInfoCache::convertTopicPatternToRegex(
         $options->{topic} );
+    if ( $includeTopicsRegex ne '' ) {
+        $includeTopicsRegex = qr/$includeTopicsRegex/;
+        $ixhQuery->Push( '_topic' => $includeTopicsRegex );
+    }
+
+
     my $excludeTopicsRegex =
       Foswiki::Search::MongoDBInfoCache::convertTopicPatternToRegex(
         $options->{excludetopic} );
-    if ( $includeTopicsRegex ne '' ) {
-        $ixhQuery->Push( '_topic' => { '$regex' => $includeTopicsRegex } );
-    }
     if ( $excludeTopicsRegex ne '' ) {
+        $excludeTopicsRegex = qr/$excludeTopicsRegex/;
         $ixhQuery->Push( '_topic' => 
-            { '$not' => { '$regex' => $excludeTopicsRegex } }
+            { '$not' => $excludeTopicsRegex }
         );
     }
 
