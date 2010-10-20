@@ -32,6 +32,7 @@ our $SHORTDESCRIPTION =
 our $NO_PREFS_IN_TOPIC = 1;
 our $pluginName        = 'MongoDBPlugin';
 
+#this can also be disabled by the listener
 our $enableOnSaveUpdates = 0;
 
 =begin TML
@@ -48,8 +49,7 @@ our $enableOnSaveUpdates = 0;
 
 sub initPlugin {
     my ( $topic, $web, $user, $installWeb ) = @_;
-
-#$debug = $Foswiki::cfg{Plugins}{KinoSearchPlugin}{Debug} || 0;
+    
     $enableOnSaveUpdates = $Foswiki::cfg{Plugins}{$pluginName}{EnableOnSaveUpdates} || 0;
 
     #SMELL: ew
@@ -139,6 +139,8 @@ sub _updateTopic {
     my $web = shift;
     my $topic = shift;
     my $savedMeta = shift;
+    
+#print STDERR "-update($web, $topic)\n";
     
     my $meta = {_web => $web,
                 _topic => $topic};

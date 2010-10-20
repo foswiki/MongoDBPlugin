@@ -243,6 +243,8 @@ sub _webQuery {
               if $options->{'wordboundaries'};
 #$searchString =~ s/\\"/./g;
 #$searchString =~ s/\\b//g;
+#$searchString =~ s/{/./g;
+#$searchString =~ s/:/./g;
 
             my $theRe = ( $casesensitive ? qr/$searchString/ : qr/$searchString/i );
         

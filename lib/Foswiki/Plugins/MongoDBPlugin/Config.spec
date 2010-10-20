@@ -17,6 +17,9 @@ $Foswiki::cfg{MongoDBPlugin}{password} = '';
 # database
 $Foswiki::cfg{MongoDBPlugin}{database} = 'foswiki';
 # **BOOLEAN**
-# update the mongoDB database on Save (when using Mongo as an accellerator, and not as a store)
+# FOswiki 1.x update the mongoDB database on Save (when using Mongo as an accellerator, and not as a store)
 $Foswiki::cfg{Plugins}{MongoDBPlugin}{EnableOnSaveUpdates} = 1; 
+# **BOOLEAN**
+# Foswiki 2.0 Store Listener - (when using Mongo as an accellerator, and not as a store)
+$Foswiki::cfg{Store}{Listeners}{'Foswiki::Plugins::MongoDBPlugin::Listener'} = 1; 
 
