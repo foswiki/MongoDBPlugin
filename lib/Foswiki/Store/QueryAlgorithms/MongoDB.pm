@@ -90,16 +90,7 @@ sub _webQuery {
 
 #SMELL: initialise the mongoDB hack. needed if the mondoPlugin is not enabled, but the algo is selected :/
     Foswiki::Plugins::MongoDBPlugin::getMongoDB();
-
-    require Foswiki::Query::HoistREs;
-    my $hoistedREs = Foswiki::Query::HoistREs::collatedHoist($query);
     
-    if ((!defined($options->{topic})) and 
-        ($hoistedREs->{name})) {
-            #set the 'includetopic' matcher..
-            #dammit, i have to de-regex it? thats mad.
-    }
-
     my $topicSet = $inputTopicSet;
     if ( !defined($topicSet) ) {
 
@@ -109,6 +100,51 @@ sub _webQuery {
         $topicSet =
           Foswiki::Search::InfoCache::getTopicListIterator( $webObject,
             $options );
+    }
+    {
+        #try HoistMongoDB first
+        require Foswiki::Plugins::MongoDBPlugin::HoistMongoDB;
+        my $mongoQuery = Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+        #limit, skip, sort_by
+        my $SortDirection   = Foswiki::isTrue( $options->{reverse} )? -1 : 1;
+    #ME bets casesensitive Sorting has no unit tests..
+    #order="topic"
+    #order="created"
+    #order="modified"
+    #order="editby"
+    #order="formfield(name)"    
+    #reverse="on"
+        my %sortKeys = (
+            topic => '_topic',
+            #created => ,   #TODO: don't yet have topic histories in mongo
+            modified => 'TOPICINFO.date',
+            editby => 'TOPICINFO.author', 
+        );
+
+        my $queryAttrs = {};
+        my $orderBy = $sortKeys{$options->{order}||'topic'}; 
+        if (defined($orderBy)) {
+            $queryAttrs = { sort_by => {$orderBy => $SortDirection } };
+        } else {
+            if ($options->{order} =~ /formfield\((.*)\)/) {
+                $orderBy = 'FIELD.'.$1;
+                $queryAttrs = { sort_by => {$orderBy => $SortDirection } };
+            }
+        }
+
+        my $cursor = doMongoSearch( $web, $options, $mongoQuery, $queryAttrs );
+        #return new Foswiki::Search::MongoDBInfoCache( $Foswiki::Plugins::SESSION,
+        #    $web, $options, $cursor );
+    }
+
+    #fall back to HoistRe
+    require Foswiki::Query::HoistREs;
+    my $hoistedREs = Foswiki::Query::HoistREs::collatedHoist($query);
+    
+    if ((!defined($options->{topic})) and 
+        ($hoistedREs->{name})) {
+            #set the 'includetopic' matcher..
+            #dammit, i have to de-regex it? thats mad.
     }
 
     #TODO: howto ask iterator for list length?
@@ -172,6 +208,46 @@ sub _webQuery {
     }
 
     return $resultTopicSet;
+}
+
+
+
+sub doMongoSearch {
+    my $web      = shift;
+    my $options  = shift;
+    my $ixhQuery = shift;
+    my $queryAttrs = shift;
+    
+#print STDERR "######## Query::MongoDB search ($web)  \n";
+print STDERR "querying mongo: ".Dumper($ixhQuery)." , ".Dumper($queryAttrs)."\n";
+    my $collection =
+      Foswiki::Plugins::MongoDBPlugin::getMongoDB()->_getCollection('current');
+    my $cursor = $collection->query($ixhQuery, $queryAttrs);
+
+print STDERR "found " . $cursor->count . "\n";
+
+    return $cursor;
+}
+
+sub convertQueryToJavascript {
+    my $name         = shift;
+    my $scope        = shift;
+    my $regex        = shift;
+    my $regexoptions = shift || '';
+    my $not          = shift || '';
+    my $invertedNot  = ( $not eq '!' ) ? '' : '!';
+
+    return '' if ( $regex eq '' );
+    
+    return <<"HERE";
+            { 
+                $name = /$regex/$regexoptions ; 
+                matched = $name.test(this.$scope);
+                if ($invertedNot(matched)) {
+                    return false; 
+                }
+             }
+HERE
 }
 
 # The getField function is here to allow for Store specific optimisations

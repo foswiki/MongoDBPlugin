@@ -308,7 +308,7 @@ sub doMongoSearch {
     my $queryAttrs = shift;
     
 #print STDERR "######## Search::MongoDB search ($web)  \n";
-#print STDERR "querying mongo: ".Dumper($ixhQuery)." , ".Dumper($queryAttrs)."\n";
+#print STDERR "searching mongo: ".Dumper($ixhQuery)." , ".Dumper($queryAttrs)."\n";
     my $collection =
       Foswiki::Plugins::MongoDBPlugin::getMongoDB()->_getCollection('current');
     my $cursor = $collection->query($ixhQuery, $queryAttrs);

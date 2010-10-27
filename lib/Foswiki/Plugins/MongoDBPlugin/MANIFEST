@@ -5,7 +5,10 @@ lib/Foswiki/Plugins/MongoDBPlugin.pm 0644 Perl module
 lib/Foswiki/Plugins/MongoDBPlugin/DB.pm 0644 Perl module
 lib/Foswiki/Plugins/MongoDBPlugin/Meta.pm 0644 Perl module
 lib/Foswiki/Plugins/MongoDBPlugin/Config.spec 0644 Config file
-lib/Foswiki/Plugins/MongoDBPlugin/Listener.pm 0644 Config file
+lib/Foswiki/Plugins/MongoDBPlugin/Listener.pm 0644 Store Listener
+lib/Foswiki/Plugins/MongoDBPlugin/HoistMongoDB.pm 0644 Hoist Queries into MongoDB queries
+
+test/unit/HoistMongoDBsTest.pm 0644 Unit tests
 
 lib/Foswiki/Store/QueryAlgorithms/MongoDB.pm 0644 Perl module
 lib/Foswiki/Store/SearchAlgorithms/MongoDB.pm 0644 Perl module
