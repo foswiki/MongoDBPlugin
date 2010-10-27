@@ -101,6 +101,8 @@ sub _webQuery {
           Foswiki::Search::InfoCache::getTopicListIterator( $webObject,
             $options );
     }
+    if (defined($Foswiki::cfg{Plugins}{MongoDBPlugin}{UnfinishedCode}) and 
+        $Foswiki::cfg{Plugins}{MongoDBPlugin}{UnfinishedCode})
     {
         #try HoistMongoDB first
         require Foswiki::Plugins::MongoDBPlugin::HoistMongoDB;
