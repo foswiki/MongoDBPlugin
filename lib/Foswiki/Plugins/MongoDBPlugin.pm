@@ -172,7 +172,15 @@ sub _updateTopic {
         {
             my $FIELD = $savedMeta->{$key};
             $meta->{$key} = {};
+            
             foreach my $elem (@$FIELD) {
+                if ($key eq 'FIELD') {
+                    #TODO: move this into the search algo, so it makes an index the first time someone builds an app that sorts on it.
+                    #even then, we have a hard limit of 40 indexes, so we're going to have to get more creative.
+                    #mind you, we don't really need indexes for speed, just to cope with query() resultsets that contain more than 1Meg of documents - so maybe we can delay creation until that happens?
+                    getMongoDB()->ensureIndex( 'current', { $key.'.'.$elem->{name} => 1 }, {name=>$key.'.'.$elem->{name}});
+                }
+                
                 $meta->{$key}{ $elem->{name} } = $elem;
             }
             next;
