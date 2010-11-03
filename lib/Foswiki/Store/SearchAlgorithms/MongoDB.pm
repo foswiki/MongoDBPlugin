@@ -265,6 +265,8 @@ sub _webQuery {
                     $ixhQuery->Push( '_raw_text' => $raw_text_regex ) if defined($raw_text_regex);
                 }
             }
+        } else {
+            $ixhQuery->Push( '_topic' => $topic_regex ) if defined($topic_regex);
         }
         
     }    #end foreach
