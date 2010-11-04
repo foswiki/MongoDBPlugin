@@ -162,6 +162,11 @@ sub _updateTopic {
 
 #shorcut version of the foreach below because atm, we know there is only one element in the array.
             $meta->{$key} = $savedMeta->{$key}[0];
+            if ($key eq 'TOPICINFO') {
+                #TODO: foswiki's sort by TOPICINFO.author sorts by WikiName, not CUID - so need to make an internal version of this
+                # to support sort=editby => 'TOPICINFO._authorWikiName', 
+                $meta->{$key}{_authorWikiName} = Foswiki::Func::getWikiName($meta->{$key}{author});
+            }
         }
         elsif
           ( #probably should just 'if ARRAY' but that makes it harder to un-array later.

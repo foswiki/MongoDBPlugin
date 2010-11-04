@@ -34,6 +34,9 @@ sub new {
     $this->{_defaultWeb}    = $defaultWeb;
     $this->{_SEARCHoptions} = $options;
     $this->{_cursor}        = $cursor;
+    
+    #TODO: this is to make sure we're getting the cursor->count before anyone uses the cursor.
+    $this->numberOfTopics();
 
     return $this;
 }
@@ -41,9 +44,21 @@ sub new {
 sub numberOfTopics {
     my $this = shift;
 
+    return $this->{cachedCount} if (defined($this->{cachedCount}));
     #count(1) takes into account the skip and limit settings
     #TODO: make sure that this is what we want..
-    return $this->{_cursor}->count(1);
+    my $count = $this->{_cursor}->count(1);
+    #TODO: find out if th
+    if (($count == 0) and $this->{_cursor}->has_next()) {
+        #work around a bug in MongoDB
+        while ($this->{_cursor}->has_next()) {
+            $this->{_cursor}->next();
+            $count++;
+        }
+        $this->{_cursor}->reset();
+    }
+    $this->{cachedCount} = $count;
+    return $count;
 }
 
 sub hasNext {

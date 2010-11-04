@@ -19,6 +19,7 @@ speed and memory size. It also depends on the complexity of the query.
 
 package Foswiki::Store::QueryAlgorithms::MongoDB;
 use strict;
+use constant MONITOR => $Foswiki::cfg{MONITOR}{'Foswiki::Plugins::MongoDBPlugin'} || 0;
 
 BEGIN {
     #enable the MongoDBPlugin which keeps the mongodb uptodate with topics changes onsave 
@@ -26,7 +27,7 @@ BEGIN {
 $Foswiki::cfg{Plugins}{MongoDBPlugin}{Module} = 'Foswiki::Plugins::MongoDBPlugin'; 
 $Foswiki::cfg{Plugins}{MongoDBPlugin}{Enabled} = 1; 
 $Foswiki::cfg{Plugins}{MongoDBPlugin}{EnableOnSaveUpdates} = 1; 
-print STDERR "****** starting MongoDBPlugin..\n";
+print STDERR "****** starting MongoDBPlugin..\n" if MONITOR;
 }
 
 use Foswiki::Search::Node ();

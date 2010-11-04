@@ -25,6 +25,8 @@ use strict;
 use MongoDB;
 use Assert;
 
+use constant MONITOR => $Foswiki::cfg{MONITOR}{'Foswiki::Plugins::MongoDBPlugin'} || 0;
+
 sub new {
     my $class  = shift;
     my $params = shift;
@@ -113,10 +115,10 @@ sub ensureIndex {
         }
     }
     if (scalar(@{$self->{mongoDBIndexes}}) >= 40) {
-        print STDERR "*******************ouch. MongoDB can only have 40 indexes per collection\n";
+        print STDERR "*******************ouch. MongoDB can only have 40 indexes per collection\n" if MONITOR;
         return;
     }
-print STDERR "creating ".$options->{name}." index\n";
+print STDERR "creating ".$options->{name}." index\n" if MONITOR;
     #TODO: consider doing these in a batch at the end of a request, or?
     $collection->ensure_index($indexRef, $options);
     undef $self->{mongoDBIndexes}; #clear the cache :/

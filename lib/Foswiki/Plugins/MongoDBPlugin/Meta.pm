@@ -50,7 +50,10 @@ sub new {
 #TODO: as of Oct 2010, mongodb can't sort on an element in an array, so we re-array the meta (see Foswiki::Plugins::MongoDBPlugin::_updateTopic).
     my $temp = $meta->{TOPICINFO};
     $meta->{TOPICINFO} = [];
-    push( @{ $meta->{TOPICINFO} }, %$temp ) if ( defined($temp) );
+    if ( defined($temp) ) {
+        push( @{ $meta->{TOPICINFO} }, %$temp );
+        undef $temp->{TOPICINFO}{_authorWikiName};
+    }
 
     $temp = $meta->{TOPICPARENT};
     $meta->{TOPICPARENT} = [];
