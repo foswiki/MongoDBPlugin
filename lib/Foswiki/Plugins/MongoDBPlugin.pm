@@ -156,6 +156,7 @@ sub _updateTopic {
         next if ( $key eq '_indices' );
 
 #TODO: as of Oct 2010, mongodb can't sort on an element in an array, so we de-array the ARRAYs.
+#TODO: use the registered list of META elements, and the type that is registered.
         if (   ( $key eq 'TOPICINFO' )
             or ( $key eq 'TOPICPARENT' ) )
         {

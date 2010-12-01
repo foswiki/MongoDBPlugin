@@ -298,6 +298,11 @@ sub getField {
             # name anywhere in the saved fields of meta
             return $data->web();
         }
+        elsif ( $realField eq 'hash' ) {
+
+            #return the topic object.
+            return $data;
+        }
         else {
 
             # The field name isn't an alias, check to see if it's
