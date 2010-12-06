@@ -131,6 +131,7 @@ sub _update {
     foreach my $topic (@topicList) {
         my ( $meta, $text ) = Foswiki::Func::readTopic( $web, $topic );
 
+	#TODO: listener called for webs too.. (delete, move etc)
         _updateTopic( $web, $topic, $meta );
 
         $count++;
