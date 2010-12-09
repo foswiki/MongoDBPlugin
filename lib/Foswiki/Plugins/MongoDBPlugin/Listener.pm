@@ -35,9 +35,11 @@ Event triggered when a new Meta object is inserted into the store
 
 sub insert {
     my $self = shift;
-    my $metaObject = shift;
+    my %args = @_;
+
+    return if (defined($args{newattachment}));
     
-    Foswiki::Plugins::MongoDBPlugin::_updateTopic($metaObject->web, $metaObject->topic, $metaObject);
+    Foswiki::Plugins::MongoDBPlugin::_updateTopic($args{newmeta}->web, $args{newmeta}->topic, $args{newmeta});
 }
 
 
