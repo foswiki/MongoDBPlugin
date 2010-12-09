@@ -154,6 +154,7 @@ sub _updateTopic {
 
     foreach my $key ( keys(%$savedMeta) ) {
         next if ( $key eq '_session' );
+        #not totally sure if there's a benefit to using / not the _indices
         next if ( $key eq '_indices' );
 
 #TODO: as of Oct 2010, mongodb can't sort on an element in an array, so we de-array the ARRAYs.
