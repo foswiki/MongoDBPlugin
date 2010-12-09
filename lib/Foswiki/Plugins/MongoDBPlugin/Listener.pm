@@ -58,15 +58,20 @@ a topic is moved.
 
 sub update {
     my $self = shift;
-    my $metaObject = shift;
-    my $movedTo = shift;
+    my %args = @_;
     
-    if (not defined($movedTo)) {
-        Foswiki::Plugins::MongoDBPlugin::_updateTopic($metaObject->web, $metaObject->topic, $metaObject);
-    } else {
-        $self->remove($metaObject);
-        Foswiki::Plugins::MongoDBPlugin::_updateTopic($metaObject->web, $metaObject->topic, $movedTo);
+    #TODO: I'm not doing attachments yet
+    return if (defined($args{newattachment}));
+    return if (defined($args{oldattachment}));
+    
+    #TODO: not doing web create/move etc yet
+    return if (not defined($args{newmeta}->topic));
+    
+    if (defined($args{oldmeta})) {
+        #move topic is (currently) a delete&insert
+        $self->remove($args{oldmeta});
     }
+    Foswiki::Plugins::MongoDBPlugin::_updateTopic($args{newmeta}->web, $args{newmeta}->topic, $args{newmeta});
 }
 
 
