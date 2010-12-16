@@ -78,7 +78,7 @@ sub completePageHandler {
 #    # special perl variables $_[0] and $_[1]. These allow you to operate
 #    # on parameters as if they were passed by reference; for example:
 #    # $_[0] =~ s/SpecialString/my alternative/ge;
-        $Foswiki::Plugins::SESSION->{response}->pushHeader('X-Foswiki-MongoDBPlugin-lastQueryTime', (getMongoDB()->{lastQueryTime}||'noQuery'));
+        $Foswiki::Plugins::SESSION->{response}->pushHeader('X-Foswiki-Monitor-MongoDBPlugin-lastQueryTime', (getMongoDB()->{lastQueryTime}||'noQuery'));
 
 }
 

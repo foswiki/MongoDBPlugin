@@ -33,12 +33,12 @@ Sorting works for fields that are strings, but doesn't yet manage to autoconvert
    6 web order appears to not have been implemented in the general store? so Mongo has to do it somewhere (unit tests have wrong order)
 
 ---+++ Metrics
----++++ HTTP reposnse header =X-Foswiki-Mongodbplugin-Lastquerytime=
+---++++ HTTP reposnse header =X-Foswiki-Monitor-MongoDBPlugin-lastQueryTime=
 you can use 
 =curl -I http://x61/f/bin/view/Lauries/TestQuery1= to get just the header info (foswiki goes through and does a complete render for =HEAD= requests atm.
 
-in combination with Foswiki::Extensions.DebugLogPlugin, you will then be able to see both the time taken to render the topic =X-Foswiki-Rendertime= and the time 
-the last MongoDB query tool =X-Foswiki-Mongodbplugin-Lastquerytime=.
+in combination with Foswiki::Extensions.DebugLogPlugin, you will then be able to see both the time taken to render the topic =X-Foswiki-Monitor-DebugLogPlugin-Rendertime= and the time 
+the last MongoDB query tool =X-Foswiki-Monitor-MongoDBPlugin-lastQueryTimee=.
 
 
 ---++ Installation Instructions
