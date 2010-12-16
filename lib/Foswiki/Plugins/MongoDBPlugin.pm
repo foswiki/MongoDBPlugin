@@ -63,6 +63,26 @@ sub initPlugin {
     return 1;
 }
 
+=begin TML
+
+---++ completePageHandler($html, $httpHeaders)
+
+add another Header element to simplify performance testing
+
+=cut
+
+sub completePageHandler {
+#    my( $html, $httpHeaders ) = @_;
+#    # modify $_[0] or $_[1] if you must change the HTML or headers
+#    # You can work on $html and $httpHeaders in place by using the
+#    # special perl variables $_[0] and $_[1]. These allow you to operate
+#    # on parameters as if they were passed by reference; for example:
+#    # $_[0] =~ s/SpecialString/my alternative/ge;
+        $Foswiki::Plugins::SESSION->{response}->pushHeader('X-Foswiki-MongoDBPlugin-lastQueryTime', (getMongoDB()->{lastQueryTime}||'noQuery'));
+
+}
+
+
 sub afterSaveHandler {
     return
       if ( $enableOnSaveUpdates != 1 )

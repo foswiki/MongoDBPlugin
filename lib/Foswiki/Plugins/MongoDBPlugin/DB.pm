@@ -24,8 +24,12 @@ package Foswiki::Plugins::MongoDBPlugin::DB;
 use strict;
 use MongoDB;
 use Assert;
+use Data::Dumper;
+use Time::HiRes ();
 
-use constant MONITOR => $Foswiki::cfg{MONITOR}{'Foswiki::Plugins::MongoDBPlugin'} || 0;
+#I wish
+#use constant MONITOR => $Foswiki::cfg{MONITOR}{'Foswiki::Plugins::MongoDBPlugin'} || 0;
+use constant MONITOR => 1;
 
 sub new {
     my $class  = shift;
@@ -39,19 +43,33 @@ sub new {
 }
 
 sub query {
-    my $self = shift;
+    my $self           = shift;
     my $collectionName = shift;
-    my $ixhQuery        = shift;
-    my $queryAttrs = shift || {};
-    
+    my $ixhQuery       = shift;
+    my $queryAttrs     = shift || {};
+
+    my $startTime = [Time::HiRes::gettimeofday];
+
     my $collection = $self->_getCollection('current');
-    print STDERR "searching mongo : ".Dumper($ixhQuery)." , ".Dumper($queryAttrs)."\n" if MONITOR;
-    my $cursor = $collection->query($ixhQuery, $queryAttrs);
-    print STDERR "found " . $cursor->count . " _BUT_ has_next is ".($cursor->has_next()?'true':'false')."\n" if MONITOR;
-    
+    print STDERR "searching mongo : "
+      . Dumper($ixhQuery) . " , "
+      . Dumper($queryAttrs) . "\n"
+      if MONITOR;
+    my $cursor = $collection->query( $ixhQuery, $queryAttrs );
+    print STDERR "found "
+      . $cursor->count
+      . " _BUT_ has_next is "
+      . ( $cursor->has_next() ? 'true' : 'false' ) . "\n"
+      if MONITOR;
+
+    #end timer
+    my $endTime = [Time::HiRes::gettimeofday];
+    my $timeDiff = Time::HiRes::tv_interval( $startTime, $endTime );
+    print STDERR "query took $timeDiff\n" if MONITOR;
+    $self->{lastQueryTime} = $timeDiff;
+
     return $cursor;
 }
-
 
 sub update {
     my $self           = shift;
@@ -59,17 +77,33 @@ sub update {
     my $address        = shift;
     my $hash           = shift;
 
-#    use Data::Dumper;
-#print STDERR "+++++ mongo update $address == ".Dumper($hash)."\n";
+    #    use Data::Dumper;
+    #print STDERR "+++++ mongo update $address == ".Dumper($hash)."\n";
 
     my $collection = $self->_getCollection($collectionName);
 
 #TODO: not the most efficient place to create and index, but I want to be sure, to be sure.
-    $self->ensureIndex( $collection, { _topic => 1 }, {name=>'_topic'});
-    $self->ensureIndex( $collection, { _topic => 1, _web => 1 }, { name=>'_topic:_web', unique => 1 } );
-    $self->ensureIndex( $collection, { 'TOPICINFO.author' => 1 }, {name=>'TOPICINFO.author'} );
-    $self->ensureIndex( $collection, { 'TOPICINFO.date' => 1  }, {name=>'TOPICINFO.date'} );
-    $self->ensureIndex( $collection, { 'TOPICPARENT.name' => 1  }, {name=>'TOPICPARENT.name'} );
+    $self->ensureIndex( $collection, { _topic => 1 }, { name => '_topic' } );
+    $self->ensureIndex(
+        $collection,
+        { _topic => 1,             _web   => 1 },
+        { name   => '_topic:_web', unique => 1 }
+    );
+    $self->ensureIndex(
+        $collection,
+        { 'TOPICINFO.author' => 1 },
+        { name               => 'TOPICINFO.author' }
+    );
+    $self->ensureIndex(
+        $collection,
+        { 'TOPICINFO.date' => 1 },
+        { name             => 'TOPICINFO.date' }
+    );
+    $self->ensureIndex(
+        $collection,
+        { 'TOPICPARENT.name' => 1 },
+        { name               => 'TOPICPARENT.name' }
+    );
 
 #TODO: maybe should use the auto indexed '_id' (or maybe we can use this as a tuid - unique foreach rev of each topic..)
 #then again, atm, its totally random, so may be good for sharding.
@@ -81,9 +115,8 @@ sub update {
     );
 }
 
-
 #BUGGER. compound indexes won't help with large queries
-#> db.current.dropIndexes();                                     
+#> db.current.dropIndexes();
 #{
 #	"nIndexesWas" : 2,
 #	"msg" : "non-_id indexes dropped for collection",
@@ -100,57 +133,62 @@ sub update {
 #	"$err" : "too much data for sort() with no index.  add an index or specify a smaller limit",
 #	"code" : 10128
 #}
-#> 
+#>
 #    $collection->ensure_index( { 'TOPICINFO.author' => 1, 'TOPICINFO.date' => 1, 'TOPICPARENT.name' => 1  } );
 #    $collection->ensure_index( { 'TOPICINFO.author' => -1, 'TOPICINFO.date' => -1, 'TOPICPARENT.name' => -1  } );
 #MongoDB's ensure_index causes the server to re0index, even if that index already exists, so we need to wrap it.
 sub ensureIndex {
-    my $self = shift;
-    my $collection = shift; #either a collection object of a name
-    my $indexRef = shift;   #can be a hashref or an ixHash
-    my $options = shift;
-    
-    ASSERT(defined($options->{name})) if DEBUG;
-    
-    if (ref($collection) eq '') {
+    my $self       = shift;
+    my $collection = shift;    #either a collection object of a name
+    my $indexRef   = shift;    #can be a hashref or an ixHash
+    my $options    = shift;
+
+    ASSERT( defined( $options->{name} ) ) if DEBUG;
+
+    if ( ref($collection) eq '' ) {
+
         #convert name of collection to collection obj
         $collection = $self->_getCollection($collection);
     }
-    
+
     #cache the indexes we know about
-    if (not defined($self->{mongoDBIndexes})) {
+    if ( not defined( $self->{mongoDBIndexes} ) ) {
         my @indexes = $collection->get_indexes();
         $self->{mongoDBIndexes} = \@indexes;
     }
-    foreach my $index (@{$self->{mongoDBIndexes}})  {
+    foreach my $index ( @{ $self->{mongoDBIndexes} } ) {
+
         #print STDERR "we already have:  ".$index->{name}." index\n";
-        if ($options->{name} eq $index->{name}) {
+        if ( $options->{name} eq $index->{name} ) {
+
             #already exists, do nothing.
             return;
         }
     }
-    if (scalar(@{$self->{mongoDBIndexes}}) >= 40) {
-        print STDERR "*******************ouch. MongoDB can only have 40 indexes per collection\n" if MONITOR;
+    if ( scalar( @{ $self->{mongoDBIndexes} } ) >= 40 ) {
+        print STDERR
+"*******************ouch. MongoDB can only have 40 indexes per collection\n"
+          if MONITOR;
         return;
     }
-print STDERR "creating ".$options->{name}." index\n" if MONITOR;
-    #TODO: consider doing these in a batch at the end of a request, or?
-    $collection->ensure_index($indexRef, $options);
-    undef $self->{mongoDBIndexes}; #clear the cache :/
-}
+    print STDERR "creating " . $options->{name} . " index\n" if MONITOR;
 
+    #TODO: consider doing these in a batch at the end of a request, or?
+    $collection->ensure_index( $indexRef, $options );
+    undef $self->{mongoDBIndexes};    #clear the cache :/
+}
 
 sub remove {
     my $self           = shift;
     my $collectionName = shift;
     my $hash           = shift;
 
-#    use Data::Dumper;
-#print STDERR "+++++ mongo remove $address == ".Dumper($hash)."\n";
+    #    use Data::Dumper;
+    #print STDERR "+++++ mongo remove $address == ".Dumper($hash)."\n";
 
     my $collection = $self->_getCollection($collectionName);
 
-    $collection->remove( $hash );
+    $collection->remove($hash);
 }
 
 #######################################################
@@ -161,7 +199,7 @@ sub _getCollection {
 
     my $connection = $self->_connect();
     my $database   = $connection->get_database( $self->{database} );
-  
+
     return $database->get_collection($collectionName);
 }
 
@@ -173,7 +211,7 @@ sub _connect {
             host => $self->{host},
             port => $self->{port}
         );
-	ASSERT($self->{connection}) if DEBUG;
+        ASSERT( $self->{connection} ) if DEBUG;
     }
     return $self->{connection};
 }
