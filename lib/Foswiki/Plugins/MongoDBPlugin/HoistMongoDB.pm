@@ -17,7 +17,7 @@ use Foswiki::Query::Node ();
 use Tie::IxHash          ();
 use Data::Dumper;
 use Assert;
-use Error;
+use Error::Simple;
 
 use Foswiki::Query::HoistREs ();
 
@@ -46,6 +46,10 @@ sub hoist {
     try {
         $mongoDBQuery =
           Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::_hoist($node);
+          
+          #TODO: sadly, the exception throwing wasn't working so I'm using a brutish propogate error
+          return if (defined($mongoDBQuery->{ERROR}));
+          
         print STDERR "HoistS ", $node->stringify(), " -> /",
           Dumper($mongoDBQuery), "/\n"
           if MONITOR;
@@ -55,7 +59,7 @@ sub hoist {
         print STDERR "HoistS ", $node->stringify(),
           " Hoist Failure (" . $e->stringify() . ")\n"
           if MONITOR;
-
+        return;
     }
     return $mongoDBQuery;
 }
@@ -65,25 +69,7 @@ sub _hoist {
 
     #name, or constants.
     if ( !ref( $node->{op} ) ) {
-        if ( $node->{op} == Foswiki::Infix::Node::NAME ) {
-
-            #TODO: map to the MongoDB field names (name, web, text, fieldname)
-            if ( $node->{params}[0] eq 'name' ) {
-                return '_topic';
-            }
-            elsif ( $node->{params}[0] eq 'web' ) {
-                return '_web';
-            }
-            elsif ( $node->{params}[0] eq 'text' ) {
-                return '_text';
-            }
-            return 'FIELD.' . $node->{params}[0] . '.value';
-        }
-        elsif (( $node->{op} == Foswiki::Infix::Node::NUMBER )
-            or ( $node->{op} == Foswiki::Infix::Node::STRING ) )
-        {
-            return $node->{params}[0];
-        }
+        return Foswiki::Query::OP_dot::hoistMongoDB($node);
     }
 
     #TODO: if 2 constants(NUMBER,STRING) ASSERT
@@ -99,9 +85,14 @@ sub _hoist {
     $node->{lhs} = Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::_hoist(
         $node->{params}[0] )
       if ( $node->{op}->{arity} > 0 );
+    $node->{ERROR} = $node->{lhs}->{ERROR} if (ref( $node->{lhs} ) and defined($node->{lhs}->{ERROR}));
+      
     $node->{rhs} = Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::_hoist(
         $node->{params}[1] )
       if ( $node->{op}->{arity} > 0 );
+    $node->{ERROR} = $node->{rhs}->{ERROR} if (ref( $node->{rhs} ) and defined($node->{rhs}->{ERROR}));
+
+
     print STDERR "----lhs: "
       . Data::Dumper::Dumper( $node->{lhs} )
       . "----rhs: "
@@ -112,8 +103,18 @@ sub _hoist {
       . $node->{op}
       . " ref(node->op)="
       . ref( $node->{op} ) . "\n";
-    throw Error::Simple( 'failed to Hoist ' . ref( $node->{op} ) . "\n" )
-      unless ( $node->{op}->can('hoistMongoDB') );
+      
+    #DAMMIT, I presume we have oddly nested eval/try catch so throwing isn't working
+    #throw Error::Simple( 'failed to Hoist ' . ref( $node->{op} ) . "\n" )
+    # unless ( $node->{op}->can('hoistMongoDB') );
+    unless ( $node->{op}->can('hoistMongoDB') ) {
+        $node->{ERROR} = 'can\'t Hoist ' . ref( $node->{op} );
+    }
+    if (defined($node->{ERROR})) {
+        print STDERR "HOIST ERROR: ".$node->{ERROR};
+        return $node;
+    }
+      
     return $node->{op}->hoistMongoDB($node);
 }
 
@@ -179,11 +180,25 @@ our %aliases = (
     #    moved       => 'META:TOPICMOVED',
     #    parent      => 'META:TOPICPARENT',
     #    preferences => 'META:PREFERENCE',
-    name => '_topic'
+    name => '_topic',
+    web => '_web',
+    text => '_text'
 );
 
 sub hoistMongoDB {
     my $node = shift;
+    
+    if ( $node->{op} == Foswiki::Infix::Node::NAME ) {
+
+        #TODO: map to the MongoDB field names (name, web, text, fieldname)
+        return $aliases{$node->{params}[0]} if ( defined($aliases{$node->{params}[0]}));
+        return 'FIELD.' . $node->{params}[0] . '.value';
+    }
+    elsif (( $node->{op} == Foswiki::Infix::Node::NUMBER )
+        or ( $node->{op} == Foswiki::Infix::Node::STRING ) )
+    {
+        return $node->{params}[0];
+    }
 }
 
 package Foswiki::Query::OP_and;

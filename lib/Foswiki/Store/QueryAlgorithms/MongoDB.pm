@@ -37,6 +37,7 @@ use Foswiki::Store::SearchAlgorithms::MongoDB();
 use Foswiki::Plugins::MongoDBPlugin       ();
 use Foswiki::Plugins::MongoDBPlugin::Meta ();
 use Foswiki::Search::InfoCache;
+use Foswiki::Plugins::MongoDBPlugin::HoistMongoDB;
 use Data::Dumper;
 
 # See Foswiki::Query::QueryAlgorithms.pm for details
@@ -108,50 +109,48 @@ sub _webQuery {
     if ( defined( $Foswiki::cfg{Plugins}{MongoDBPlugin}{ExperimentalCode} )
         and $Foswiki::cfg{Plugins}{MongoDBPlugin}{ExperimentalCode} )
     {
-
-#    my $queryParser = new Foswiki::Query::Parser();
-#    my $query       = $queryParser->parse($s);
-#    my $mongoDBQuery = Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
-
         #try HoistMongoDB first
-        require Foswiki::Plugins::MongoDBPlugin::HoistMongoDB;
         my $mongoQuery =
           Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
 
-        #limit, skip, sort_by
-        my $SortDirection = Foswiki::isTrue( $options->{reverse} ) ? -1 : 1;
+        if ( defined($mongoQuery) ) {
 
-        #ME bets casesensitive Sorting has no unit tests..
-        #order="topic"
-        #order="created"
-        #order="modified"
-        #order="editby"
-        #order="formfield(name)"
-        #reverse="on"
-        my %sortKeys = (
-            topic => '_topic',
+            #limit, skip, sort_by
+            my $SortDirection = Foswiki::isTrue( $options->{reverse} ) ? -1 : 1;
 
-            #created => ,   #TODO: don't yet have topic histories in mongo
-            modified => 'TOPICINFO.date',
-            editby   => 'TOPICINFO.author',
-        );
+            #ME bets casesensitive Sorting has no unit tests..
+            #order="topic"
+            #order="created"
+            #order="modified"
+            #order="editby"
+            #order="formfield(name)"
+            #reverse="on"
+            my %sortKeys = (
+                topic => '_topic',
 
-        my $queryAttrs = {};
-        my $orderBy = $sortKeys{ $options->{order} || 'topic' };
-        if ( defined($orderBy) ) {
-            $queryAttrs = { sort_by => { $orderBy => $SortDirection } };
-        }
-        else {
-            if ( $options->{order} =~ /formfield\((.*)\)/ ) {
-                $orderBy = 'FIELD.' . $1;
+                #created => ,   #TODO: don't yet have topic histories in mongo
+                modified => 'TOPICINFO.date',
+                editby   => 'TOPICINFO.author',
+            );
+
+            my $queryAttrs = {};
+            my $orderBy = $sortKeys{ $options->{order} || 'topic' };
+            if ( defined($orderBy) ) {
                 $queryAttrs = { sort_by => { $orderBy => $SortDirection } };
             }
-        }
+            else {
+                if ( $options->{order} =~ /formfield\((.*)\)/ ) {
+                    $orderBy = 'FIELD.' . $1;
+                    $queryAttrs = { sort_by => { $orderBy => $SortDirection } };
+                }
+            }
 
-        my $cursor = doMongoSearch( $web, $options, $mongoQuery, $queryAttrs );
-        return new Foswiki::Search::MongoDBInfoCache(
-            $Foswiki::Plugins::SESSION,
-            $web, $options, $cursor );
+            my $cursor =
+              doMongoSearch( $web, $options, $mongoQuery, $queryAttrs );
+            return new Foswiki::Search::MongoDBInfoCache(
+                $Foswiki::Plugins::SESSION,
+                $web, $options, $cursor );
+        }
     }
 
     #fall back to HoistRe
