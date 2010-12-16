@@ -98,6 +98,21 @@ use Data::Dumper;
 #    my $val = $query->evaluate( tom => $meta, data => $meta );
 }
 
+sub test_hoistSimple_OP_Like {
+    my $this        = shift;
+    my $s           = "String~'.*rin.*'";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery = Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+use Data::Dumper;
+    print STDERR "HoistS ",$query->stringify()," -> /",Dumper($mongoDBQuery),"/\n";
+#    $this->assert_str_equals( '^%META:FIELD{name=\"number\".*\bvalue=\"99\"',
+#        join( ';', map {$_->{regex}} @filter ) );
+#    my $meta = $this->{meta};
+#    my $val = $query->evaluate( tom => $meta, data => $meta );
+}
+
 sub test_hoistSimple2 {
     my $this        = shift;
     my $s           = "99=number";
