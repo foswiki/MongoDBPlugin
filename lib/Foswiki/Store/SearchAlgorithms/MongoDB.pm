@@ -77,7 +77,8 @@ sub search {
                     }
                     );
 
-    my $cursor = doMongoSearch( $web, $options, \%elements );
+    my $cursor =
+      Foswiki::Plugins::MongoDBPlugin::getMongoDB()->query('current',  \%elements);
     return new Foswiki::Search::MongoDBInfoCache( $Foswiki::Plugins::SESSION,
         $web, $options, $cursor );
 }
@@ -306,26 +307,13 @@ sub _webQuery {
         }
     }
 
-    my $cursor = doMongoSearch( $web, $options, $ixhQuery, $queryAttrs );
+    my $cursor =
+      Foswiki::Plugins::MongoDBPlugin::getMongoDB()->query('current', $ixhQuery, $queryAttrs);
+
     return new Foswiki::Search::MongoDBInfoCache( $Foswiki::Plugins::SESSION,
         $web, $options, $cursor );
 }
 
-sub doMongoSearch {
-    my $web      = shift;
-    my $options  = shift;
-    my $ixhQuery = shift;
-    my $queryAttrs = shift;
-    
-print STDERR "searching mongo ($web): ".Dumper($ixhQuery)." , ".Dumper($queryAttrs)."\n" if MONITOR;
-    my $collection =
-      Foswiki::Plugins::MongoDBPlugin::getMongoDB()->_getCollection('current');
-    my $cursor = $collection->query($ixhQuery, $queryAttrs);
-
-print STDERR "found " . $cursor->count . "\n" if MONITOR;
-
-    return $cursor;
-}
 
 sub convertQueryToMongoRegex {
     my ($searchString, $casesensitive, $invertSearch) = @_;

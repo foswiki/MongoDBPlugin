@@ -15,6 +15,8 @@ use strict;
 use Foswiki::Infix::Node ();
 use Foswiki::Query::Node ();
 use Tie::IxHash ();
+use Data::Dumper;
+use Assert;
 
 
 use Foswiki::Query::HoistREs ();
@@ -41,12 +43,61 @@ sub hoist {
     #    $ixhQuery->Push( $scope => $elem );
     print STDERR "hoist from: ", $node->stringify(), "\n" if MONITOR;
 
+    my $mongoDBQuery = Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::_hoist($node);
+    print STDERR "HoistS ",$node->stringify()," -> /",Dumper($mongoDBQuery),"/\n" if MONITOR;
+    return $mongoDBQuery;
+}
+
+sub _hoist {
+    my $node = shift;
+    
+    #name, or constants.
+    if ((!ref($node->{op})) and 
+            (($node->{op} == Foswiki::Infix::Node::NAME) or 
+            ($node->{op} == Foswiki::Infix::Node::NUMBER) or 
+            ($node->{op} == Foswiki::Infix::Node::STRING)
+            )) {
+#TODO: map to the MongoDB field names
+        return $node->{params}[0];
+    }
+    
+    #TODO: if 2 constants(NUMBER,STRING) ASSERT
+    #TODO: if the first is a constant, swap
+        
+print STDERR "\nparam0(".$node->{params}[0]->{op}."): ", Data::Dumper::Dumper($node->{params}[0]), "\n" if MONITOR;
+print STDERR "\nparam1(".$node->{params}[1]->{op}."): ", Data::Dumper::Dumper($node->{params}[1]), "\n" if MONITOR;
+
+     $node->{lhs} = Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::_hoist( $node->{params}[0] ) if ($node->{op}->{arity} > 0);
+     $node->{rhs} = Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::_hoist( $node->{params}[1] ) if ($node->{op}->{arity} > 0);
+print STDERR "----lhs: ".Data::Dumper::Dumper($node->{lhs})."----rhs: ".Data::Dumper::Dumper($node->{rhs})." \n" if MONITOR;
+        
+    
+    print STDERR "node->op=".$node->{op}." ref(node->op)=".ref($node->{op})."|\n";
     return $node->{op}->hoistMongoDB($node);
 }
 
 
+
 ########################################################################################
 #Hoist the OP's
+
+=begin TML
+
+---++ ObjectMethod Foswiki::Query::OP_eq::hoistMongoDB($node) -> $ref to IxHash
+
+hoist ~ into a mongoDB ixHash query
+
+=cut
+
+package Foswiki::Query::OP_eq;
+use Assert;
+sub hoistMongoDB {
+    my $op = shift;
+    my $node = shift;
+    
+    ASSERT ( $node->{op}->{name} eq '=' ) if DEBUG;
+    return {$node->{lhs} => $node->{rhs}};
+}
 
 =begin TML
 
@@ -61,21 +112,12 @@ sub hoistMongoDB {
     my $op = shift;
     my $node = shift;
     
-    if ( $node->{op}->{name} eq '~' ) {
-        
-print STDERR "param1(".$node->{params}[0]->{op}."): ", $node->{params}[0]->stringify(), "\n" if Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::MONITOR;
+    $node->{rhs} = quotemeta($node->{rhs});
+    $node->{rhs}          =~ s/\\\?/./g;
+    $node->{rhs}          =~ s/\\\*/.*/g;
+    $node->{rhs} = qr/$node->{rhs}/;
 
-        my $lhs = Foswiki::Query::HoistREs::_hoistDOT( $node->{params}[0] );
-        my $rhs = Foswiki::Query::HoistREs::_hoistConstant( $node->{params}[1] );
-        if ( $lhs && $rhs ) {
-            $rhs = quotemeta($rhs);
-            $rhs          =~ s/\\\?/./g;
-            $rhs          =~ s/\\\*/.*/g;
-            $lhs->{regex} =~ s/\000RHS\001/$rhs/g;
-            $lhs->{source} = Foswiki::Query::HoistREs::_hoistConstant( $node->{params}[1] );
-            return $lhs;
-        }
-    }
+    return {$node->{lhs} => $node->{rhs}};
 }
 
 =begin TML
@@ -100,9 +142,26 @@ our %aliases = (
 
 sub hoistMongoDB {
     my $node = shift;
-    
-    
 }
+
+package Foswiki::Query::OP_and;
+package Foswiki::Query::OP_or;
+package Foswiki::Query::OP_not;
+
+package Foswiki::Query::OP_gte;
+package Foswiki::Query::OP_gt;
+package Foswiki::Query::OP_lte;
+package Foswiki::Query::OP_lt;
+package Foswiki::Query::OP_match;
+package Foswiki::Query::OP_ne;
+
+package Foswiki::Query::OP_d2n;
+package Foswiki::Query::OP_lc;
+package Foswiki::Query::OP_length;
+package Foswiki::Query::OP_ob;
+package Foswiki::Query::OP_ref;
+package Foswiki::Query::OP_uc;
+package Foswiki::Query::OP_where;
 
 
 1;

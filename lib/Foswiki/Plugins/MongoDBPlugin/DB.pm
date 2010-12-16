@@ -38,6 +38,21 @@ sub new {
     return $self;
 }
 
+sub query {
+    my $self = shift;
+    my $collectionName = shift;
+    my $ixhQuery        = shift;
+    my $queryAttrs = shift || {};
+    
+    my $collection = $self->_getCollection('current');
+    print STDERR "searching mongo : ".Dumper($ixhQuery)." , ".Dumper($queryAttrs)."\n" if MONITOR;
+    my $cursor = $collection->query($ixhQuery, $queryAttrs);
+    print STDERR "found " . $cursor->count . " _BUT_ has_next is ".($cursor->has_next()?'true':'false')."\n" if MONITOR;
+    
+    return $cursor;
+}
+
+
 sub update {
     my $self           = shift;
     my $collectionName = shift;
@@ -146,6 +161,7 @@ sub _getCollection {
 
     my $connection = $self->_connect();
     my $database   = $connection->get_database( $self->{database} );
+  
     return $database->get_collection($collectionName);
 }
 
