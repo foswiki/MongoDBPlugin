@@ -22,12 +22,14 @@ use strict;
 use constant MONITOR => 1;
 
 BEGIN {
-    #enable the MongoDBPlugin which keeps the mongodb uptodate with topics changes onsave 
-#TODO: make conditional - or figure out how to force this in the MongoDB search and query algo's 
-$Foswiki::cfg{Plugins}{MongoDBPlugin}{Module} = 'Foswiki::Plugins::MongoDBPlugin'; 
-$Foswiki::cfg{Plugins}{MongoDBPlugin}{Enabled} = 1; 
-$Foswiki::cfg{Plugins}{MongoDBPlugin}{EnableOnSaveUpdates} = 1; 
-print STDERR "****** starting MongoDBPlugin..\n" if MONITOR;
+
+#enable the MongoDBPlugin which keeps the mongodb uptodate with topics changes onsave
+#TODO: make conditional - or figure out how to force this in the MongoDB search and query algo's
+    $Foswiki::cfg{Plugins}{MongoDBPlugin}{Module} =
+      'Foswiki::Plugins::MongoDBPlugin';
+    $Foswiki::cfg{Plugins}{MongoDBPlugin}{Enabled}             = 1;
+    $Foswiki::cfg{Plugins}{MongoDBPlugin}{EnableOnSaveUpdates} = 1;
+    print STDERR "****** starting MongoDBPlugin..\n" if MONITOR;
 }
 
 use Foswiki::Search::Node ();
@@ -50,8 +52,9 @@ sub query {
     my $isAdmin  = $session->{users}->isAdmin( $session->{user} );
 
     my $searchAllFlag = ( $webNames =~ /(^|[\,\s])(all|on)([\,\s]|$)/i );
-    my @webs = Foswiki::Plugins::MongoDBPlugin::_getListOfWebs( $webNames,
-        $recurse, $searchAllFlag );
+    my @webs =
+      Foswiki::Plugins::MongoDBPlugin::_getListOfWebs( $webNames, $recurse,
+        $searchAllFlag );
 
     my @resultCacheList;
     foreach my $web (@webs) {
@@ -60,8 +63,8 @@ sub query {
         next unless $session->webExists($web);
 
         my $webObject = Foswiki::Meta->new( $session, $web );
-        my $thisWebNoSearchAll = Foswiki::isTrue(
-            $webObject->getPreference('NOSEARCHALL') );
+        my $thisWebNoSearchAll =
+          Foswiki::isTrue( $webObject->getPreference('NOSEARCHALL') );
 
         # make sure we can report this web on an 'all' search
         # DON'T filter out unless it's part of an 'all' search.
@@ -91,7 +94,7 @@ sub _webQuery {
 
 #SMELL: initialise the mongoDB hack. needed if the mondoPlugin is not enabled, but the algo is selected :/
     Foswiki::Plugins::MongoDBPlugin::getMongoDB();
-    
+
     my $topicSet = $inputTopicSet;
     if ( !defined($topicSet) ) {
 
@@ -102,82 +105,97 @@ sub _webQuery {
           Foswiki::Search::InfoCache::getTopicListIterator( $webObject,
             $options );
     }
-    if (defined($Foswiki::cfg{Plugins}{MongoDBPlugin}{UnfinishedCode}) and 
-        $Foswiki::cfg{Plugins}{MongoDBPlugin}{UnfinishedCode})
+    if ( defined( $Foswiki::cfg{Plugins}{MongoDBPlugin}{ExperimentalCode} )
+        and $Foswiki::cfg{Plugins}{MongoDBPlugin}{ExperimentalCode} )
     {
+
+#    my $queryParser = new Foswiki::Query::Parser();
+#    my $query       = $queryParser->parse($s);
+#    my $mongoDBQuery = Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
         #try HoistMongoDB first
         require Foswiki::Plugins::MongoDBPlugin::HoistMongoDB;
-        my $mongoQuery = Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+        my $mongoQuery =
+          Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
         #limit, skip, sort_by
-        my $SortDirection   = Foswiki::isTrue( $options->{reverse} )? -1 : 1;
-    #ME bets casesensitive Sorting has no unit tests..
-    #order="topic"
-    #order="created"
-    #order="modified"
-    #order="editby"
-    #order="formfield(name)"    
-    #reverse="on"
+        my $SortDirection = Foswiki::isTrue( $options->{reverse} ) ? -1 : 1;
+
+        #ME bets casesensitive Sorting has no unit tests..
+        #order="topic"
+        #order="created"
+        #order="modified"
+        #order="editby"
+        #order="formfield(name)"
+        #reverse="on"
         my %sortKeys = (
             topic => '_topic',
+
             #created => ,   #TODO: don't yet have topic histories in mongo
             modified => 'TOPICINFO.date',
-            editby => 'TOPICINFO.author', 
+            editby   => 'TOPICINFO.author',
         );
 
         my $queryAttrs = {};
-        my $orderBy = $sortKeys{$options->{order}||'topic'}; 
-        if (defined($orderBy)) {
-            $queryAttrs = { sort_by => {$orderBy => $SortDirection } };
-        } else {
-            if ($options->{order} =~ /formfield\((.*)\)/) {
-                $orderBy = 'FIELD.'.$1;
-                $queryAttrs = { sort_by => {$orderBy => $SortDirection } };
+        my $orderBy = $sortKeys{ $options->{order} || 'topic' };
+        if ( defined($orderBy) ) {
+            $queryAttrs = { sort_by => { $orderBy => $SortDirection } };
+        }
+        else {
+            if ( $options->{order} =~ /formfield\((.*)\)/ ) {
+                $orderBy = 'FIELD.' . $1;
+                $queryAttrs = { sort_by => { $orderBy => $SortDirection } };
             }
         }
 
         my $cursor = doMongoSearch( $web, $options, $mongoQuery, $queryAttrs );
-        #return new Foswiki::Search::MongoDBInfoCache( $Foswiki::Plugins::SESSION,
-        #    $web, $options, $cursor );
+        return new Foswiki::Search::MongoDBInfoCache(
+            $Foswiki::Plugins::SESSION,
+            $web, $options, $cursor );
     }
 
     #fall back to HoistRe
     require Foswiki::Query::HoistREs;
     my $hoistedREs = Foswiki::Query::HoistREs::collatedHoist($query);
-    
-    if ((!defined($options->{topic})) and 
-        ($hoistedREs->{name})) {
-            #set the 'includetopic' matcher..
-            #dammit, i have to de-regex it? thats mad.
+
+    if (    ( !defined( $options->{topic} ) )
+        and ( $hoistedREs->{name} ) )
+    {
+
+        #set the 'includetopic' matcher..
+        #dammit, i have to de-regex it? thats mad.
     }
 
     #TODO: howto ask iterator for list length?
     #TODO: once the inputTopicSet isa ResultSet we might have an idea
     #    if ( scalar(@$topics) > 6 ) {
-    if ( defined($hoistedREs->{text}) ) {
+    if ( defined( $hoistedREs->{text} ) ) {
         my $searchOptions = {
             type                => 'regex',
             casesensitive       => 1,
             files_without_match => 1,
         };
-        my @filter = @{$hoistedREs->{text}};
+        my @filter = @{ $hoistedREs->{text} };
         my $searchQuery =
           new Foswiki::Search::Node( $query->toString(), \@filter,
             $searchOptions );
-         $topicSet->reset();
+        $topicSet->reset();
 
-        #for now we're kicking down to regex to reduce the set we then brute force query.
-        #next itr we start to HoistMongoDB
-        $topicSet = Foswiki::Store::SearchAlgorithms::MongoDB::_webQuery ( $searchQuery, $web, $topicSet, $session, $searchOptions );
+#for now we're kicking down to regex to reduce the set we then brute force query.
+#next itr we start to HoistMongoDB
+        $topicSet =
+          Foswiki::Store::SearchAlgorithms::MongoDB::_webQuery( $searchQuery,
+            $web, $topicSet, $session, $searchOptions );
     }
     else {
 
 #TODO: clearly _this_ can be re-written as a FilterIterator, and if we are able to use the sorting hints (ie DB Store) can propogate all the way to FORMAT
 
-#        print STDERR "WARNING: couldn't hoistREs on " . Dumper($query);
+        #        print STDERR "WARNING: couldn't hoistREs on " . Dumper($query);
     }
 
     #print STDERR "))))".$query->toString()."((((\n";
-#    print STDERR "--------Query::MongoDB \n" . Dumper($query) . "\n";
+    #    print STDERR "--------Query::MongoDB \n" . Dumper($query) . "\n";
     my $resultTopicSet =
       new Foswiki::Search::InfoCache( $Foswiki::Plugins::SESSION, $web );
     local $/;
@@ -213,21 +231,24 @@ sub _webQuery {
     return $resultTopicSet;
 }
 
-
-
 sub doMongoSearch {
-    my $web      = shift;
-    my $options  = shift;
-    my $ixhQuery = shift;
+    my $web        = shift;
+    my $options    = shift;
+    my $ixhQuery   = shift;
     my $queryAttrs = shift;
-    
-#print STDERR "######## Query::MongoDB search ($web)  \n";
-print STDERR "querying mongo: ".Dumper($ixhQuery)." , ".Dumper($queryAttrs)."\n";
-    my $collection =
-      Foswiki::Plugins::MongoDBPlugin::getMongoDB()->_getCollection('current');
-    my $cursor = $collection->query($ixhQuery, $queryAttrs);
 
-print STDERR "found " . $cursor->count . "\n";
+    #print STDERR "######## Query::MongoDB search ($web)  \n";
+    print STDERR "querying mongo: "
+      . Dumper($ixhQuery) . " , "
+      . Dumper($queryAttrs) . "\n";
+
+#    my $collection =
+#      Foswiki::Plugins::MongoDBPlugin::getMongoDB()->_getCollection('current');
+#    my $cursor = $collection->query($ixhQuery, $queryAttrs);
+    my $cursor = Foswiki::Plugins::MongoDBPlugin::getMongoDB()
+      ->query( 'current', $ixhQuery, $queryAttrs );
+
+    print STDERR "found " . $cursor->count . "\n";
 
     return $cursor;
 }
@@ -241,7 +262,7 @@ sub convertQueryToJavascript {
     my $invertedNot  = ( $not eq '!' ) ? '' : '!';
 
     return '' if ( $regex eq '' );
-    
+
     return <<"HERE";
             { 
                 $name = /$regex/$regexoptions ; 

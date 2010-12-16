@@ -14,14 +14,12 @@ use strict;
 
 use Foswiki::Infix::Node ();
 use Foswiki::Query::Node ();
-use Tie::IxHash ();
+use Tie::IxHash          ();
 use Data::Dumper;
 use Assert;
-
+use Error;
 
 use Foswiki::Query::HoistREs ();
-
-
 
 use constant MONITOR => 1;
 
@@ -33,50 +31,91 @@ use constant MONITOR => 1;
 =cut
 
 sub hoist {
-    my ($node, $indent) = @_;
+    my ( $node, $indent ) = @_;
 
     return undef unless ref( $node->{op} );
-    
-    #use IxHash to keep the hash order - _some_ parts of queries are order sensitive
+
+#use IxHash to keep the hash order - _some_ parts of queries are order sensitive
     my %mongoQuery = ();
-    my $ixhQuery            = tie( %mongoQuery, 'Tie::IxHash' );
+    my $ixhQuery = tie( %mongoQuery, 'Tie::IxHash' );
+
     #    $ixhQuery->Push( $scope => $elem );
     print STDERR "hoist from: ", $node->stringify(), "\n" if MONITOR;
 
-    my $mongoDBQuery = Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::_hoist($node);
-    print STDERR "HoistS ",$node->stringify()," -> /",Dumper($mongoDBQuery),"/\n" if MONITOR;
+    my $mongoDBQuery;
+    try {
+        $mongoDBQuery =
+          Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::_hoist($node);
+        print STDERR "HoistS ", $node->stringify(), " -> /",
+          Dumper($mongoDBQuery), "/\n"
+          if MONITOR;
+    }
+    catch Error::Simple with {
+        my $e = shift;
+        print STDERR "HoistS ", $node->stringify(),
+          " Hoist Failure (" . $e->stringify() . ")\n"
+          if MONITOR;
+
+    }
     return $mongoDBQuery;
 }
 
 sub _hoist {
     my $node = shift;
-    
+
     #name, or constants.
-    if ((!ref($node->{op})) and 
-            (($node->{op} == Foswiki::Infix::Node::NAME) or 
-            ($node->{op} == Foswiki::Infix::Node::NUMBER) or 
-            ($node->{op} == Foswiki::Infix::Node::STRING)
-            )) {
-#TODO: map to the MongoDB field names
-        return $node->{params}[0];
+    if ( !ref( $node->{op} ) ) {
+        if ( $node->{op} == Foswiki::Infix::Node::NAME ) {
+
+            #TODO: map to the MongoDB field names (name, web, text, fieldname)
+            if ( $node->{params}[0] eq 'name' ) {
+                return '_topic';
+            }
+            elsif ( $node->{params}[0] eq 'web' ) {
+                return '_web';
+            }
+            elsif ( $node->{params}[0] eq 'text' ) {
+                return '_text';
+            }
+            return 'FIELD.' . $node->{params}[0] . '.value';
+        }
+        elsif (( $node->{op} == Foswiki::Infix::Node::NUMBER )
+            or ( $node->{op} == Foswiki::Infix::Node::STRING ) )
+        {
+            return $node->{params}[0];
+        }
     }
-    
+
     #TODO: if 2 constants(NUMBER,STRING) ASSERT
     #TODO: if the first is a constant, swap
-        
-print STDERR "\nparam0(".$node->{params}[0]->{op}."): ", Data::Dumper::Dumper($node->{params}[0]), "\n" if MONITOR;
-print STDERR "\nparam1(".$node->{params}[1]->{op}."): ", Data::Dumper::Dumper($node->{params}[1]), "\n" if MONITOR;
 
-     $node->{lhs} = Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::_hoist( $node->{params}[0] ) if ($node->{op}->{arity} > 0);
-     $node->{rhs} = Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::_hoist( $node->{params}[1] ) if ($node->{op}->{arity} > 0);
-print STDERR "----lhs: ".Data::Dumper::Dumper($node->{lhs})."----rhs: ".Data::Dumper::Dumper($node->{rhs})." \n" if MONITOR;
-        
-    
-    print STDERR "node->op=".$node->{op}." ref(node->op)=".ref($node->{op})."|\n";
+    print STDERR "\nparam0(" . $node->{params}[0]->{op} . "): ",
+      Data::Dumper::Dumper( $node->{params}[0] ), "\n"
+      if MONITOR;
+    print STDERR "\nparam1(" . $node->{params}[1]->{op} . "): ",
+      Data::Dumper::Dumper( $node->{params}[1] ), "\n"
+      if MONITOR;
+
+    $node->{lhs} = Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::_hoist(
+        $node->{params}[0] )
+      if ( $node->{op}->{arity} > 0 );
+    $node->{rhs} = Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::_hoist(
+        $node->{params}[1] )
+      if ( $node->{op}->{arity} > 0 );
+    print STDERR "----lhs: "
+      . Data::Dumper::Dumper( $node->{lhs} )
+      . "----rhs: "
+      . Data::Dumper::Dumper( $node->{rhs} ) . " \n"
+      if MONITOR;
+
+    print STDERR "node->op="
+      . $node->{op}
+      . " ref(node->op)="
+      . ref( $node->{op} ) . "\n";
+    throw Error::Simple( 'failed to Hoist ' . ref( $node->{op} ) . "\n" )
+      unless ( $node->{op}->can('hoistMongoDB') );
     return $node->{op}->hoistMongoDB($node);
 }
-
-
 
 ########################################################################################
 #Hoist the OP's
@@ -91,12 +130,13 @@ hoist ~ into a mongoDB ixHash query
 
 package Foswiki::Query::OP_eq;
 use Assert;
+
 sub hoistMongoDB {
-    my $op = shift;
+    my $op   = shift;
     my $node = shift;
-    
-    ASSERT ( $node->{op}->{name} eq '=' ) if DEBUG;
-    return {$node->{lhs} => $node->{rhs}};
+
+    ASSERT( $node->{op}->{name} eq '=' ) if DEBUG;
+    return { $node->{lhs} => $node->{rhs} };
 }
 
 =begin TML
@@ -108,16 +148,17 @@ hoist ~ into a mongoDB ixHash query
 =cut
 
 package Foswiki::Query::OP_like;
+
 sub hoistMongoDB {
-    my $op = shift;
+    my $op   = shift;
     my $node = shift;
-    
-    $node->{rhs} = quotemeta($node->{rhs});
-    $node->{rhs}          =~ s/\\\?/./g;
-    $node->{rhs}          =~ s/\\\*/.*/g;
+
+    $node->{rhs} = quotemeta( $node->{rhs} );
+    $node->{rhs} =~ s/\\\?/./g;
+    $node->{rhs} =~ s/\\\*/.*/g;
     $node->{rhs} = qr/$node->{rhs}/;
 
-    return {$node->{lhs} => $node->{rhs}};
+    return { $node->{lhs} => $node->{rhs} };
 }
 
 =begin TML
@@ -130,14 +171,15 @@ hoist ~ into a mongoDB ixHash query
 
 package Foswiki::Query::OP_dot;
 our %aliases = (
-#    attachments => 'META:FILEATTACHMENT',
-#    fields      => 'META:FIELD',
-#    form        => 'META:FORM',
-#    info        => 'META:TOPICINFO',
-#    moved       => 'META:TOPICMOVED',
-#    parent      => 'META:TOPICPARENT',
-#    preferences => 'META:PREFERENCE',
-    name    => '_topic'
+
+    #    attachments => 'META:FILEATTACHMENT',
+    #    fields      => 'META:FIELD',
+    #    form        => 'META:FORM',
+    #    info        => 'META:TOPICINFO',
+    #    moved       => 'META:TOPICMOVED',
+    #    parent      => 'META:TOPICPARENT',
+    #    preferences => 'META:PREFERENCE',
+    name => '_topic'
 );
 
 sub hoistMongoDB {
@@ -145,24 +187,48 @@ sub hoistMongoDB {
 }
 
 package Foswiki::Query::OP_and;
+
 package Foswiki::Query::OP_or;
+
 package Foswiki::Query::OP_not;
 
 package Foswiki::Query::OP_gte;
+
 package Foswiki::Query::OP_gt;
+
 package Foswiki::Query::OP_lte;
+
 package Foswiki::Query::OP_lt;
+
 package Foswiki::Query::OP_match;
+
+sub hoistMongoDB {
+    my $op   = shift;
+    my $node = shift;
+
+    $node->{rhs} = quotemeta( $node->{rhs} );
+    $node->{rhs} =~ s/\\\././g;
+    $node->{rhs} =~ s/\\\*/*/g;
+    $node->{rhs} = qr/$node->{rhs}/;
+
+    return { $node->{lhs} => $node->{rhs} };
+}
+
 package Foswiki::Query::OP_ne;
 
 package Foswiki::Query::OP_d2n;
-package Foswiki::Query::OP_lc;
-package Foswiki::Query::OP_length;
-package Foswiki::Query::OP_ob;
-package Foswiki::Query::OP_ref;
-package Foswiki::Query::OP_uc;
-package Foswiki::Query::OP_where;
 
+package Foswiki::Query::OP_lc;
+
+package Foswiki::Query::OP_length;
+
+package Foswiki::Query::OP_ob;
+
+package Foswiki::Query::OP_ref;
+
+package Foswiki::Query::OP_uc;
+
+package Foswiki::Query::OP_where;
 
 1;
 __DATA__
