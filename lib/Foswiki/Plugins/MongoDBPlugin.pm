@@ -120,6 +120,7 @@ sub getMongoDB {
     return $Foswiki::Func::SESSION->{MongoDB};
 }
 
+#restHandler used to update the requested web.
 sub _update {
     my $session = shift;
     my $query   = Foswiki::Func::getCgiQuery();
@@ -129,10 +130,22 @@ sub _update {
 
     my $count = 0;
     foreach my $topic (@topicList) {
-        my ( $meta, $text ) = Foswiki::Func::readTopic( $web, $topic );
+        my ( $meta, $text, $raw_text);# = Foswiki::Func::readTopic( $web, $topic );
+        my $filename = join('/', ($Foswiki::cfg{PubDir}, $web, $topic.'.txt'));
+        if ((1 == 2) and (($Foswiki::cfg{Store}{Implementation} eq 'Foswiki::Store::RcsWrap') or 
+                    ($Foswiki::cfg{Store}{Implementation} eq 'Foswiki::Store::RcsLite')) and 
+                (-e $filename)) {
+            #if this happens to be a normal file based store, then we can speed things up a bit by breaking the Store abstraction
+            $raw_text = Foswiki::Func::readFile( $filename );
+            $raw_text =~ s/\r//g;    # Remove carriage returns
+            $meta->setEmbeddedStoreForm($raw_text);
+            $text = $meta->text();
+        } else {
+            ($meta, $text ) = Foswiki::Func::readTopic( $web, $topic );
+        }
 
-	#TODO: listener called for webs too.. (delete, move etc)
-        _updateTopic( $web, $topic, $meta );
+        #TODO: listener called for webs too.. (delete, move etc)
+        _updateTopic( $web, $topic, $meta, $raw_text );
 
         $count++;
     }
@@ -144,6 +157,7 @@ sub _updateTopic {
     my $web       = shift;
     my $topic     = shift;
     my $savedMeta = shift;
+    my $raw_text = shift;  #if we already have the embeddedStoreForm store form, we can avoid re-serialising.
 
     #print STDERR "-update($web, $topic)\n";
 
@@ -196,7 +210,7 @@ sub _updateTopic {
 
     }
 
-    $meta->{_raw_text} = $savedMeta->getEmbeddedStoreForm();
+    $meta->{_raw_text} = $raw_text || $savedMeta->getEmbeddedStoreForm();
 
     my $ret = getMongoDB()->update( 'current', "$web.$topic", $meta );
 }
