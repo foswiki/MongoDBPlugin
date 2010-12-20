@@ -207,7 +207,18 @@ sub test_hoistANDAND {
     print STDERR "HoistS ", $query->stringify(), " -> /", Dumper($mongoDBQuery),
       "/\n";
 }
+sub test_hoistSimpleDOT {
+    my $this        = shift;
+    my $s           = "number.bana = 12";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
 
+    use Data::Dumper;
+    print STDERR "HoistS ", $query->stringify(), " -> /", Dumper($mongoDBQuery),
+      "/\n";
+}
 sub test_hoistCompound {
     my $this = shift;
     my $s =

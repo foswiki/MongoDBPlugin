@@ -11,17 +11,18 @@ extract MonogDB queries from Query Nodes to accellerate querying
 package Foswiki::Plugins::MongoDBPlugin::HoistMongoDB;
 
 use strict;
+use warnings;
 
 use Foswiki::Infix::Node ();
 use Foswiki::Query::Node ();
 use Tie::IxHash          ();
 use Data::Dumper;
-use Assert;
 use Error::Simple;
+use Assert;
 
 use Foswiki::Query::HoistREs ();
 
-use constant MONITOR => 1;
+use constant MONITOR => 0;
 
 =begin TML
 
@@ -66,6 +67,10 @@ sub _hoist {
     if ( !ref( $node->{op} ) ) {
         return Foswiki::Query::OP_dot::hoistMongoDB($node);
     }
+    if ( ref( $node->{op} ) eq 'Foswiki::Query::OP_dot' ) {
+        return Foswiki::Query::OP_dot::hoistMongoDB($node);
+    }
+    print STDERR "???????" . ref( $node->{op} ) . "\n" if MONITOR;
 
     #TODO: if 2 constants(NUMBER,STRING) ASSERT
     #TODO: if the first is a constant, swap
@@ -104,7 +109,7 @@ sub _hoist {
     print STDERR "Hoist node->op="
       . Dumper( $node->{op} )
       . " ref(node->op)="
-      . ref( $node->{op} ) . "\n";
+      . ref( $node->{op} ) . "\n" if MONITOR;;
 
 #DAMMIT, I presume we have oddly nested eval/try catch so throwing isn't working
 #throw Error::Simple( 'failed to Hoist ' . ref( $node->{op} ) . "\n" )
@@ -190,7 +195,42 @@ our %aliases = (
 sub hoistMongoDB {
     my $node = shift;
 
-    if ( $node->{op} == Foswiki::Infix::Node::NAME ) {
+    if ( ref( $node->{op} ) ) {
+        my $lhs = $node->{params}[0];
+        my $rhs = $node->{params}[1];
+
+        #        ASSERT( !ref( $lhs->{op} ) ) if DEBUG;
+        #        ASSERT( !ref( $rhs->{op} ) ) if DEBUG;
+        #        ASSERT( $lhs->{op} eq Foswiki::Infix::Node::NAME ) if DEBUG;
+        #        ASSERT( $rhs->{op} eq Foswiki::Infix::Node::NAME )
+        #          if DEBUG;
+
+        $lhs = $lhs->{params}[0];
+        $rhs = $rhs->{params}[0];
+        if ( $Foswiki::Query::Node::aliases{$lhs} ) {
+            $lhs = $Foswiki::Query::Node::aliases{$lhs};
+        }
+
+#        print STDERR "hoist OP_dot("
+#          . ref( $node->{op} ) . ", "
+#          . Data::Dumper::Dumper($node)
+#          . ")\n INTO "
+#          . $lhs . '.'
+#          . $rhs . "\n";
+
+        if ( $lhs =~ s/^META:// ) {
+            return $lhs . '.' . $rhs;
+        }
+        else {
+
+            # Otherwise assume the term before the dot is the form name
+            return $rhs;
+        }
+    }
+    elsif ( $node->{op} == Foswiki::Infix::Node::NAME ) {
+#        print STDERR "hoist OP_dot("
+#          . $node->{op} . ", "
+#          . $node->{params}[0] . ")\n";
 
         #TODO: map to the MongoDB field names (name, web, text, fieldname)
         return $aliases{ $node->{params}[0] }
@@ -230,13 +270,49 @@ sub hoistMongoDB {
 
 package Foswiki::Query::OP_not;
 
+sub hoistMongoDB {
+    my $op   = shift;
+    my $node = shift;
+
+    return { %{ $node->{lhs} } => { '$not' => %{ $node->{rhs} } } };
+}
+
 package Foswiki::Query::OP_gte;
+
+sub hoistMongoDB {
+    my $op   = shift;
+    my $node = shift;
+
+    return { %{ $node->{lhs} } => { '$gte' => %{ $node->{rhs} } } };
+}
 
 package Foswiki::Query::OP_gt;
 
+sub hoistMongoDB {
+    my $op   = shift;
+    my $node = shift;
+
+    return { $node->{lhs} => { '$gt' => $node->{rhs} } };
+#    return { %{ $node->{lhs} } => { '$gt' => %{ $node->{rhs} } } };
+}
+
 package Foswiki::Query::OP_lte;
 
+sub hoistMongoDB {
+    my $op   = shift;
+    my $node = shift;
+
+    return { %{ $node->{lhs} } => { '$lte' => %{ $node->{rhs} } } };
+}
+
 package Foswiki::Query::OP_lt;
+
+sub hoistMongoDB {
+    my $op   = shift;
+    my $node = shift;
+
+    return { %{ $node->{lhs} } => { '$lt' => %{ $node->{rhs} } } };
+}
 
 package Foswiki::Query::OP_match;
 

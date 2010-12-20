@@ -25,6 +25,8 @@ use strict;
 
 use Foswiki::Func    ();    # The plugins API
 use Foswiki::Plugins ();    # For the API version
+use Data::Dumper;
+
 our $VERSION = '$Rev: 5771 $';
 our $RELEASE = '1.1.1';
 our $SHORTDESCRIPTION =
@@ -72,16 +74,19 @@ add another Header element to simplify performance testing
 =cut
 
 sub completePageHandler {
-#    my( $html, $httpHeaders ) = @_;
-#    # modify $_[0] or $_[1] if you must change the HTML or headers
-#    # You can work on $html and $httpHeaders in place by using the
-#    # special perl variables $_[0] and $_[1]. These allow you to operate
-#    # on parameters as if they were passed by reference; for example:
-#    # $_[0] =~ s/SpecialString/my alternative/ge;
-        $Foswiki::Plugins::SESSION->{response}->pushHeader('X-Foswiki-Monitor-MongoDBPlugin-lastQueryTime', (getMongoDB()->{lastQueryTime}||'noQuery'));
+
+    #    my( $html, $httpHeaders ) = @_;
+    #    # modify $_[0] or $_[1] if you must change the HTML or headers
+    #    # You can work on $html and $httpHeaders in place by using the
+    #    # special perl variables $_[0] and $_[1]. These allow you to operate
+    #    # on parameters as if they were passed by reference; for example:
+    #    # $_[0] =~ s/SpecialString/my alternative/ge;
+    $Foswiki::Plugins::SESSION->{response}->pushHeader(
+        'X-Foswiki-Monitor-MongoDBPlugin-lastQueryTime',
+        ( getMongoDB()->{lastQueryTime} || 'noQuery' )
+    );
 
 }
-
 
 sub afterSaveHandler {
     return
@@ -150,18 +155,32 @@ sub _update {
 
     my $count = 0;
     foreach my $topic (@topicList) {
-        my ( $meta, $text, $raw_text);# = Foswiki::Func::readTopic( $web, $topic );
-        my $filename = join('/', ($Foswiki::cfg{PubDir}, $web, $topic.'.txt'));
-        if ((1 == 2) and (($Foswiki::cfg{Store}{Implementation} eq 'Foswiki::Store::RcsWrap') or 
-                    ($Foswiki::cfg{Store}{Implementation} eq 'Foswiki::Store::RcsLite')) and 
-                (-e $filename)) {
-            #if this happens to be a normal file based store, then we can speed things up a bit by breaking the Store abstraction
-            $raw_text = Foswiki::Func::readFile( $filename );
+        my ( $meta, $text, $raw_text )
+          ;    # = Foswiki::Func::readTopic( $web, $topic );
+        my $filename =
+          join( '/', ( $Foswiki::cfg{PubDir}, $web, $topic . '.txt' ) );
+        if (
+            ( 1 == 2 )
+            and (
+                (
+                    $Foswiki::cfg{Store}{Implementation} eq
+                    'Foswiki::Store::RcsWrap'
+                )
+                or ( $Foswiki::cfg{Store}{Implementation} eq
+                    'Foswiki::Store::RcsLite' )
+            )
+            and ( -e $filename )
+          )
+        {
+
+#if this happens to be a normal file based store, then we can speed things up a bit by breaking the Store abstraction
+            $raw_text = Foswiki::Func::readFile($filename);
             $raw_text =~ s/\r//g;    # Remove carriage returns
             $meta->setEmbeddedStoreForm($raw_text);
             $text = $meta->text();
-        } else {
-            ($meta, $text ) = Foswiki::Func::readTopic( $web, $topic );
+        }
+        else {
+            ( $meta, $text ) = Foswiki::Func::readTopic( $web, $topic );
         }
 
         #TODO: listener called for webs too.. (delete, move etc)
@@ -177,7 +196,8 @@ sub _updateTopic {
     my $web       = shift;
     my $topic     = shift;
     my $savedMeta = shift;
-    my $raw_text = shift;  #if we already have the embeddedStoreForm store form, we can avoid re-serialising.
+    my $raw_text  = shift
+      ; #if we already have the embeddedStoreForm store form, we can avoid re-serialising.
 
     #print STDERR "-update($web, $topic)\n";
 
@@ -187,47 +207,62 @@ sub _updateTopic {
     };
 
     foreach my $key ( keys(%$savedMeta) ) {
+#print STDERR "------------------ importing $key - ".ref($savedMeta->{$key})."\n";
         next if ( $key eq '_session' );
+
         #not totally sure if there's a benefit to using / not the _indices
         next if ( $key eq '_indices' );
 
 #TODO: as of Oct 2010, mongodb can't sort on an element in an array, so we de-array the ARRAYs.
 #TODO: use the registered list of META elements, and the type that is registered.
-        if (   ( $key eq 'TOPICINFO' )
-            or ( $key eq 'TOPICPARENT' ) )
+        if ($Foswiki::Meta::isArrayType{$key})
         {
-
-#shorcut version of the foreach below because atm, we know there is only one element in the array.
-            $meta->{$key} = $savedMeta->{$key}[0];
-            if ($key eq 'TOPICINFO') {
-                #TODO: foswiki's sort by TOPICINFO.author sorts by WikiName, not CUID - so need to make an internal version of this
-                # to support sort=editby => 'TOPICINFO._authorWikiName', 
-                $meta->{$key}{_authorWikiName} = Foswiki::Func::getWikiName($meta->{$key}{author});
-            }
-        }
-        elsif
-          ( #probably should just 'if ARRAY' but that makes it harder to un-array later.
-            ( $key    eq 'FILEATTACHMENT' )
-            or ( $key eq 'FIELD' )
-            or ( $key eq 'PREFERENCE' )
-          )
-        {
+#print STDERR "---- $key == many\n";
             my $FIELD = $savedMeta->{$key};
             $meta->{$key} = {};
-            
+
             foreach my $elem (@$FIELD) {
-                if ($key eq 'FIELD') {
-                    #TODO: move this into the search algo, so it makes an index the first time someone builds an app that sorts on it.
-                    #even then, we have a hard limit of 40 indexes, so we're going to have to get more creative.
-                    #mind you, we don't really need indexes for speed, just to cope with query() resultsets that contain more than 1Meg of documents - so maybe we can delay creation until that happens?
-                    getMongoDB()->ensureIndex( 'current', { $key.'.'.$elem->{name} => 1 }, {name=>$key.'.'.$elem->{name}});
+                if ( $key eq 'FIELD' ) {
+
+#TODO: move this into the search algo, so it makes an index the first time someone builds an app that sorts on it.
+#even then, we have a hard limit of 40 indexes, so we're going to have to get more creative.
+#mind you, we don't really need indexes for speed, just to cope with query() resultsets that contain more than 1Meg of documents - so maybe we can delay creation until that happens?
+                    getMongoDB()->ensureIndex(
+                        'current',
+                        { $key . '.' . $elem->{name} => 1 },
+                        { name => $key . '.' . $elem->{name} }
+                    );
                 }
-                
+
                 $meta->{$key}{ $elem->{name} } = $elem;
             }
-            next;
         }
+        else {
+            if (ref($savedMeta->{$key}) eq '') {
+#print STDERR "-A---$key - ".ref($savedMeta->{$key})."\n";
+                $meta->{$key} = $savedMeta->{$key};
+            } else {
+if (ref($savedMeta->{$key}) ne 'ARRAY') {
+    #i don't know why, but this is never triggered, but without it, i get a crash.
+    #so, i presume there is a weird case where it happens
+    print STDERR "-B---($web . $topic) $key - ".ref($savedMeta->{$key})."\n";
+    print STDERR Dumper($savedMeta->{$key})."\n";
+    print STDERR "\n######################################################## BOOOOOOOOM\n";
+    next;
+}
+#print STDERR Dumper(shift(@{$savedMeta->{$key}}))."\n";
+                
+    #shorcut version of the foreach below because atm, we know there is only one element in the array.
+                #$meta->{$key} = $savedMeta->{$key}[0];
+                if ( $key eq 'TOPICINFO' ) {
 
+    #TODO: foswiki's sort by TOPICINFO.author sorts by WikiName, not CUID - so need to make an internal version of this
+    # to support sort=editby => 'TOPICINFO._authorWikiName',
+                    $meta->{$key}{_authorWikiName} =
+                      Foswiki::Func::getWikiName( $meta->{$key}{author} );
+                }
+            }
+        }
     }
 
     $meta->{_raw_text} = $raw_text || $savedMeta->getEmbeddedStoreForm();

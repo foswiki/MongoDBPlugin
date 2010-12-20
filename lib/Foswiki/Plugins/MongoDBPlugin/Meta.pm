@@ -42,43 +42,33 @@ sub new {
 
 #TODO: if $data is undef - see if its in mongoDB already, and if so, load it... ((OR... this should happen in the load/reload mess))
 
-    my @validKeys = keys(%Foswiki::Meta::VALIDATE);
-    push( @validKeys, '_text' );
-    @$meta{@validKeys} = @$data{@validKeys};
-
 #doooooood, shouln't this be in the reload?
 #TODO: as of Oct 2010, mongodb can't sort on an element in an array, so we re-array the meta (see Foswiki::Plugins::MongoDBPlugin::_updateTopic).
-    my $temp = $meta->{TOPICINFO};
-    $meta->{TOPICINFO} = [];
-    if ( defined($temp) ) {
-        push( @{ $meta->{TOPICINFO} }, %$temp );
-        undef $temp->{TOPICINFO}{_authorWikiName};
-    }
-
-    $temp = $meta->{TOPICPARENT};
-    $meta->{TOPICPARENT} = [];
-    push( @{ $meta->{TOPICPARENT} }, %$temp ) if ( defined($temp) );
-
-    if ( defined( $meta->{FIELD} ) ) {
-        my %FIELD = $meta->{FIELD};
-        $meta->{FIELD} = [];
-        foreach my $elem ( keys(%FIELD) ) {
-            push( @{ $meta->{FIELD} }, $FIELD{$elem} );
+    $meta->{_text} = $data->{_text};
+    foreach my $key ( keys(%Foswiki::Meta::VALIDATE) ) {
+        if ( $Foswiki::Meta::isArrayType{$key} )
+        {
+            if ( defined( $data->{$key} ) ) {
+                my %FIELD = $data->{$key};
+                $meta->{$key} = [];
+                foreach my $elem ( keys(%FIELD) ) {
+                    push( @{ $meta->{$key} }, $FIELD{$elem} );
+                }
+            }
         }
-    }
-    if ( defined( $meta->{FILEATTACHMENT} ) ) {
-        my %FILEATTACHMENT = $meta->{FILEATTACHMENT};
-        $meta->{FILEATTACHMENT} = [];
-        foreach my $elem ( keys(%FILEATTACHMENT) ) {
-            push( @{ $meta->{FILEATTACHMENT} }, $FILEATTACHMENT{$elem} );
+        else {
+            if (ref(\$data->{$key}) eq 'SCALAR') {
+                $meta->{$key} = $data->{$key};
+            } else {
+                my $temp = $data->{$key};
+                $meta->{$key} = [];
+                if ( defined($temp) ) {
+                    push( @{ $meta->{$key} }, %$temp );
+                    undef $meta->{$key}{_authorWikiName} if ( $key eq 'TOPICINFO' );
+                }
+            }
         }
-    }
-    if ( defined( $meta->{PREFERENCE} ) ) {
-        my %PREFERENCE = $meta->{PREFERENCE};
-        $meta->{PREFERENCE} = [];
-        foreach my $elem ( keys(%PREFERENCE) ) {
-            push( @{ $meta->{PREFERENCE} }, $PREFERENCE{$elem} );
-        }
+        
     }
 
     return $meta;
