@@ -110,14 +110,16 @@ sub _webQuery {
     if ( defined( $Foswiki::cfg{Plugins}{MongoDBPlugin}{ExperimentalCode} )
         and $Foswiki::cfg{Plugins}{MongoDBPlugin}{ExperimentalCode} )
     {
+
         #try HoistMongoDB first
         my $mongoQuery =
           Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
 
         if ( defined($mongoQuery) ) {
-#TODO: where are we limiting the query to the $web?
-            ASSERT(not defined($mongoQuery->{'_web'})) if DEBUG;
-            $mongoQuery->{'_web'} = $web ;
+
+            #TODO: where are we limiting the query to the $web?
+            ASSERT( not defined( $mongoQuery->{'_web'} ) ) if DEBUG;
+            $mongoQuery->{'_web'} = $web;
 
             #limit, skip, sort_by
             my $SortDirection = Foswiki::isTrue( $options->{reverse} ) ? -1 : 1;
@@ -144,6 +146,7 @@ sub _webQuery {
             }
             else {
                 if ( $options->{order} =~ /formfield\((.*)\)/ ) {
+
 #TODO: this will crash things - I need to work on indexes, and one collection per web/form_def
 #                    $orderBy = 'FIELD.' . $1.'value';
 #                    $queryAttrs = { sort_by => { $orderBy => $SortDirection } };

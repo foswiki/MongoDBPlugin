@@ -35,7 +35,6 @@ sub hoist {
 
     return undef unless ref( $node->{op} );
 
-
     print STDERR "hoist from: ", $node->stringify(), "\n" if MONITOR;
 
 #TODO: use IxHash to keep the hash order - _some_ parts of queries are order sensitive
@@ -46,13 +45,13 @@ sub hoist {
 
     $mongoDBQuery =
       Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::_hoist($node);
-      
-      #TODO: sadly, the exception throwing wasn't working so I'm using a brutish propogate error
-      if (defined($mongoDBQuery->{ERROR})) {
-          print STDERR "AAAAARGH ".$mongoDBQuery->{ERROR}."\n";
-      }
-      
-    print STDERR "Hoisted to:  ", #$node->stringify(), " -> /",
+
+#TODO: sadly, the exception throwing wasn't working so I'm using a brutish propogate error
+    if ( defined( $mongoDBQuery->{ERROR} ) ) {
+        print STDERR "AAAAARGH " . $mongoDBQuery->{ERROR} . "\n";
+    }
+
+    print STDERR "Hoisted to:  ",    #$node->stringify(), " -> /",
       Dumper($mongoDBQuery), "/\n"
       if MONITOR;
 
@@ -80,12 +79,14 @@ sub _hoist {
     $node->{lhs} = Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::_hoist(
         $node->{params}[0] )
       if ( $node->{op}->{arity} > 0 );
-    $node->{ERROR} = $node->{lhs}->{ERROR} if (ref( $node->{lhs} ) and defined($node->{lhs}->{ERROR}));
-      
+    $node->{ERROR} = $node->{lhs}->{ERROR}
+      if ( ref( $node->{lhs} ) and defined( $node->{lhs}->{ERROR} ) );
+
     $node->{rhs} = Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::_hoist(
         $node->{params}[1] )
       if ( $node->{op}->{arity} > 0 );
-    $node->{ERROR} = $node->{rhs}->{ERROR} if (ref( $node->{rhs} ) and defined($node->{rhs}->{ERROR}));
+    $node->{ERROR} = $node->{rhs}->{ERROR}
+      if ( ref( $node->{rhs} ) and defined( $node->{rhs}->{ERROR} ) );
 
     #TODO: mmm, do we only have unary and binary ops?
 
@@ -95,26 +96,26 @@ sub _hoist {
       . Data::Dumper::Dumper( $node->{rhs} ) . " \n"
       if MONITOR;
 
+    use Data::Dumper;
 
-use Data::Dumper;
-    #print STDERR "HoistS ",$query->stringify()," -> /",Dumper($mongoDBQuery),"/\n";
-    
+#print STDERR "HoistS ",$query->stringify()," -> /",Dumper($mongoDBQuery),"/\n";
+
     print STDERR "Hoist node->op="
-      . Dumper($node->{op})
+      . Dumper( $node->{op} )
       . " ref(node->op)="
       . ref( $node->{op} ) . "\n";
-      
-    #DAMMIT, I presume we have oddly nested eval/try catch so throwing isn't working
-    #throw Error::Simple( 'failed to Hoist ' . ref( $node->{op} ) . "\n" )
-    # unless ( $node->{op}->can('hoistMongoDB') );
+
+#DAMMIT, I presume we have oddly nested eval/try catch so throwing isn't working
+#throw Error::Simple( 'failed to Hoist ' . ref( $node->{op} ) . "\n" )
+# unless ( $node->{op}->can('hoistMongoDB') );
     unless ( $node->{op}->can('hoistMongoDB') ) {
         $node->{ERROR} = 'can\'t Hoist ' . ref( $node->{op} );
     }
-    if (defined($node->{ERROR})) {
-        print STDERR "HOIST ERROR: ".$node->{ERROR};
+    if ( defined( $node->{ERROR} ) ) {
+        print STDERR "HOIST ERROR: " . $node->{ERROR};
         return $node;
     }
-      
+
     return $node->{op}->hoistMongoDB($node);
 }
 
@@ -157,7 +158,7 @@ sub hoistMongoDB {
     my $rhs = quotemeta( $node->{rhs} );
     $rhs =~ s/\\\?/./g;
     $rhs =~ s/\\\*/.*/g;
-    $rhs = qr/$node->{rhs}/;
+    $rhs = qr/rhs/;
 
     return { $node->{lhs} => $rhs };
 }
@@ -181,17 +182,18 @@ our %aliases = (
     #    parent      => 'META:TOPICPARENT',
     #    preferences => 'META:PREFERENCE',
     name => '_topic',
-    web => '_web',
+    web  => '_web',
     text => '_text'
 );
 
 sub hoistMongoDB {
     my $node = shift;
-    
+
     if ( $node->{op} == Foswiki::Infix::Node::NAME ) {
 
         #TODO: map to the MongoDB field names (name, web, text, fieldname)
-        return $aliases{$node->{params}[0]} if ( defined($aliases{$node->{params}[0]}));
+        return $aliases{ $node->{params}[0] }
+          if ( defined( $aliases{ $node->{params}[0] } ) );
         return 'FIELD.' . $node->{params}[0] . '.value';
     }
     elsif (( $node->{op} == Foswiki::Infix::Node::NUMBER )
@@ -207,7 +209,7 @@ sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
 
-    return { %{$node->{lhs}}, %{$node->{rhs}}};
+    return { %{ $node->{lhs} }, %{ $node->{rhs} } };
 }
 
 package Foswiki::Query::OP_or;
@@ -215,14 +217,14 @@ package Foswiki::Query::OP_or;
 sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
-    
+
     #need to detect nested OR's and unwind them
-    if (defined($node->{lhs}->{'$or'})) {
-        push(@{$node->{lhs}->{'$or'}}, $node->{rhs});
+    if ( defined( $node->{lhs}->{'$or'} ) ) {
+        push( @{ $node->{lhs}->{'$or'} }, $node->{rhs} );
         return $node->{lhs};
     }
 
-    return { '$or' => [ $node->{lhs}, $node->{rhs} ]};
+    return { '$or' => [ $node->{lhs}, $node->{rhs} ] };
 }
 
 package Foswiki::Query::OP_not;
@@ -244,7 +246,7 @@ sub hoistMongoDB {
     my $rhs = quotemeta( $node->{rhs} );
     $rhs =~ s/\\\././g;
     $rhs =~ s/\\\*/*/g;
-    $rhs = qr/$node->{rhs}/;
+    $rhs = qr/$rhs/;
 
     return { $node->{lhs} => $rhs };
 }
@@ -258,6 +260,7 @@ package Foswiki::Query::OP_lc;
 package Foswiki::Query::OP_length;
 
 package Foswiki::Query::OP_ob;
+
 # ( )
 sub hoistMongoDB {
     my $op   = shift;

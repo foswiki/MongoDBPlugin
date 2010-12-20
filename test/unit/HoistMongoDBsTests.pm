@@ -70,13 +70,17 @@ sub set_up {
         { name => "number", title => "Number", value => "99" } );
     $meta->putKeyed( 'FIELD',
         { name => "string", title => "String", value => "String" } );
-    $meta->putKeyed( 'FIELD',
-        { name => "StringWithChars", title => "StringWithChars",
-          value => "n\nn t\tt s\\s q'q o#o h#h X~X \\b \\a \\e \\f \\r \\cX" } );
+    $meta->putKeyed(
+        'FIELD',
+        {
+            name  => "StringWithChars",
+            title => "StringWithChars",
+            value => "n\nn t\tt s\\s q'q o#o h#h X~X \\b \\a \\e \\f \\r \\cX"
+        }
+    );
     $meta->putKeyed( 'FIELD',
         { name => "boolean", title => "Boolean", value => "1" } );
-    $meta->putKeyed( 'FIELD',
-        { name => "macro", value => "%RED%" } );
+    $meta->putKeyed( 'FIELD', { name => "macro", value => "%RED%" } );
 
     $meta->{_text} = "Green ideas sleep furiously";
 
@@ -88,14 +92,17 @@ sub test_hoistSimple {
     my $s           = "number=99";
     my $queryParser = new Foswiki::Query::Parser();
     my $query       = $queryParser->parse($s);
-    my $mongoDBQuery = Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
 
-use Data::Dumper;
-    print STDERR "HoistS ",$query->stringify()," -> /",Dumper($mongoDBQuery),"/\n";
-#    $this->assert_str_equals( '^%META:FIELD{name=\"number\".*\bvalue=\"99\"',
-#        join( ';', map {$_->{regex}} @filter ) );
-#    my $meta = $this->{meta};
-#    my $val = $query->evaluate( tom => $meta, data => $meta );
+    use Data::Dumper;
+    print STDERR "HoistS ", $query->stringify(), " -> /", Dumper($mongoDBQuery),
+      "/\n";
+
+  #    $this->assert_str_equals( '^%META:FIELD{name=\"number\".*\bvalue=\"99\"',
+  #        join( ';', map {$_->{regex}} @filter ) );
+  #    my $meta = $this->{meta};
+  #    my $val = $query->evaluate( tom => $meta, data => $meta );
 }
 
 sub test_hoistSimple_OP_Like {
@@ -103,14 +110,17 @@ sub test_hoistSimple_OP_Like {
     my $s           = "String~'.*rin.*'";
     my $queryParser = new Foswiki::Query::Parser();
     my $query       = $queryParser->parse($s);
-    my $mongoDBQuery = Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
 
-use Data::Dumper;
-    print STDERR "HoistS ",$query->stringify()," -> /",Dumper($mongoDBQuery),"/\n";
-#    $this->assert_str_equals( '^%META:FIELD{name=\"number\".*\bvalue=\"99\"',
-#        join( ';', map {$_->{regex}} @filter ) );
-#    my $meta = $this->{meta};
-#    my $val = $query->evaluate( tom => $meta, data => $meta );
+    use Data::Dumper;
+    print STDERR "HoistS ", $query->stringify(), " -> /", Dumper($mongoDBQuery),
+      "/\n";
+
+  #    $this->assert_str_equals( '^%META:FIELD{name=\"number\".*\bvalue=\"99\"',
+  #        join( ';', map {$_->{regex}} @filter ) );
+  #    my $meta = $this->{meta};
+  #    my $val = $query->evaluate( tom => $meta, data => $meta );
 }
 
 sub test_hoistSimple2 {
@@ -118,14 +128,17 @@ sub test_hoistSimple2 {
     my $s           = "99=number";
     my $queryParser = new Foswiki::Query::Parser();
     my $query       = $queryParser->parse($s);
-    my $mongoDBQuery = Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
 
-use Data::Dumper;
-    print STDERR "HoistS ",$query->stringify()," -> /",Dumper($mongoDBQuery),"/\n";
-#    $this->assert_str_equals( '^%META:FIELD{name=\"number\".*\bvalue=\"99\"',
-#        join( ';', map {$_->{regex}}@filter ) );
-#    my $meta = $this->{meta};
-#    my $val = $query->evaluate( tom => $meta, data => $meta );
+    use Data::Dumper;
+    print STDERR "HoistS ", $query->stringify(), " -> /", Dumper($mongoDBQuery),
+      "/\n";
+
+  #    $this->assert_str_equals( '^%META:FIELD{name=\"number\".*\bvalue=\"99\"',
+  #        join( ';', map {$_->{regex}}@filter ) );
+  #    my $meta = $this->{meta};
+  #    my $val = $query->evaluate( tom => $meta, data => $meta );
 }
 
 sub test_hoistOR {
@@ -133,10 +146,12 @@ sub test_hoistOR {
     my $s           = "number=12 or string='bana'";
     my $queryParser = new Foswiki::Query::Parser();
     my $query       = $queryParser->parse($s);
-    my $mongoDBQuery = Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
 
-use Data::Dumper;
-    print STDERR "HoistS ",$query->stringify()," -> /",Dumper($mongoDBQuery),"/\n";
+    use Data::Dumper;
+    print STDERR "HoistS ", $query->stringify(), " -> /", Dumper($mongoDBQuery),
+      "/\n";
 }
 
 sub test_hoistOROR {
@@ -144,10 +159,12 @@ sub test_hoistOROR {
     my $s           = "number=12 or string='bana' or string = 'apple'";
     my $queryParser = new Foswiki::Query::Parser();
     my $query       = $queryParser->parse($s);
-    my $mongoDBQuery = Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
 
-use Data::Dumper;
-    print STDERR "HoistS ",$query->stringify()," -> /",Dumper($mongoDBQuery),"/\n";
+    use Data::Dumper;
+    print STDERR "HoistS ", $query->stringify(), " -> /", Dumper($mongoDBQuery),
+      "/\n";
 }
 
 sub test_hoistBrace {
@@ -155,36 +172,40 @@ sub test_hoistBrace {
     my $s           = "(number=12)";
     my $queryParser = new Foswiki::Query::Parser();
     my $query       = $queryParser->parse($s);
-    my $mongoDBQuery = Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
 
-use Data::Dumper;
-#    print STDERR "HoistS ",$query->stringify();
-    print STDERR "HoistS ",Dumper($query);
-    print STDERR " -> /",Dumper($mongoDBQuery),"/\n";
+    use Data::Dumper;
+
+    #    print STDERR "HoistS ",$query->stringify();
+    print STDERR "HoistS ", Dumper($query);
+    print STDERR " -> /", Dumper($mongoDBQuery), "/\n";
 }
-
 
 sub test_hoistAND {
     my $this        = shift;
     my $s           = "number=12 and string='bana'";
     my $queryParser = new Foswiki::Query::Parser();
     my $query       = $queryParser->parse($s);
-    my $mongoDBQuery = Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
 
-use Data::Dumper;
-    print STDERR "HoistS ",$query->stringify()," -> /",Dumper($mongoDBQuery),"/\n";
+    use Data::Dumper;
+    print STDERR "HoistS ", $query->stringify(), " -> /", Dumper($mongoDBQuery),
+      "/\n";
 }
-
 
 sub test_hoistANDAND {
     my $this        = shift;
     my $s           = "number=12 and string='bana' and something='nothing'";
     my $queryParser = new Foswiki::Query::Parser();
     my $query       = $queryParser->parse($s);
-    my $mongoDBQuery = Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
 
-use Data::Dumper;
-    print STDERR "HoistS ",$query->stringify()," -> /",Dumper($mongoDBQuery),"/\n";
+    use Data::Dumper;
+    print STDERR "HoistS ", $query->stringify(), " -> /", Dumper($mongoDBQuery),
+      "/\n";
 }
 
 sub test_hoistCompound {
@@ -205,7 +226,7 @@ sub test_hoistCompound {
 '^%META:TOPICMOVED{.*\bby=\"AlbertCamus\"|^%META:TOPICMOVED{.*\bby=\".*bert.*\"',
         $filter[2]->{regex}
     );
-    $this->assert(!defined($filter[3]));
+    $this->assert( !defined( $filter[3] ) );
     my $meta = $this->{meta};
     my $val = $query->evaluate( tom => $meta, data => $meta );
 }
@@ -228,7 +249,7 @@ sub test_hoistCompound2 {
     $this->assert_str_equals(
         '^%META:FIELD{name=\"string\".*\bvalue=\"String\"',
         $filter[2]->{regex} );
-    $this->assert(!defined($filter[3]));
+    $this->assert( !defined( $filter[3] ) );
     my $meta = $this->{meta};
     my $val = $query->evaluate( tom => $meta, data => $meta );
 }
@@ -239,8 +260,10 @@ sub test_hoistAlias {
     my $queryParser = new Foswiki::Query::Parser();
     my $query       = $queryParser->parse($s);
     my @filter = Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
-    $this->assert_str_equals( '^%META:TOPICINFO{.*\bdate=\"12345\"',
-        join( ';', map {$_->{regex}}@filter ) );
+    $this->assert_str_equals(
+        '^%META:TOPICINFO{.*\bdate=\"12345\"',
+        join( ';', map { $_->{regex} } @filter )
+    );
     my $meta = $this->{meta};
     my $val = $query->evaluate( tom => $meta, data => $meta );
 }
@@ -251,8 +274,10 @@ sub test_hoistFormField {
     my $queryParser = new Foswiki::Query::Parser();
     my $query       = $queryParser->parse($s);
     my @filter = Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
-    $this->assert_str_equals( '^%META:FIELD{name=\"number\".*\bvalue=\"99\"',
-        join( ';', map {$_->{regex}}@filter ) );
+    $this->assert_str_equals(
+        '^%META:FIELD{name=\"number\".*\bvalue=\"99\"',
+        join( ';', map { $_->{regex} } @filter )
+    );
     my $meta = $this->{meta};
     my $val = $query->evaluate( tom => $meta, data => $meta );
 }
@@ -263,45 +288,48 @@ sub test_hoistText {
     my $queryParser = new Foswiki::Query::Parser();
     my $query       = $queryParser->parse($s);
     my @filter = Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
-    $this->assert_str_equals( '.*Green.*', join( ';', map {$_->{regex}}@filter ) );
+    $this->assert_str_equals( '.*Green.*',
+        join( ';', map { $_->{regex} } @filter ) );
     my $meta = $this->{meta};
     my $val = $query->evaluate( tom => $meta, data => $meta );
 }
 
-sub test_hoistName{
+sub test_hoistName {
     my $this        = shift;
     my $s           = "name ~ 'Web*'";
     my $queryParser = new Foswiki::Query::Parser();
     my $query       = $queryParser->parse($s);
     my @filter = Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
-    $this->assert_str_equals( 'name', $filter[0]->{node} );
+    $this->assert_str_equals( 'name',  $filter[0]->{node} );
     $this->assert_str_equals( 'Web.*', $filter[0]->{regex} );
-    $this->assert_str_equals( 'Web*', $filter[0]->{source} );
-    $this->assert(!defined($filter[1]));
+    $this->assert_str_equals( 'Web*',  $filter[0]->{source} );
+    $this->assert( !defined( $filter[1] ) );
     my $meta = $this->{meta};
     my $val = $query->evaluate( tom => $meta, data => $meta );
 }
 
-sub test_hoistName2{
+sub test_hoistName2 {
     my $this        = shift;
     my $s           = "name ~ 'Web*' OR name ~ 'A*' OR name = 'Banana'";
     my $queryParser = new Foswiki::Query::Parser();
     my $query       = $queryParser->parse($s);
     my @filter = Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
-    $this->assert_str_equals( 'name', $filter[0]->{node} );
+    $this->assert_str_equals( 'name',             $filter[0]->{node} );
     $this->assert_str_equals( 'Web.*|A.*|Banana', $filter[0]->{regex} );
-    $this->assert_str_equals( 'Web*,A*,Banana', $filter[0]->{source} );
-    $this->assert(!defined($filter[1]));
+    $this->assert_str_equals( 'Web*,A*,Banana',   $filter[0]->{source} );
+    $this->assert( !defined( $filter[1] ) );
     my $meta = $this->{meta};
     my $val = $query->evaluate( tom => $meta, data => $meta );
 }
+
 sub test_hoist_OPMatch {
     my $this        = shift;
     my $s           = "text =~ '.*Green.*'";
     my $queryParser = new Foswiki::Query::Parser();
     my $query       = $queryParser->parse($s);
     my @filter = Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
-    $this->assert_str_equals( '.*Green.*', join( ';', map {$_->{regex}}@filter ) );
+    $this->assert_str_equals( '.*Green.*',
+        join( ';', map { $_->{regex} } @filter ) );
     my $meta = $this->{meta};
     my $val = $query->evaluate( tom => $meta, data => $meta );
 }
