@@ -116,6 +116,7 @@ sub _webQuery {
           Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
 
         if ( defined($mongoQuery) ) {
+            ASSERT(not(defined($mongoQuery->{ERROR}))) if DEBUG;
 
             #TODO: where are we limiting the query to the $web?
             ASSERT( not defined( $mongoQuery->{'_web'} ) ) if DEBUG;

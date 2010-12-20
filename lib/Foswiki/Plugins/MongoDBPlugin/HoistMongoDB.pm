@@ -49,6 +49,7 @@ sub hoist {
 #TODO: sadly, the exception throwing wasn't working so I'm using a brutish propogate error
     if ( defined( $mongoDBQuery->{ERROR} ) ) {
         print STDERR "AAAAARGH " . $mongoDBQuery->{ERROR} . "\n";
+        return;
     }
 
     print STDERR "Hoisted to:  ",    #$node->stringify(), " -> /",
@@ -158,7 +159,7 @@ sub hoistMongoDB {
     my $rhs = quotemeta( $node->{rhs} );
     $rhs =~ s/\\\?/./g;
     $rhs =~ s/\\\*/.*/g;
-    $rhs = qr/rhs/;
+    $rhs = qr/$rhs/;
 
     return { $node->{lhs} => $rhs };
 }
