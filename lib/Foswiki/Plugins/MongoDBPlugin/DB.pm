@@ -55,12 +55,24 @@ sub query {
       . Dumper($ixhQuery) . " , "
       . Dumper($queryAttrs) . "\n"
       if MONITOR;
+
+#debugging for upstream
+#print STDERR "----------------------------------------------------------------------------------\n";
+#my $connection = $self->_connect();
+#my $database   = $connection->get_database( $self->{database} );
+#$database->run_command({"profile" => 2});
+
     my $cursor = $collection->query( $ixhQuery, $queryAttrs );
     print STDERR "found "
       . $cursor->count
       . " _BUT_ has_next is "
       . ( $cursor->has_next() ? 'true' : 'false' ) . "\n"
       if MONITOR;
+
+#more debugging
+#print STDERR "get_collection(system.profile)".Dumper($database->get_collection("system.profile")->find->all)."\n";
+#$database->run_command({"profile" => 0});
+#print STDERR "----------------------------------------------------------------------------------\n";
 
     #end timer
     my $endTime = [Time::HiRes::gettimeofday];
