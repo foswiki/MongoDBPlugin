@@ -128,6 +128,65 @@ use Data::Dumper;
 #    my $val = $query->evaluate( tom => $meta, data => $meta );
 }
 
+sub test_hoistOR {
+    my $this        = shift;
+    my $s           = "number=12 or string='bana'";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery = Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+use Data::Dumper;
+    print STDERR "HoistS ",$query->stringify()," -> /",Dumper($mongoDBQuery),"/\n";
+}
+
+sub test_hoistOROR {
+    my $this        = shift;
+    my $s           = "number=12 or string='bana' or string = 'apple'";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery = Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+use Data::Dumper;
+    print STDERR "HoistS ",$query->stringify()," -> /",Dumper($mongoDBQuery),"/\n";
+}
+
+sub test_hoistBrace {
+    my $this        = shift;
+    my $s           = "(number=12)";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery = Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+use Data::Dumper;
+#    print STDERR "HoistS ",$query->stringify();
+    print STDERR "HoistS ",Dumper($query);
+    print STDERR " -> /",Dumper($mongoDBQuery),"/\n";
+}
+
+
+sub test_hoistAND {
+    my $this        = shift;
+    my $s           = "number=12 and string='bana'";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery = Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+use Data::Dumper;
+    print STDERR "HoistS ",$query->stringify()," -> /",Dumper($mongoDBQuery),"/\n";
+}
+
+
+sub test_hoistANDAND {
+    my $this        = shift;
+    my $s           = "number=12 and string='bana' and something='nothing'";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery = Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+use Data::Dumper;
+    print STDERR "HoistS ",$query->stringify()," -> /",Dumper($mongoDBQuery),"/\n";
+}
+
 sub test_hoistCompound {
     my $this = shift;
     my $s =

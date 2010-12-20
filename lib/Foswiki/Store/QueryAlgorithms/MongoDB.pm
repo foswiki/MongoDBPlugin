@@ -39,6 +39,7 @@ use Foswiki::Plugins::MongoDBPlugin::Meta ();
 use Foswiki::Search::InfoCache;
 use Foswiki::Plugins::MongoDBPlugin::HoistMongoDB;
 use Data::Dumper;
+use Assert;
 
 # See Foswiki::Query::QueryAlgorithms.pm for details
 sub query {
@@ -114,6 +115,9 @@ sub _webQuery {
           Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
 
         if ( defined($mongoQuery) ) {
+#TODO: where are we limiting the query to the $web?
+            ASSERT(not defined($mongoQuery->{'_web'})) if DEBUG;
+            $mongoQuery->{'_web'} = $web ;
 
             #limit, skip, sort_by
             my $SortDirection = Foswiki::isTrue( $options->{reverse} ) ? -1 : 1;
@@ -140,8 +144,9 @@ sub _webQuery {
             }
             else {
                 if ( $options->{order} =~ /formfield\((.*)\)/ ) {
-                    $orderBy = 'FIELD.' . $1;
-                    $queryAttrs = { sort_by => { $orderBy => $SortDirection } };
+#TODO: this will crash things - I need to work on indexes, and one collection per web/form_def
+#                    $orderBy = 'FIELD.' . $1.'value';
+#                    $queryAttrs = { sort_by => { $orderBy => $SortDirection } };
                 }
             }
 
