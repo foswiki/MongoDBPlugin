@@ -109,7 +109,8 @@ sub _hoist {
     print STDERR "Hoist node->op="
       . Dumper( $node->{op} )
       . " ref(node->op)="
-      . ref( $node->{op} ) . "\n" if MONITOR;;
+      . ref( $node->{op} ) . "\n"
+      if MONITOR;
 
 #DAMMIT, I presume we have oddly nested eval/try catch so throwing isn't working
 #throw Error::Simple( 'failed to Hoist ' . ref( $node->{op} ) . "\n" )
@@ -196,6 +197,8 @@ sub hoistMongoDB {
     my $node = shift;
 
     if ( ref( $node->{op} ) ) {
+
+        #an actual OP_dot
         my $lhs = $node->{params}[0];
         my $rhs = $node->{params}[1];
 
@@ -211,26 +214,27 @@ sub hoistMongoDB {
             $lhs = $Foswiki::Query::Node::aliases{$lhs};
         }
 
-#        print STDERR "hoist OP_dot("
-#          . ref( $node->{op} ) . ", "
-#          . Data::Dumper::Dumper($node)
-#          . ")\n INTO "
-#          . $lhs . '.'
-#          . $rhs . "\n";
+        #        print STDERR "hoist OP_dot("
+        #          . ref( $node->{op} ) . ", "
+        #          . Data::Dumper::Dumper($node)
+        #          . ")\n INTO "
+        #          . $lhs . '.'
+        #          . $rhs . "\n";
 
         if ( $lhs =~ s/^META:// ) {
             return $lhs . '.' . $rhs;
         }
         else {
 
-            # Otherwise assume the term before the dot is the form name
-            return $rhs;
+            # TODO: assumes the term before the dot is the form name??? gads
+            return 'FIELD.' . $rhs . '.value';
         }
     }
     elsif ( $node->{op} == Foswiki::Infix::Node::NAME ) {
-#        print STDERR "hoist OP_dot("
-#          . $node->{op} . ", "
-#          . $node->{params}[0] . ")\n";
+
+        #        print STDERR "hoist OP_dot("
+        #          . $node->{op} . ", "
+        #          . $node->{params}[0] . ")\n";
 
         #TODO: map to the MongoDB field names (name, web, text, fieldname)
         return $aliases{ $node->{params}[0] }
@@ -274,7 +278,7 @@ sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
 
-    return { %{ $node->{lhs} } => { '$not' => %{ $node->{rhs} } } };
+    return { '$not' => $node->{lhs} };
 }
 
 package Foswiki::Query::OP_gte;
@@ -283,7 +287,7 @@ sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
 
-    return { %{ $node->{lhs} } => { '$gte' => %{ $node->{rhs} } } };
+    return { $node->{lhs} => { '$gte' => $node->{rhs} } };
 }
 
 package Foswiki::Query::OP_gt;
@@ -293,7 +297,6 @@ sub hoistMongoDB {
     my $node = shift;
 
     return { $node->{lhs} => { '$gt' => $node->{rhs} } };
-#    return { %{ $node->{lhs} } => { '$gt' => %{ $node->{rhs} } } };
 }
 
 package Foswiki::Query::OP_lte;
@@ -302,7 +305,7 @@ sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
 
-    return { %{ $node->{lhs} } => { '$lte' => %{ $node->{rhs} } } };
+    return { $node->{lhs} => { '$lte' => $node->{rhs} } };
 }
 
 package Foswiki::Query::OP_lt;
@@ -311,7 +314,7 @@ sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
 
-    return { %{ $node->{lhs} } => { '$lt' => %{ $node->{rhs} } } };
+    return { $node->{lhs} => { '$lt' => $node->{rhs} } };
 }
 
 package Foswiki::Query::OP_match;
@@ -329,6 +332,13 @@ sub hoistMongoDB {
 }
 
 package Foswiki::Query::OP_ne;
+
+sub hoistMongoDB {
+    my $op   = shift;
+    my $node = shift;
+
+    return { $node->{lhs} => { '$ne' => $node->{rhs} } };
+}
 
 package Foswiki::Query::OP_d2n;
 

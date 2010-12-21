@@ -8,7 +8,22 @@ use Foswiki::Query::Parser;
 use Foswiki::Plugins::MongoDBPlugin::HoistMongoDB;
 use Foswiki::Query::Node;
 use Foswiki::Meta;
+use Data::Dumper;
 use strict;
+
+sub do_Assert {
+    my $this                 = shift;
+    my $query                = shift;
+    my $mongoDBQuery         = shift;
+    my $expectedMongoDBQuery = shift;
+
+    #    print STDERR "HoistS ",$query->stringify();
+    print STDERR "HoistS ", Dumper($query);
+    print STDERR "\n -> /", Dumper($mongoDBQuery), "/\n";
+
+    $this->assert_deep_equals( $expectedMongoDBQuery, $mongoDBQuery );
+
+}
 
 sub set_up {
     my $this = shift;
@@ -95,14 +110,7 @@ sub test_hoistSimple {
     my $mongoDBQuery =
       Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
 
-    use Data::Dumper;
-    print STDERR "HoistS ", $query->stringify(), " -> /", Dumper($mongoDBQuery),
-      "/\n";
-
-  #    $this->assert_str_equals( '^%META:FIELD{name=\"number\".*\bvalue=\"99\"',
-  #        join( ';', map {$_->{regex}} @filter ) );
-  #    my $meta = $this->{meta};
-  #    my $val = $query->evaluate( tom => $meta, data => $meta );
+    $this->do_Assert( $query, $mongoDBQuery, { 'FIELD.number.value' => '99' } );
 }
 
 sub test_hoistSimple_OP_Like {
@@ -112,15 +120,8 @@ sub test_hoistSimple_OP_Like {
     my $query       = $queryParser->parse($s);
     my $mongoDBQuery =
       Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
-
-    use Data::Dumper;
-    print STDERR "HoistS ", $query->stringify(), " -> /", Dumper($mongoDBQuery),
-      "/\n";
-
-  #    $this->assert_str_equals( '^%META:FIELD{name=\"number\".*\bvalue=\"99\"',
-  #        join( ';', map {$_->{regex}} @filter ) );
-  #    my $meta = $this->{meta};
-  #    my $val = $query->evaluate( tom => $meta, data => $meta );
+    $this->do_Assert( $query, $mongoDBQuery,
+        { 'FIELD.String.value' => qr/(?-xism:\..*rin\..*)/ } );
 }
 
 sub test_hoistSimple2 {
@@ -131,14 +132,8 @@ sub test_hoistSimple2 {
     my $mongoDBQuery =
       Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
 
-    use Data::Dumper;
-    print STDERR "HoistS ", $query->stringify(), " -> /", Dumper($mongoDBQuery),
-      "/\n";
-
-  #    $this->assert_str_equals( '^%META:FIELD{name=\"number\".*\bvalue=\"99\"',
-  #        join( ';', map {$_->{regex}}@filter ) );
-  #    my $meta = $this->{meta};
-  #    my $val = $query->evaluate( tom => $meta, data => $meta );
+#TODO: should really reverse these, but it is harder with strings - (i think the lhs in  'web.topic'/something is a string..
+    $this->do_Assert( $query, $mongoDBQuery, { '99' => 'FIELD.number.value' } );
 }
 
 sub test_hoistOR {
@@ -149,9 +144,16 @@ sub test_hoistOR {
     my $mongoDBQuery =
       Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
 
-    use Data::Dumper;
-    print STDERR "HoistS ", $query->stringify(), " -> /", Dumper($mongoDBQuery),
-      "/\n";
+    $this->do_Assert(
+        $query,
+        $mongoDBQuery,
+        {
+            '$or' => [
+                { 'FIELD.number.value' => '12' },
+                { 'FIELD.string.value' => 'bana' }
+            ]
+        }
+    );
 }
 
 sub test_hoistOROR {
@@ -162,9 +164,17 @@ sub test_hoistOROR {
     my $mongoDBQuery =
       Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
 
-    use Data::Dumper;
-    print STDERR "HoistS ", $query->stringify(), " -> /", Dumper($mongoDBQuery),
-      "/\n";
+    $this->do_Assert(
+        $query,
+        $mongoDBQuery,
+        {
+            '$or' => [
+                { 'FIELD.number.value' => '12' },
+                { 'FIELD.string.value' => 'bana' },
+                { 'FIELD.string.value' => 'apple' }
+            ]
+        }
+    );
 }
 
 sub test_hoistBrace {
@@ -175,11 +185,7 @@ sub test_hoistBrace {
     my $mongoDBQuery =
       Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
 
-    use Data::Dumper;
-
-    #    print STDERR "HoistS ",$query->stringify();
-    print STDERR "HoistS ", Dumper($query);
-    print STDERR " -> /", Dumper($mongoDBQuery), "/\n";
+    $this->do_Assert( $query, $mongoDBQuery, { 'FIELD.number.value' => '12' } );
 }
 
 sub test_hoistAND {
@@ -190,9 +196,14 @@ sub test_hoistAND {
     my $mongoDBQuery =
       Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
 
-    use Data::Dumper;
-    print STDERR "HoistS ", $query->stringify(), " -> /", Dumper($mongoDBQuery),
-      "/\n";
+    $this->do_Assert(
+        $query,
+        $mongoDBQuery,
+        {
+            'FIELD.number.value' => '12',
+            'FIELD.string.value' => 'bana'
+        }
+    );
 }
 
 sub test_hoistANDAND {
@@ -203,10 +214,17 @@ sub test_hoistANDAND {
     my $mongoDBQuery =
       Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
 
-    use Data::Dumper;
-    print STDERR "HoistS ", $query->stringify(), " -> /", Dumper($mongoDBQuery),
-      "/\n";
+    $this->do_Assert(
+        $query,
+        $mongoDBQuery,
+        {
+            'FIELD.number.value'    => '12',
+            'FIELD.something.value' => 'nothing',
+            'FIELD.string.value'    => 'bana'
+        }
+    );
 }
+
 sub test_hoistSimpleDOT {
     my $this        = shift;
     my $s           = "number.bana = 12";
@@ -215,31 +233,112 @@ sub test_hoistSimpleDOT {
     my $mongoDBQuery =
       Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
 
-    use Data::Dumper;
-    print STDERR "HoistS ", $query->stringify(), " -> /", Dumper($mongoDBQuery),
-      "/\n";
+    #TODO: there's and assumption that the bit before the . is the form-name
+    $this->do_Assert( $query, $mongoDBQuery, { 'FIELD.bana.value' => '12' } );
 }
+
+sub test_hoistGT {
+    my $this        = shift;
+    my $s           = "number>12";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert( $query, $mongoDBQuery,
+        { 'FIELD.number.value' => { '$gt' => '12' } } );
+}
+
+sub test_hoistGTE {
+    my $this        = shift;
+    my $s           = "number>=12";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert( $query, $mongoDBQuery,
+        { 'FIELD.number.value' => { '$gte' => '12' } } );
+}
+
+sub test_hoistLT {
+    my $this        = shift;
+    my $s           = "number<12";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert( $query, $mongoDBQuery,
+        { 'FIELD.number.value' => { '$lt' => '12' } } );
+}
+
+sub test_hoistLTE {
+    my $this        = shift;
+    my $s           = "number<=12";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert( $query, $mongoDBQuery,
+        { 'FIELD.number.value' => { '$lte' => '12' } } );
+}
+
+sub test_hoistEQ {
+    my $this        = shift;
+    my $s           = "number=12";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert( $query, $mongoDBQuery, { 'FIELD.number.value' => '12' } );
+}
+
+sub test_hoistNE {
+    my $this        = shift;
+    my $s           = "number!=12";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert( $query, $mongoDBQuery,
+        { 'FIELD.number.value' => { '$ne' => '12' } } );
+}
+
+sub test_hoistNOT_EQ {
+    my $this        = shift;
+    my $s           = "not(number=12)";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+    $this->do_Assert( $query, $mongoDBQuery,
+        { '$not' => { 'FIELD.number.value' => '12' } } );
+}
+
 sub test_hoistCompound {
     my $this = shift;
     my $s =
 "number=99 AND string='String' and (moved.by='AlbertCamus' OR moved.by ~ '*bert*')";
     my $queryParser = new Foswiki::Query::Parser();
     my $query       = $queryParser->parse($s);
-    my @filter = Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
-
-   #print STDERR "HoistC ",$query->stringify()," -> /",join(';', @filter),"/\n";
-    $this->assert_str_equals( '^%META:FIELD{name=\"number\".*\bvalue=\"99\"',
-        $filter[0]->{regex} );
-    $this->assert_str_equals(
-        '^%META:FIELD{name=\"string\".*\bvalue=\"String\"',
-        $filter[1]->{regex} );
-    $this->assert_str_equals(
-'^%META:TOPICMOVED{.*\bby=\"AlbertCamus\"|^%META:TOPICMOVED{.*\bby=\".*bert.*\"',
-        $filter[2]->{regex}
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+    $this->do_Assert(
+        $query,
+        $mongoDBQuery,
+        {
+            'FIELD.number.value' => '99',
+            '$or'                => [
+                { 'TOPICMOVED.by' => 'AlbertCamus' },
+                { 'TOPICMOVED.by' => qr/(?-xism:.*bert.*)/ }
+            ],
+            'FIELD.string.value' => 'String'
+        }
     );
-    $this->assert( !defined( $filter[3] ) );
-    my $meta = $this->{meta};
-    my $val = $query->evaluate( tom => $meta, data => $meta );
 }
 
 sub test_hoistCompound2 {
@@ -248,21 +347,21 @@ sub test_hoistCompound2 {
 "(moved.by='AlbertCamus' OR moved.by ~ '*bert*') AND number=99 AND string='String'";
     my $queryParser = new Foswiki::Query::Parser();
     my $query       = $queryParser->parse($s);
-    my @filter = Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
 
-   #print STDERR "HoistC ",$query->stringify()," -> /",join(';', @filter),"/\n";
-    $this->assert_str_equals(
-'^%META:TOPICMOVED{.*\bby=\"AlbertCamus\"|^%META:TOPICMOVED{.*\bby=\".*bert.*\"',
-        $filter[0]->{regex}
+    $this->do_Assert(
+        $query,
+        $mongoDBQuery,
+        {
+            'FIELD.number.value' => '99',
+            'FIELD.string.value' => 'String',
+            '$or'                => [
+                { 'TOPICMOVED.by' => 'AlbertCamus' },
+                { 'TOPICMOVED.by' => qr/(?-xism:.*bert.*)/ }
+            ]
+        }
     );
-    $this->assert_str_equals( '^%META:FIELD{name=\"number\".*\bvalue=\"99\"',
-        $filter[1]->{regex} );
-    $this->assert_str_equals(
-        '^%META:FIELD{name=\"string\".*\bvalue=\"String\"',
-        $filter[2]->{regex} );
-    $this->assert( !defined( $filter[3] ) );
-    my $meta = $this->{meta};
-    my $val = $query->evaluate( tom => $meta, data => $meta );
 }
 
 sub test_hoistAlias {
@@ -270,13 +369,10 @@ sub test_hoistAlias {
     my $s           = "info.date=12345";
     my $queryParser = new Foswiki::Query::Parser();
     my $query       = $queryParser->parse($s);
-    my @filter = Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
-    $this->assert_str_equals(
-        '^%META:TOPICINFO{.*\bdate=\"12345\"',
-        join( ';', map { $_->{regex} } @filter )
-    );
-    my $meta = $this->{meta};
-    my $val = $query->evaluate( tom => $meta, data => $meta );
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert( $query, $mongoDBQuery, { 'TOPICINFO.date' => '12345' } );
 }
 
 sub test_hoistFormField {
@@ -284,13 +380,10 @@ sub test_hoistFormField {
     my $s           = "TestForm.number=99";
     my $queryParser = new Foswiki::Query::Parser();
     my $query       = $queryParser->parse($s);
-    my @filter = Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
-    $this->assert_str_equals(
-        '^%META:FIELD{name=\"number\".*\bvalue=\"99\"',
-        join( ';', map { $_->{regex} } @filter )
-    );
-    my $meta = $this->{meta};
-    my $val = $query->evaluate( tom => $meta, data => $meta );
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert( $query, $mongoDBQuery, { 'FIELD.number.value' => '99' } );
 }
 
 sub test_hoistText {
@@ -298,11 +391,10 @@ sub test_hoistText {
     my $s           = "text ~ '*Green*'";
     my $queryParser = new Foswiki::Query::Parser();
     my $query       = $queryParser->parse($s);
-    my @filter = Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
-    $this->assert_str_equals( '.*Green.*',
-        join( ';', map { $_->{regex} } @filter ) );
-    my $meta = $this->{meta};
-    my $val = $query->evaluate( tom => $meta, data => $meta );
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+    $this->do_Assert( $query, $mongoDBQuery,
+        { '_text' => qr/(?-xism:.*Green.*)/ } );
 }
 
 sub test_hoistName {
@@ -310,13 +402,11 @@ sub test_hoistName {
     my $s           = "name ~ 'Web*'";
     my $queryParser = new Foswiki::Query::Parser();
     my $query       = $queryParser->parse($s);
-    my @filter = Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
-    $this->assert_str_equals( 'name',  $filter[0]->{node} );
-    $this->assert_str_equals( 'Web.*', $filter[0]->{regex} );
-    $this->assert_str_equals( 'Web*',  $filter[0]->{source} );
-    $this->assert( !defined( $filter[1] ) );
-    my $meta = $this->{meta};
-    my $val = $query->evaluate( tom => $meta, data => $meta );
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert( $query, $mongoDBQuery,
+        { '_topic' => qr/(?-xism:Web.*)/ } );
 }
 
 sub test_hoistName2 {
@@ -324,25 +414,32 @@ sub test_hoistName2 {
     my $s           = "name ~ 'Web*' OR name ~ 'A*' OR name = 'Banana'";
     my $queryParser = new Foswiki::Query::Parser();
     my $query       = $queryParser->parse($s);
-    my @filter = Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
-    $this->assert_str_equals( 'name',             $filter[0]->{node} );
-    $this->assert_str_equals( 'Web.*|A.*|Banana', $filter[0]->{regex} );
-    $this->assert_str_equals( 'Web*,A*,Banana',   $filter[0]->{source} );
-    $this->assert( !defined( $filter[1] ) );
-    my $meta = $this->{meta};
-    my $val = $query->evaluate( tom => $meta, data => $meta );
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert(
+        $query,
+        $mongoDBQuery,
+        {
+            '$or' => [
+                { '_topic' => qr/(?-xism:Web.*)/ },
+                { '_topic' => qr/(?-xism:A.*)/ },
+                { '_topic' => 'Banana' }
+            ]
+        }
+    );
 }
 
-sub test_hoist_OPMatch {
+sub test_hoistOP_Match {
     my $this        = shift;
     my $s           = "text =~ '.*Green.*'";
     my $queryParser = new Foswiki::Query::Parser();
     my $query       = $queryParser->parse($s);
-    my @filter = Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
-    $this->assert_str_equals( '.*Green.*',
-        join( ';', map { $_->{regex} } @filter ) );
-    my $meta = $this->{meta};
-    my $val = $query->evaluate( tom => $meta, data => $meta );
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert( $query, $mongoDBQuery,
+        { '_text' => qr/(?-xism:.*Green.*)/ } );
 }
 
 1;
