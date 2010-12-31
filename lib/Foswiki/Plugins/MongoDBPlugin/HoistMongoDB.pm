@@ -23,6 +23,7 @@ use Assert;
 use Foswiki::Query::HoistREs ();
 
 use constant MONITOR => 0;
+use constant WATCH => 0;
 
 =begin TML
 
@@ -36,7 +37,7 @@ sub hoist {
 
     return undef unless ref( $node->{op} );
 
-    print STDERR "hoist from: ", $node->stringify(), "\n" if MONITOR;
+    print STDERR "hoist from: ", $node->stringify(), "\n" if MONITOR or WATCH;
 
 #TODO: use IxHash to keep the hash order - _some_ parts of queries are order sensitive
 #    my %mongoQuery = ();
@@ -55,22 +56,24 @@ sub hoist {
 
     print STDERR "Hoisted to:  ",    #$node->stringify(), " -> /",
       Dumper($mongoDBQuery), "/\n"
-      if MONITOR;
+      if MONITOR or WATCH;
 
     return $mongoDBQuery;
 }
 
 sub _hoist {
     my $node = shift;
+    
+    die 'node eq undef' unless defined($node);
 
     #name, or constants.
     if ( !ref( $node->{op} ) ) {
-        return Foswiki::Query::OP_dot::hoistMongoDB($node);
+        return Foswiki::Query::OP_dot::hoistMongoDB($node->{op}, $node);
     }
     if ( ref( $node->{op} ) eq 'Foswiki::Query::OP_dot' ) {
-        return Foswiki::Query::OP_dot::hoistMongoDB($node);
+        return Foswiki::Query::OP_dot::hoistMongoDB($node->{op}, $node);
     }
-    print STDERR "???????" . ref( $node->{op} ) . "\n" if MONITOR;
+    print STDERR "???????" . ref( $node->{op} ) . "\n" if MONITOR or WATCH;
 
     #TODO: if 2 constants(NUMBER,STRING) ASSERT
     #TODO: if the first is a constant, swap
@@ -90,7 +93,7 @@ sub _hoist {
 
     $node->{rhs} = Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::_hoist(
         $node->{params}[1] )
-      if ( $node->{op}->{arity} > 0 );
+      if ( $node->{op}->{arity} > 1 );
     $node->{ERROR} = $node->{rhs}->{ERROR}
       if ( ref( $node->{rhs} ) and defined( $node->{rhs}->{ERROR} ) );
 
@@ -194,7 +197,14 @@ our %aliases = (
 );
 
 sub hoistMongoDB {
+    my $op   = shift;
     my $node = shift;
+
+if (!defined($node->{op})) {
+    print STDERR 'CONFUSED: '.Data::Dumper::Dumper($node)."\n";
+    die 'here';
+    #return;
+}
 
     if ( ref( $node->{op} ) ) {
 
@@ -253,6 +263,8 @@ package Foswiki::Query::OP_and;
 sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
+    
+    die 'MongoDB cannot AND 2 queries with the same key - '.join(',',keys(%{ $node->{lhs} })) if (keys(%{$node->{lhs}}) eq keys(%{ $node->{rhs} }));
 
     return { %{ $node->{lhs} }, %{ $node->{rhs} } };
 }

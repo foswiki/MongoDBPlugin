@@ -177,6 +177,68 @@ sub test_hoistOROR {
     );
 }
 
+sub test_hoistBraceOROR {
+    my $this        = shift;
+    my $s           = "(number=12 or string='bana' or string = 'apple')";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert(
+        $query,
+        $mongoDBQuery,
+        {
+            '$or' => [
+                { 'FIELD.number.value' => '12' },
+                { 'FIELD.string.value' => 'bana' },
+                { 'FIELD.string.value' => 'apple' }
+            ]
+        }
+    );
+}
+
+sub test_hoistANDBraceOROR {
+    my $this = shift;
+    my $s =
+      "(number=12 or string='bana' or string = 'apple') AND (something=12)";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert(
+        $query,
+        $mongoDBQuery,
+        {
+            'FIELD.something.value' => '12',
+            '$or'                   => [
+                { 'FIELD.number.value' => '12' },
+                { 'FIELD.string.value' => 'bana' },
+                { 'FIELD.string.value' => 'apple' }
+            ]
+        }
+    );
+}
+
+sub test_hoistBraceANDBrace {
+    my $this = shift;
+    my $s    = "(TargetRelease != 'minor') AND (TargetRelease != 'major')";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert(
+        $query,
+        $mongoDBQuery,
+        {
+            'FIELD.TargetRelease.value' => { '$ne' => 'minor' },
+            'FIELD.TargetRelease.value' => { '$ne' => 'major' }
+        }
+    );
+}
+
 sub test_hoistBrace {
     my $this        = shift;
     my $s           = "(number=12)";
