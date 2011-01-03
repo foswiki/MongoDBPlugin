@@ -246,9 +246,9 @@ sub doMongoSearch {
     my $queryAttrs = shift;
 
     #print STDERR "######## Query::MongoDB search ($web)  \n";
-    print STDERR "querying mongo: "
-      . Dumper($ixhQuery) . " , "
-      . Dumper($queryAttrs) . "\n";
+    #print STDERR "querying mongo: "
+    #  . Dumper($ixhQuery) . " , "
+    #  . Dumper($queryAttrs) . "\n";
 
 #    my $collection =
 #      Foswiki::Plugins::MongoDBPlugin::getMongoDB()->_getCollection('current');

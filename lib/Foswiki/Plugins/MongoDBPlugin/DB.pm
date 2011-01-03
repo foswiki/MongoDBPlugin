@@ -78,7 +78,7 @@ sub query {
     my $endTime = [Time::HiRes::gettimeofday];
     my $timeDiff = Time::HiRes::tv_interval( $startTime, $endTime );
     print STDERR "query took $timeDiff\n" if MONITOR;
-    $Foswiki::Func::SESSION->{MongoDB}->{lastQueryTime} = $timeDiff;
+    push(@{$Foswiki::Func::SESSION->{MongoDB}->{lastQueryTime}}, $timeDiff);
 
     return $cursor;
 }

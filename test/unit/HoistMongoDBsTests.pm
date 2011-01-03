@@ -11,6 +11,16 @@ use Foswiki::Meta;
 use Data::Dumper;
 use strict;
 
+#list of operators we can output
+my @MongoOperators = qw/$or $not $nin $in/;
+#list of all Query ops
+#TODO: build this from code?
+my @QueryOps = qw/== != > < =~ ~/;
+
+#TODO: use the above to test operator coverage - fail until we have full coverage.
+#TODO: test must run _last_
+
+
 sub do_Assert {
     my $this                 = shift;
     my $query                = shift;
@@ -23,6 +33,8 @@ sub do_Assert {
 
     $this->assert_deep_equals( $expectedMongoDBQuery, $mongoDBQuery );
 
+   #try out converttoJavascript
+   print STDERR "\nconvertToJavascript: \n".Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::convertToJavascript($mongoDBQuery)."\n";
 }
 
 sub set_up {
@@ -221,6 +233,25 @@ sub test_hoistANDBraceOROR {
     );
 }
 
+
+sub test_hoistBraceANDBrace_OPTIMISE {
+    my $this = shift;
+    my $s    = "(TargetRelease = 'minor') AND (TargetRelease = 'minor')";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert(
+        $query,
+        $mongoDBQuery,
+        {
+            'FIELD.TargetRelease.value' => 'minor' 
+        }
+    );
+}
+
+#need to optimise it, as mongo cna't have 2 keys of the same name, its queries are a hash
 sub test_hoistBraceANDBrace {
     my $this = shift;
     my $s    = "(TargetRelease != 'minor') AND (TargetRelease != 'major')";
@@ -233,8 +264,12 @@ sub test_hoistBraceANDBrace {
         $query,
         $mongoDBQuery,
         {
-            'FIELD.TargetRelease.value' => { '$ne' => 'minor' },
-            'FIELD.TargetRelease.value' => { '$ne' => 'major' }
+          'FIELD.TargetRelease.value' => {
+                                           '$nin' => [
+                                                       'minor',
+                                                       'major'
+                                                     ]
+                                         }
         }
     );
 }
@@ -502,6 +537,31 @@ sub test_hoistOP_Match {
 
     $this->do_Assert( $query, $mongoDBQuery,
         { '_text' => qr/(?-xism:.*Green.*)/ } );
+}
+
+sub test_hoistORANDOR {
+    my $this        = shift;
+    my $s           = "(number=14 OR number=12) and (string='apple' OR string='bana')";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert(
+        $query,
+        $mongoDBQuery,
+        {
+          '$where' => 'this.FIELD.number.value == \'14\' || this.FIELD.number.value == \'12\'',
+          '$or' => [
+                     {
+                       'FIELD.string.value' => 'apple'
+                     },
+                     {
+                       'FIELD.string.value' => 'bana'
+                     }
+                   ]
+        }
+    );
 }
 
 1;

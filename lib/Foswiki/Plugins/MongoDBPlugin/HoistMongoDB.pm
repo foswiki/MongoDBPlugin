@@ -23,7 +23,7 @@ use Assert;
 use Foswiki::Query::HoistREs ();
 
 use constant MONITOR => 0;
-use constant WATCH => 0;
+use constant WATCH   => 0;
 
 =begin TML
 
@@ -58,62 +58,76 @@ sub hoist {
       Dumper($mongoDBQuery), "/\n"
       if MONITOR or WATCH;
 
+    if ( defined( $Foswiki::cfg{Plugins}{MongoDBPlugin}{UseJavascriptQuery} )
+        and $Foswiki::cfg{Plugins}{MongoDBPlugin}{UseJavascriptQuery} )
+    {
+        #convert the entire query to a javascript $where clause for testing
+        return {'$where' => convertToJavascript($mongoDBQuery)};
+    } else {
+#need to test to see if we need to re-write parts of the query in javascript
+#ie, nested OR's
+#one reason for doing it here, after we've made the mongo queries, is that later, they may implement it and we can remove the kludge
+        kludge($mongoDBQuery);
+    }
+
     return $mongoDBQuery;
 }
 
+sub kludge {
+    my $node = shift;
+    my $inOr = shift;
+    
+    foreach my $key (keys(%$node)) {
+        my $value = $node->{$key};
+        my $thisIsOr = ($key eq '$or');
+        if ($inOr and $thisIsOr) {
+            #nested OR detected, replace with $where and hope
+            delete $node->{$key};
+            $node->{'$where'} = convertToJavascript({$key => $value});
+        } else {
+            if (ref($value) eq 'HASH') {
+                kludge($value, ($inOr or $thisIsOr));
+            } elsif (ref($value) eq 'ARRAY') {
+                next if ($key eq '$in');
+                next if ($key eq '$nin');
+                foreach my $n (@$value) {
+                    kludge($n, ($inOr or $thisIsOr));
+                }
+            } else {
+            }
+        }
+    }
+}
+
+
 sub _hoist {
     my $node = shift;
-    
+
     die 'node eq undef' unless defined($node);
 
     #name, or constants.
     if ( !ref( $node->{op} ) ) {
-        return Foswiki::Query::OP_dot::hoistMongoDB($node->{op}, $node);
+        return Foswiki::Query::OP_dot::hoistMongoDB( $node->{op}, $node );
     }
     if ( ref( $node->{op} ) eq 'Foswiki::Query::OP_dot' ) {
-        return Foswiki::Query::OP_dot::hoistMongoDB($node->{op}, $node);
+        return Foswiki::Query::OP_dot::hoistMongoDB( $node->{op}, $node );
     }
     print STDERR "???????" . ref( $node->{op} ) . "\n" if MONITOR or WATCH;
 
     #TODO: if 2 constants(NUMBER,STRING) ASSERT
     #TODO: if the first is a constant, swap
 
-    print STDERR "\nparam0(" . $node->{params}[0]->{op} . "): ",
-      Data::Dumper::Dumper( $node->{params}[0] ), "\n"
-      if MONITOR;
-    print STDERR "\nparam1(" . $node->{params}[1]->{op} . "): ",
-      Data::Dumper::Dumper( $node->{params}[1] ), "\n"
-      if MONITOR;
-
-    $node->{lhs} = Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::_hoist(
-        $node->{params}[0] )
+    $node->{lhs} = _hoist( $node->{params}[0] )
       if ( $node->{op}->{arity} > 0 );
     $node->{ERROR} = $node->{lhs}->{ERROR}
       if ( ref( $node->{lhs} ) and defined( $node->{lhs}->{ERROR} ) );
 
-    $node->{rhs} = Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::_hoist(
-        $node->{params}[1] )
+    $node->{rhs} = _hoist( $node->{params}[1] )
       if ( $node->{op}->{arity} > 1 );
     $node->{ERROR} = $node->{rhs}->{ERROR}
       if ( ref( $node->{rhs} ) and defined( $node->{rhs}->{ERROR} ) );
 
-    #TODO: mmm, do we only have unary and binary ops?
-
-    print STDERR "----lhs: "
-      . Data::Dumper::Dumper( $node->{lhs} )
-      . "----rhs: "
-      . Data::Dumper::Dumper( $node->{rhs} ) . " \n"
-      if MONITOR;
-
-    use Data::Dumper;
-
-#print STDERR "HoistS ",$query->stringify()," -> /",Dumper($mongoDBQuery),"/\n";
-
-    print STDERR "Hoist node->op="
-      . Dumper( $node->{op} )
-      . " ref(node->op)="
-      . ref( $node->{op} ) . "\n"
-      if MONITOR;
+    monitor($node);
 
 #DAMMIT, I presume we have oddly nested eval/try catch so throwing isn't working
 #throw Error::Simple( 'failed to Hoist ' . ref( $node->{op} ) . "\n" )
@@ -127,6 +141,116 @@ sub _hoist {
     }
 
     return $node->{op}->hoistMongoDB($node);
+}
+
+sub monitor {
+    my $node = shift;
+
+    print STDERR "\nparam0(" . $node->{params}[0]->{op} . "): ",
+      Data::Dumper::Dumper( $node->{params}[0] ), "\n"
+      if MONITOR;
+    print STDERR "\nparam1(" . $node->{params}[1]->{op} . "): ",
+      Data::Dumper::Dumper( $node->{params}[1] ), "\n"
+      if MONITOR;
+
+    #TODO: mmm, do we only have unary and binary ops?
+
+    print STDERR "----lhs: "
+      . Data::Dumper::Dumper( $node->{lhs} )
+      . "----rhs: "
+      . Data::Dumper::Dumper( $node->{rhs} ) . " \n"
+      if MONITOR;
+
+
+
+#print STDERR "HoistS ",$query->stringify()," -> /",Dumper($mongoDBQuery),"/\n";
+
+    print STDERR "Hoist node->op="
+      . Dumper( $node->{op} )
+      . " ref(node->op)="
+      . ref( $node->{op} ) . "\n"
+      if MONITOR;
+}
+
+#map mongodb $ops to javascript logic
+my %js_op_map = (
+    '$eq'  => '==',    #doesn't exist, probly should for simplicity
+    '$ne'  => '!=',
+    '$not' => '!',
+    '$lt'  => '<',
+    '$lte' => '<=',
+    '$gt'  => '>',
+    '$gte' => '>=',
+    '$and' => '&&',
+    '$or'  => '||',
+
+    #'' => '',
+);
+
+#converts a mongodb query hash into a $where clause
+#frustratingly, both (field:value) and {field:{$op,value}} and {$op, {nodes}} and {$op, []} are valid, making it a little messy
+#and {$op, []} might refer to the key outside it (as in $nin), or not, as in $or
+sub convertToJavascript {
+    my $node      = shift;
+    my $statement = '';
+    
+#print STDERR "\n..............DUMPER: ".Dumper($node)."\n";
+    
+    while ( my ( $key, $value ) = each(%$node) ) {
+        $statement .= ' && ' if ( $statement ne '' );
+
+        #convert $ops into js ones
+        my $js_key = $key;
+        $js_key = $js_op_map{$key} if ( defined( $js_op_map{$key} ) );
+
+        if ( ref($value) eq 'HASH' ) {
+            my ($k, $v) = each(%$value);
+            if (($k eq '$in') or ($k eq '$nin')) {
+                #TODO: look up to see if javascrip thas an value.in(list) or ARRAY.contains(value)
+                $statement .= join(' || ', map {
+                                    "$js_key == $_"
+                                } @$v);
+                $statement = (($key eq '$nin')?'!':'')." ($statement) ";
+            } else {
+                $value = convertToJavascript($value);
+
+                $statement .= "$js_key $value";
+            }
+        }
+        elsif ( ref($value) eq 'ARRAY' ) {
+            if (($key eq '$in') or ($key eq '$nin')) {
+                die 'unpleasently'; #should never get here - it needs to be handled while we knoe the field it refers to
+            } elsif ($key eq '$or') {
+                #er, assuming $key == $or - $in and $nin will kick me
+                $statement .=
+                  join( ' ' . $js_key . ' ', map { convertToJavascript($_) } @$value );
+
+                #$statement = " ($statement) ";
+            } else {
+                die 'sadly '.$key;
+            }
+
+
+        }
+        else {
+            if ( $key eq '$where' ) {
+                $statement = " ($value) ";
+            }
+            else {
+
+                #value isa string..
+                #TODO: argh, string or number, er, or regex?
+#print STDERR "convertToJavascript - $value is a ".ref($value)."\n";
+                if (ref($value) eq 'Regexp') {
+                    $value =~ /\(\?-xism:(.*)\)/; #TODO: er, regex options?
+                    $statement .= "( /$1/.test(this.$js_key) )";
+                } else {
+                    $statement .= "this.$js_key == '$value'";
+                }
+            }
+        }
+    }
+    return $statement;
 }
 
 ########################################################################################
@@ -200,11 +324,12 @@ sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
 
-if (!defined($node->{op})) {
-    print STDERR 'CONFUSED: '.Data::Dumper::Dumper($node)."\n";
-    die 'here';
-    #return;
-}
+    if ( !defined( $node->{op} ) ) {
+        print STDERR 'CONFUSED: ' . Data::Dumper::Dumper($node) . "\n";
+        die 'here';
+
+        #return;
+    }
 
     if ( ref( $node->{op} ) ) {
 
@@ -259,14 +384,117 @@ if (!defined($node->{op})) {
 }
 
 package Foswiki::Query::OP_and;
+use Foswiki::Plugins::MongoDBPlugin::HoistMongoDB;
 
 sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
-    
-    die 'MongoDB cannot AND 2 queries with the same key - '.join(',',keys(%{ $node->{lhs} })) if (keys(%{$node->{lhs}}) eq keys(%{ $node->{rhs} }));
+
+    #monogdb queries all have only one hash key
+    my ( $key, $val ) = each( %{ $node->{lhs} } );
+
+    #print STDERR "---- $key, $val\n";
+    if ( defined($key)
+        and ( defined( $node->{rhs}->{$key} ) ) )
+    {
+        my $rhsval = $node->{rhs}->{$key};
+        print STDERR "---- $key, $val, $rhsval, ("
+          . ref($val) . ")("
+          . ref($rhsval) . ")\n";
+
+        if ( not( $key =~ /^\$/ ) ) {
+
+            #anding non-operators
+            print STDERR "---------- ref($val) == " . ref($val) . "\n";
+            if (    ( not ref($val) )
+                and ( not ref($rhsval) )
+                and ( $val eq $rhsval ) )
+            {
+
+                #A and A == A
+                print STDERR "SIIIIIIIIIIIIIIIIIIIIIIIIIIMPLIFY\n";
+                return $node->{lhs};
+            }
+            elsif ( ( ref($val) eq 'HASH' ) and ( ref($rhsval) eq 'HASH' ) ) {
+
+                #maybe we know how to combine these 2 ops
+                my ( $ikey, $ival ) = each( %{$val} );
+                print STDERR "----i $ikey, $ival - "
+                  . join( ',', each( %{$rhsval} ) ) . "\n";
+                if ( defined($ikey)
+                    and ( defined( $rhsval->{$ikey} ) ) )
+                {
+                    my $irhsval = $rhsval->{$ikey};
+                    print STDERR
+                      "SIIIIIIMCOMPLEXIFY: $key : $ikey [$ival, $irhsval]\n";
+                    if ( $ikey eq '$ne' ) {
+                        return { $key => { '$nin' => [ $ival, $irhsval ] } };
+                    }
+                }
+            }
+        }
+        else {
+
+            #$key == op, so it should be $or, $in, $nin etc
+            #if ( ( ref($val) eq 'ARRAY' ) and ( ref($rhsval) eq 'ARRAY' ) ) {
+            if ( $key eq '$or' ) {
+
+               #(a OR b) AND (c OR d OR e)
+               #identify the least complex, and leave the more complex one alone
+               #for now, doe the first, leave the second
+
+    #return {'$or' =>$rhsval, '$where' => convertToJavascript({'$or' => $val})};
+            }
+        }
+
+        print STDERR
+          "MongoDB cannot AND 2 queries with the same key ($key, $val) \n";
+
+        # re-write one as $where
+        return {
+            $key => $rhsval,
+            '$where' =>
+              Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::convertToJavascript(
+                { $key => $val }
+              )
+        };
+
+        #die "MongoDB cannot AND 2 queries with the same key ($key, $val) \n";
+    }
 
     return { %{ $node->{lhs} }, %{ $node->{rhs} } };
+}
+
+#TODO: mmmm, this isn't going to work.
+#mongodb doesn't have the expresiveness to convert competently
+#and the only reason i'm doing it is to cope with its inablilty to nest/AND OR's
+#i'm told that internally, it can actually deal with multiple keys of the same name, so it might make more sense to implement at
+#for now, when we hit a complexity, we can still toss off to a javascript $where clause
+sub convertORintoAND {
+    my $ORedArray = shift;
+
+    #convert (a OR b) into !(!a AND !b)
+    my $query = {};
+    foreach my $elem (@$ORedArray) {
+        my ( $k, $v ) = each(%$elem);
+        if ( defined( $query->{$k} ) ) {
+            if ( defined( $query->{$k}->{'$not'} ) ) {
+
+                #convert to $nin
+                $query->{$k}->{'$nin'} = [ $query->{$k}->{'$not'}, $v ];
+                delete $query->{$k}->{'$not'};
+            }
+            else {
+
+                #push into $nin
+                push( @{ $query->{$k}->{'$nin'} }, $v );
+            }
+        }
+        else {
+            $query->{$k} = { '$not' => $v };
+        }
+    }
+    return $query;
 }
 
 package Foswiki::Query::OP_or;
@@ -352,14 +580,7 @@ sub hoistMongoDB {
     return { $node->{lhs} => { '$ne' => $node->{rhs} } };
 }
 
-package Foswiki::Query::OP_d2n;
-
-package Foswiki::Query::OP_lc;
-
-package Foswiki::Query::OP_length;
-
 package Foswiki::Query::OP_ob;
-
 # ( )
 sub hoistMongoDB {
     my $op   = shift;
@@ -367,6 +588,12 @@ sub hoistMongoDB {
 
     return $node->{lhs};
 }
+
+package Foswiki::Query::OP_d2n;
+
+package Foswiki::Query::OP_lc;
+
+package Foswiki::Query::OP_length;
 
 package Foswiki::Query::OP_ref;
 
