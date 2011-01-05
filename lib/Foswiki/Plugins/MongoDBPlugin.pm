@@ -247,9 +247,9 @@ sub _updateTopic {
 if (ref($savedMeta->{$key}) ne 'ARRAY') {
     #i don't know why, but this is never triggered, but without it, i get a crash.
     #so, i presume there is a weird case where it happens
-    print STDERR "-B---($web . $topic) $key - ".ref($savedMeta->{$key})."\n";
-    print STDERR Dumper($savedMeta->{$key})."\n";
-    print STDERR "\n######################################################## BOOOOOOOOM\n";
+    #print STDERR "-B---($web . $topic) $key - ".ref($savedMeta->{$key})."\n";
+    #print STDERR Dumper($savedMeta->{$key})."\n";
+    #print STDERR "\n######################################################## BOOOOOOOOM\n";
     next;
 }
 #print STDERR Dumper(shift(@{$savedMeta->{$key}}))."\n";
