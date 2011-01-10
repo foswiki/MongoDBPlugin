@@ -82,11 +82,11 @@ sub completePageHandler {
     #    # on parameters as if they were passed by reference; for example:
     #    # $_[0] =~ s/SpecialString/my alternative/ge;
     my $queryTimes = 'noQuery';
-    my $timeArray = getMongoDB()->{lastQueryTime};
-    $queryTimes = join(', ', @$timeArray) if (defined($timeArray));
-    $Foswiki::Plugins::SESSION->{response}->pushHeader(
-        'X-Foswiki-Monitor-MongoDBPlugin-lastQueryTime', $queryTimes
-    );
+    my $timeArray  = getMongoDB()->{lastQueryTime};
+    $queryTimes = join( ', ', @$timeArray ) if ( defined($timeArray) );
+    $Foswiki::Plugins::SESSION->{response}
+      ->pushHeader( 'X-Foswiki-Monitor-MongoDBPlugin-lastQueryTime',
+        $queryTimes );
 
 }
 
@@ -195,13 +195,14 @@ sub _update {
 }
 
 sub _removeTopic {
-    my $web       = shift;
-    my $topic     = shift;
-    
-    my $query = { '_web' => $web};
-    $query->{'_topic'} = $topic if (defined($topic));
-#    $query->{'_attachment'} = $topic if (defined($attachment));
-    
+    my $web   = shift;
+    my $topic = shift;
+
+    my $query = { '_web' => $web };
+    $query->{'_topic'} = $topic if ( defined($topic) );
+
+    #    $query->{'_attachment'} = $topic if (defined($attachment));
+
     my $ret = getMongoDB()->remove( 'current', $query );
 
 }
@@ -221,7 +222,8 @@ sub _updateTopic {
     };
 
     foreach my $key ( keys(%$savedMeta) ) {
-#print STDERR "------------------ importing $key - ".ref($savedMeta->{$key})."\n";
+        #print STDERR "------------------ importing $key - "
+        #  . ref( $savedMeta->{$key} ) . "\n";
         next if ( $key eq '_session' );
 
         #not totally sure if there's a benefit to using / not the _indices
@@ -229,9 +231,8 @@ sub _updateTopic {
 
 #TODO: as of Oct 2010, mongodb can't sort on an element in an array, so we de-array the ARRAYs.
 #TODO: use the registered list of META elements, and the type that is registered.
-        if ($Foswiki::Meta::isArrayType{$key})
-        {
-#print STDERR "---- $key == many\n";
+        if ( $Foswiki::Meta::isArrayType{$key} ) {
+            #print STDERR "---- $key == many\n";
             my $FIELD = $savedMeta->{$key};
             $meta->{$key} = {};
 
@@ -252,28 +253,34 @@ sub _updateTopic {
             }
         }
         else {
-            if (ref($savedMeta->{$key}) eq '') {
-#print STDERR "-A---$key - ".ref($savedMeta->{$key})."\n";
+            if ( ref( $savedMeta->{$key} ) eq '' ) {
+                #print STDERR "-A---$key - " . ref( $savedMeta->{$key} ) . "\n";
                 $meta->{$key} = $savedMeta->{$key};
-            } else {
-if (ref($savedMeta->{$key}) ne 'ARRAY') {
-    #i don't know why, but this is never triggered, but without it, i get a crash.
-    #so, i presume there is a weird case where it happens
-    #print STDERR "-B---($web . $topic) $key - ".ref($savedMeta->{$key})."\n";
-    #print STDERR Dumper($savedMeta->{$key})."\n";
-    #print STDERR "\n######################################################## BOOOOOOOOM\n";
-    next;
-}
-#print STDERR Dumper(shift(@{$savedMeta->{$key}}))."\n";
-                
-    #shorcut version of the foreach below because atm, we know there is only one element in the array.
-                #$meta->{$key} = $savedMeta->{$key}[0];
+            }
+            else {
+                if ( ref( $savedMeta->{$key} ) ne 'ARRAY' ) {
+
+  #i don't know why, but this is never triggered, but without it, i get a crash.
+  #so, i presume there is a weird case where it happens
+                    #print STDERR "-B---($web . $topic) $key - "
+                    #  . ref( $savedMeta->{$key} ) . "\n";
+
+#print STDERR Dumper($savedMeta->{$key})."\n";
+#print STDERR "\n######################################################## BOOOOOOOOM\n";
+                    next;
+                }
+                #shorcut version of the foreach below because atm, we know there is only one element in the array.
+                $meta->{$key} = $savedMeta->{$key}[0];
+
+                #print STDERR "-C---($web . $topic) $key - ";
+                #print STDERR Dumper( $meta->{$key}) . "\n";
+
                 if ( $key eq 'TOPICINFO' ) {
 
-    #TODO: foswiki's sort by TOPICINFO.author sorts by WikiName, not CUID - so need to make an internal version of this
-    # to support sort=editby => 'TOPICINFO._authorWikiName',
-                    $meta->{$key}{_authorWikiName} =
-                      Foswiki::Func::getWikiName( $meta->{$key}{author} );
+#TODO: foswiki's sort by TOPICINFO.author sorts by WikiName, not CUID - so need to make an internal version of this
+# to support sort=editby => 'TOPICINFO._authorWikiName',
+                    $meta->{$key}->{_authorWikiName} =
+                      Foswiki::Func::getWikiName( $meta->{$key}->{author} );
                 }
             }
         }
