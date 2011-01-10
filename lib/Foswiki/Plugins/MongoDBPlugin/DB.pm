@@ -190,17 +190,15 @@ sub ensureIndex {
     undef $self->{mongoDBIndexes};    #clear the cache :/
 }
 
+
 sub remove {
     my $self           = shift;
     my $collectionName = shift;
-    my $hash           = shift;
-
-    #    use Data::Dumper;
-    #print STDERR "+++++ mongo remove $address == ".Dumper($hash)."\n";
+    my $mongoDbQuery           = shift;
 
     my $collection = $self->_getCollection($collectionName);
 
-    $collection->remove($hash);
+    $collection->remove($mongoDbQuery);
 }
 
 #######################################################

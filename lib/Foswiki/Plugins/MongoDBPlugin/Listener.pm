@@ -2,6 +2,7 @@
 package Foswiki::Plugins::MongoDBPlugin::Listener;
 
 use Foswiki::Plugins::MongoDBPlugin ();
+use Assert;
 
 =begin TML
 
@@ -69,9 +70,10 @@ sub update {
     #TODO: not doing web create/move etc yet
     return if (not defined($args{newmeta}->topic));
     
+    #TODO: do this differently when we support previous revs
     if (defined($args{oldmeta})) {
         #move topic is (currently) a delete&insert
-        $self->remove($args{oldmeta});
+        $self->remove(oldmeta => $args{oldmeta});
     }
     Foswiki::Plugins::MongoDBPlugin::_updateTopic($args{newmeta}->web, $args{newmeta}->topic, $args{newmeta});
 }
@@ -79,15 +81,23 @@ sub update {
 
 =begin TML
 
----++ ObjectMethod remove($metaObject)
+---++ ObjectMethod remove(oldmeta=>obj [,  oldattachment=>$string])
 We are removing the given object.
 
 =cut
 
 sub remove {
     my $self = shift;
+    my %args = @_;
+    
+    ASSERT($args{oldmeta}) if DEBUG;
+
+    
+#print STDERR "removing ".join(',',keys(%args))."\n";
+#print STDERR "     (".$args{oldmeta}->web.", ".($args{oldmeta}->topic||'UNDEF').")\n";
      
     #TODO: find the old topic object, and remove it.
+    Foswiki::Plugins::MongoDBPlugin::_removeTopic( $args{oldmeta}->web, $args{oldmeta}->topic );
 }
 
 

@@ -194,6 +194,18 @@ sub _update {
     return $count;
 }
 
+sub _removeTopic {
+    my $web       = shift;
+    my $topic     = shift;
+    
+    my $query = { '_web' => $web};
+    $query->{'_topic'} = $topic if (defined($topic));
+#    $query->{'_attachment'} = $topic if (defined($attachment));
+    
+    my $ret = getMongoDB()->remove( 'current', $query );
+
+}
+
 sub _updateTopic {
     my $web       = shift;
     my $topic     = shift;
