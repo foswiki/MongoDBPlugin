@@ -223,7 +223,7 @@ sub _webQuery {
 
               # Escape /, used as delimiter. This also blocks any attempt to use
               # the search string to execute programs on the server.
-                $raw_searchString =~ s!/!\\/!g;
+                $raw_searchString =~ s!/!\/!g;
             }
             else {
 
