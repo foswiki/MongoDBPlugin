@@ -82,8 +82,15 @@ sub kludge {
         my $thisIsOr = ($key eq '$or');
         if ($inOr and $thisIsOr) {
             #nested OR detected, replace with $where and hope
+            #try converting to $in first.
+            use Foswiki::Query::OP_and;
+            my ($lfield, $lhsIn, $lNum) = convertOrToIn($value);
+            if (($lNum > 0) and !defined($node->{$lfield})) {
+                $node->{$lfield} = $lhsIn;
+            } else {
+                $node->{'$where'} = convertToJavascript({$key => $value});
+            }
             delete $node->{$key};
-            $node->{'$where'} = convertToJavascript({$key => $value});
         } else {
             if (ref($value) eq 'HASH') {
                 kludge($value, ($inOr or $thisIsOr));
@@ -207,9 +214,9 @@ sub convertToJavascript {
             my ($k, $v) = each(%$value);
             if (($k eq '$in') or ($k eq '$nin')) {
                 #TODO: look up to see if javascrip thas an value.in(list) or ARRAY.contains(value)
-                $statement .= join(' || ', map {
+                $statement .= ' ( '.join(' || ', map {
                                     "$js_key == $_"
-                                } @$v);
+                                } @$v).' ) ';
                 $statement = (($key eq '$nin')?'!':'')." ($statement) ";
             } else {
                 $value = convertToJavascript($value);
@@ -222,8 +229,9 @@ sub convertToJavascript {
                 die 'unpleasently'; #should never get here - it needs to be handled while we knoe the field it refers to
             } elsif ($key eq '$or') {
                 #er, assuming $key == $or - $in and $nin will kick me
-                $statement .=
-                  join( ' ' . $js_key . ' ', map { convertToJavascript($_) } @$value );
+                $statement .= ' ( '.
+                  join( ' ' . $js_key . ' ', map { convertToJavascript($_) } @$value )
+                  .' ) ';
 
                 #$statement = " ($statement) ";
             } else {
@@ -251,6 +259,66 @@ sub convertToJavascript {
         }
     }
     return $statement;
+}
+
+
+#---+++ convertOrToIn($refToOrArray) -> ($field, $mongoInQuery, numberOfElements)
+#if we can convert to in / nin, do so, else return undef
+#return partial query hash - ie {$in : []} or {$nin : []}
+sub convertOrToIn {
+        my $orArrayRef = shift;
+        
+        my $fieldname;
+        my $mongoInQuery;
+        my $numberOfElements = 0;
+
+        my $failedToConvertToOnlyIn = 0;
+
+        #if more than 2 elements in the ARRAY are the same key, and same negation, aggregate into $in / $nin
+        #IFF the elements in the array are simple - otherwise, need to kick out
+        my $keys = {};
+        my @complex;
+        foreach my $elem (@$orArrayRef) {
+            $numberOfElements++;
+                my ($firstKey, $moreKeys) = keys(%$elem);
+                my $firstVal = $elem->{$firstKey};
+                if (defined($moreKeys) or not ((ref($firstVal) eq '') or (ref($firstVal) eq 'Regexp'))) {
+    print STDERR "------ too complex ($firstKey,$firstVal == ".ref($firstVal) .")\n" if MONITOR;
+    #actually, if its an $in/$nin we could do something..
+                    push(@complex, $elem);
+                    $failedToConvertToOnlyIn = 1;
+                } else {
+                    #just do $in for now
+    print STDERR "------ simple ($firstKey, $firstVal)\n" if MONITOR;
+                    push(@{$keys->{$firstKey}}, $firstVal);
+                }
+            }
+            
+            while (my ($k, $v) = each(%$keys)) {
+                my @array = @$v;
+
+    print STDERR "------ erg $#array\n" if MONITOR;
+
+                if ($#array >= 1) {
+    print STDERR "------ $k => \$in @$v\n" if MONITOR;
+
+                    push(@complex, {$k => {'$in' => $v}});
+                } else {
+    print STDERR "------ $k => $v->[0]\n" if MONITOR;
+                    push(@complex, {$k => $v->[0]});
+                }
+            }
+
+        if (scalar(@complex) > 1) {
+            $failedToConvertToOnlyIn = 1;
+            #$optimisedOr->{'$or'} = \@complex;
+        } else {
+            #success - its an $in?
+            ($fieldname, $mongoInQuery) = each(%{$complex[0]});
+        }
+    use Data::Dumper;
+    print STDERR "----------------------------------------------------- STUPENDIFY!! - (".Dumper($mongoInQuery).")\n" if MONITOR;
+    return ($fieldname, $mongoInQuery, ($failedToConvertToOnlyIn?0:$numberOfElements));
 }
 
 ########################################################################################
@@ -385,116 +453,104 @@ sub hoistMongoDB {
 
 package Foswiki::Query::OP_and;
 use Foswiki::Plugins::MongoDBPlugin::HoistMongoDB;
+use Assert;
 
 sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
-
-    #monogdb queries all have only one hash key
-    my ( $key, $val ) = each( %{ $node->{lhs} } );
-
-    #print STDERR "---- $key, $val\n";
-    if ( defined($key)
-        and ( defined( $node->{rhs}->{$key} ) ) )
-    {
-        my $rhsval = $node->{rhs}->{$key};
-        print STDERR "---- $key, $val, $rhsval, ("
-          . ref($val) . ")("
-          . ref($rhsval) . ")\n";
-
-        if ( not( $key =~ /^\$/ ) ) {
-
-            #anding non-operators
-            print STDERR "---------- ref($val) == " . ref($val) . "\n";
-            if (    ( not ref($val) )
-                and ( not ref($rhsval) )
-                and ( $val eq $rhsval ) )
-            {
-
-                #A and A == A
-                print STDERR "SIIIIIIIIIIIIIIIIIIIIIIIIIIMPLIFY\n";
-                return $node->{lhs};
-            }
-            elsif ( ( ref($val) eq 'HASH' ) and ( ref($rhsval) eq 'HASH' ) ) {
-
-                #maybe we know how to combine these 2 ops
-                my ( $ikey, $ival ) = each( %{$val} );
-                print STDERR "----i $ikey, $ival - "
-                  . join( ',', each( %{$rhsval} ) ) . "\n";
-                if ( defined($ikey)
-                    and ( defined( $rhsval->{$ikey} ) ) )
-                {
-                    my $irhsval = $rhsval->{$ikey};
-                    print STDERR
-                      "SIIIIIIMCOMPLEXIFY: $key : $ikey [$ival, $irhsval]\n";
-                    if ( $ikey eq '$ne' ) {
-                        return { $key => { '$nin' => [ $ival, $irhsval ] } };
+    
+    #beware, can't have the same key in both lhs and rhs, as the hash collapses them into one
+    #this is more a limitation of the mongodb drivers - internally, mongodb (i'm told) can doit.
+    
+    my %andHash = %{ $node->{lhs} };
+    foreach my $key (keys(%{ $node->{rhs} })) {
+        if (defined($andHash{$key})) {
+            my $conflictResolved = 0;
+            if ($key =~ /^\$.*/) {
+                #its an operator $or, $in, $nin, 
+                if ( $key eq '$or' ) {
+                    #if one of the OR's happens to be all on the same field, then its simple
+                    #if not, (A OR B) AND (C OR D) == (A OR B) AND NOT (NOT C AND NOT D) :(
+                    #EXCEPT of course, that mongo doesn't have NOT. - but... we do have $nor
+                    #A AND B == NOT (NOT A OR NOT B) == $nor: {A $ne banana, B $ne trifle}
+                    
+                    my ($rfield, $rhsIn, $rNum) = Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::convertOrToIn($node->{rhs}->{$key});
+                    my ($lfield, $lhsIn, $lNum) = Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::convertOrToIn($andHash{$key});
+                    
+                    if (($rNum == 0) and ($lNum == 0)) {
+                        print STDERR 'I have no solution for this query';
+                    } else {
+                        if (($rNum > 0) and ($lNum > 0)) {
+                            if ($rfield eq $lfield) {
+                                #bummer, have to choose one or the other
+                                if ($rNum > $lNum) {
+                                    $andHash{$rfield} = $rhsIn;
+                                } else {
+                                    $andHash{$lfield} = $lhsIn;
+                                    $andHash{'$or'} = $node->{rhs}->{$key};
+                                }
+                            } else {
+                                    $andHash{$rfield} = $rhsIn;
+                                    $andHash{$lfield} = $lhsIn;
+                                    delete $andHash{'$or'};
+                            }
+                        } elsif ($rNum > 0) {
+                            $andHash{$rfield} = $rhsIn;
+                        } else {
+                            $andHash{$lfield} = $lhsIn;
+                            $andHash{'$or'} = $node->{rhs}->{$key};
+                        }
+                        $conflictResolved = 1;
                     }
+                    
+                } else {
+                    print STDERR 'not here yet '.$key;
+                }
+            } else {
+                #mmmm, SomeField == '1234' AND SomeField == '2345'?
+                #work out if its true or false, and work out something
+                
+                #TODO: how about minimising 2 identical non-simple queries ANDed?
+                #this eq test below doesn't do identical regex, nor identical $ne etc..
+print STDERR "----+++++++++++++++++ ||".$andHash{$key}."||".$node->{rhs}->{$key}."||".ref($andHash{$key})."||".ref($node->{rhs}->{$key})."||\n";
+                if (    (ref($andHash{$key}) eq '') and (ref($node->{rhs}->{$key}) eq '') and 
+                        ($andHash{$key} eq $node->{rhs}->{$key})) {
+                    #they're the same, ignore the second..
+                    $conflictResolved = 1;
+                    print STDERR "bump\n"
+                } elsif ((ref($andHash{$key})eq 'HASH') and (ref($node->{rhs}->{$key}) eq 'HASH') and 
+                        (defined($andHash{$key}->{'$ne'})) and 
+                        (defined(($node->{rhs}->{$key}->{'$ne'})))
+                    ) {
+                    ###(A != 'qe') AND (A != 'zx') transforms to {A: {$nin: ['qe', 'zx']}} (and regex $ne too?)
+                    $andHash{$key} = {'$nin' => [$andHash{$key}->{'$ne'}, $node->{rhs}->{$key}->{'$ne'}]};
+                    $conflictResolved = 1;
+                } else {
+                    use Data::Dumper;
+                    print STDERR 'field - not here yet '.$key.'   ----   '.Dumper($andHash{$key}).'    ----    '.Dumper($node->{rhs}->{$key});
                 }
             }
-        }
-        else {
+            if (not $conflictResolved) {
+                #i don't think i've implemented convertToJavascript to do $where too
+                die 'argh@' if (defined($andHash{'$where'}));
+                
+                
+                print STDERR
+                  "MongoDB cannot AND 2 queries with the same key ($key) \n";
 
-            #$key == op, so it should be $or, $in, $nin etc
-            #if ( ( ref($val) eq 'ARRAY' ) and ( ref($rhsval) eq 'ARRAY' ) ) {
-            if ( $key eq '$or' ) {
-
-               #(a OR b) AND (c OR d OR e)
-               #identify the least complex, and leave the more complex one alone
-               #for now, doe the first, leave the second
-
-    #return {'$or' =>$rhsval, '$where' => convertToJavascript({'$or' => $val})};
+                # re-write one as $where
+                    $andHash{'$where'} =
+                      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::convertToJavascript(
+                        { $key => $node->{rhs}->{$key} }
+                      )
             }
+        } else {
+            $andHash{$key} = $node->{rhs}->{$key};
         }
-
-        print STDERR
-          "MongoDB cannot AND 2 queries with the same key ($key, $val) \n";
-
-        # re-write one as $where
-        return {
-            $key => $rhsval,
-            '$where' =>
-              Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::convertToJavascript(
-                { $key => $val }
-              )
-        };
-
-        #die "MongoDB cannot AND 2 queries with the same key ($key, $val) \n";
+       
     }
-
-    return { %{ $node->{lhs} }, %{ $node->{rhs} } };
-}
-
-#TODO: mmmm, this isn't going to work.
-#mongodb doesn't have the expresiveness to convert competently
-#and the only reason i'm doing it is to cope with its inablilty to nest/AND OR's
-#i'm told that internally, it can actually deal with multiple keys of the same name, so it might make more sense to implement at
-#for now, when we hit a complexity, we can still toss off to a javascript $where clause
-sub convertORintoAND {
-    my $ORedArray = shift;
-
-    #convert (a OR b) into !(!a AND !b)
-    my $query = {};
-    foreach my $elem (@$ORedArray) {
-        my ( $k, $v ) = each(%$elem);
-        if ( defined( $query->{$k} ) ) {
-            if ( defined( $query->{$k}->{'$not'} ) ) {
-
-                #convert to $nin
-                $query->{$k}->{'$nin'} = [ $query->{$k}->{'$not'}, $v ];
-                delete $query->{$k}->{'$not'};
-            }
-            else {
-
-                #push into $nin
-                push( @{ $query->{$k}->{'$nin'} }, $v );
-            }
-        }
-        else {
-            $query->{$k} = { '$not' => $v };
-        }
-    }
-    return $query;
+    
+    return \%andHash;
 }
 
 package Foswiki::Query::OP_or;
@@ -502,14 +558,26 @@ package Foswiki::Query::OP_or;
 sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
+    
+    my $mongoQuery;
+    
+    my $lhs = $node->{lhs};
 
     #need to detect nested OR's and unwind them
-    if ( defined( $node->{lhs}->{'$or'} ) ) {
-        push( @{ $node->{lhs}->{'$or'} }, $node->{rhs} );
-        return $node->{lhs};
+    if ( defined( $lhs->{'$or'} ) ) {
+        $lhs = $lhs->{'$or'};
+#print STDERR "---+++--- $lhs, ".ref($lhs)."\n";
+        $mongoQuery = { '$or' => [ @$lhs, $node->{rhs} ] };
+    } elsif ( defined( $node->{rhs}->{'$or'} ) ) {
+        #i'm somewhat sure this can't happen.
+        my $rhs = $node->{rhs}->{'$or'};
+die "---+++--- TTHATS A SURPRISE: $rhs, ".ref($rhs)."\n";
+        $mongoQuery = { '$or' => [ $lhs, @$rhs ] };
+    } else {
+        $mongoQuery = { '$or' => [ $lhs, $node->{rhs} ] };
     }
-
-    return { '$or' => [ $node->{lhs}, $node->{rhs} ] };
+    
+    return $mongoQuery;
 }
 
 package Foswiki::Query::OP_not;

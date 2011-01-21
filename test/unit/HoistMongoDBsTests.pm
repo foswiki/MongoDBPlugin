@@ -550,16 +550,19 @@ sub test_hoistORANDOR {
     $this->do_Assert(
         $query,
         $mongoDBQuery,
-        {
-          '$where' => 'this.FIELD.number.value == \'14\' || this.FIELD.number.value == \'12\'',
-          '$or' => [
-                     {
-                       'FIELD.string.value' => 'apple'
-                     },
-                     {
-                       'FIELD.string.value' => 'bana'
-                     }
-                   ]
+{
+          'FIELD.number.value' => {
+                                    '$in' => [
+                                               '14',
+                                               '12'
+                                             ]
+                                  },
+          'FIELD.string.value' => {
+                                    '$in' => [
+                                               'apple',
+                                               'bana'
+                                             ]
+                                  }
         }
     );
 }
