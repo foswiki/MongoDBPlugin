@@ -29,7 +29,7 @@ use Time::HiRes ();
 
 #I wish
 #use constant MONITOR => $Foswiki::cfg{MONITOR}{'Foswiki::Plugins::MongoDBPlugin'} || 0;
-use constant MONITOR => 1;
+use constant MONITOR => 0;
 
 sub new {
     my $class  = shift;
