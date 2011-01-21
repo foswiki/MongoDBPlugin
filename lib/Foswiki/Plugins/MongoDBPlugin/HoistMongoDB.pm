@@ -634,6 +634,10 @@ sub hoistMongoDB {
     my $rhs = quotemeta( $node->{rhs} );
     $rhs =~ s/\\\././g;
     $rhs =~ s/\\\*/*/g;
+
+    #marginal speedup, but still every straw
+    return {} if ($rhs eq '.*');
+    
     $rhs = qr/$rhs/;
 
     return { $node->{lhs} => $rhs };

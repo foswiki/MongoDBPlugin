@@ -69,13 +69,17 @@ sub search {
     my %elements;
 
     push( @{ $elements{_web} }, $web );
-    push(
+
+    #dont' add a search for all..
+    if ($searchString ne '.*') {
+        push(
                     @{ $elements{_raw_text} },
                     {
                         '$regex'   => $searchString,
                         '$options' => ( $casesensitive ? '' : 'i' )
                     }
-                    );
+                );
+            }
 
     my $cursor =
       Foswiki::Plugins::MongoDBPlugin::getMongoDB()->query('current',  \%elements);
@@ -236,6 +240,10 @@ sub _webQuery {
             $raw_searchString =~ s/^(.*)$/\\b$1\\b/go
               if $options->{'wordboundaries'};
         }
+
+    #remove pointless regex..
+    $raw_searchString = undef if ($raw_searchString eq '.*');
+    $topic_searchString = undef if ($topic_searchString eq '.*');
         
         if ($counter == 0) {
             my $raw_text_regex = convertQueryToMongoRegex ($raw_searchString, $casesensitive, $invertSearch);
