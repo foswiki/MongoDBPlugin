@@ -172,7 +172,9 @@ sub _webQuery {
     my $includeTopicsRegex =
       Foswiki::Search::MongoDBInfoCache::convertTopicPatternToRegex(
         $options->{topic} );
-    if ( $includeTopicsRegex ne '' ) {
+#print STDERR "-------------------- _topic => $includeTopicsRegex (".$options->{topic}.")\n";
+    if (( $includeTopicsRegex ne '' ) and 
+        ($includeTopicsRegex ne '.*')){
         $includeTopicsRegex = qr/$includeTopicsRegex/;
         $ixhQuery->Push( '_topic' => $includeTopicsRegex );
     }
@@ -181,6 +183,7 @@ sub _webQuery {
     my $excludeTopicsRegex =
       Foswiki::Search::MongoDBInfoCache::convertTopicPatternToRegex(
         $options->{excludetopic} );
+#print STDERR "--------------------2 _topic => $includeTopicsRegex\n";
     if ( $excludeTopicsRegex ne '' ) {
         $excludeTopicsRegex = qr/$excludeTopicsRegex/;
         $ixhQuery->Push( '_topic' => 
@@ -242,6 +245,7 @@ sub _webQuery {
         }
 
     #remove pointless regex..
+    #TODO: need to work out wtf '\.*'
     $raw_searchString = undef if ($raw_searchString eq '.*');
     $topic_searchString = undef if ($topic_searchString eq '.*');
         
