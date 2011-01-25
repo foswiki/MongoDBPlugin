@@ -539,6 +539,34 @@ sub test_hoistOP_Match {
         { '_text' => qr/(?-xism:.*Green.*)/ } );
 }
 
+
+sub test_hoistOP_Where {
+    my $this        = shift;
+    my $s           = "preferences[name='SVEN']";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+# db.current.find({ 'PREFERENCE.__RAW_ARRAY' : { '$elemMatch' : {'name' : 'SVEN' }}})
+
+    $this->do_Assert( $query, $mongoDBQuery,
+        { 'PREFERENCE.__RAW_ARRAY' => { '$elemMatch' => {'name' => 'SVEN' }}}
+        );
+}
+#i think this is meaninless, but i'm not sure.
+sub test_hoistOP_preferencesDotName {
+    my $this        = shift;
+    my $s           = "preferences.name='BLAH'";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert( $query, $mongoDBQuery,
+        {  'PREFERENCE.name' => 'BLAH' } );
+}
+
 sub test_hoistORANDOR {
     my $this        = shift;
     my $s           = "(number=14 OR number=12) and (string='apple' OR string='bana')";

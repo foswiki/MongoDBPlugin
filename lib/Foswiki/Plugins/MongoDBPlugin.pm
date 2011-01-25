@@ -234,7 +234,7 @@ sub _updateTopic {
         if ( $Foswiki::Meta::isArrayType{$key} ) {
             #print STDERR "---- $key == many\n";
             my $FIELD = $savedMeta->{$key};
-            $meta->{$key} = {};
+            $meta->{$key} = {'__RAW_ARRAY' => $FIELD};
 
             foreach my $elem (@$FIELD) {
                 if ( $key eq 'FIELD' ) {
