@@ -322,6 +322,29 @@ sub test_hoistANDAND {
     );
 }
 
+sub test_hoistSimpleFieldDOT {
+    my $this        = shift;
+    my $s           = "FIELD.number.bana = 12";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    #TODO: there's and assumption that the bit before the . is the form-name
+    $this->do_Assert( $query, $mongoDBQuery, { 'FIELD.bana.value' => '12' } );
+}
+sub test_hoistMETAFieldDOT {
+    my $this        = shift;
+    my $s           = "META:FIELD.number.bana = 12";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    #TODO: there's and assumption that the bit before the . is the form-name
+    $this->do_Assert( $query, $mongoDBQuery, { 'FIELD.bana.value' => '12' } );
+}
+
 sub test_hoistSimpleDOT {
     my $this        = shift;
     my $s           = "number.bana = 12";
@@ -332,6 +355,17 @@ sub test_hoistSimpleDOT {
 
     #TODO: there's and assumption that the bit before the . is the form-name
     $this->do_Assert( $query, $mongoDBQuery, { 'FIELD.bana.value' => '12' } );
+}
+sub test_hoistSimpleField {
+    my $this        = shift;
+    my $s           = "number = 12";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    #TODO: there's and assumption that the bit before the . is the form-name
+    $this->do_Assert( $query, $mongoDBQuery, { 'FIELD.number.value' => '12' } );
 }
 
 sub test_hoistGT {
@@ -552,6 +586,68 @@ sub test_hoistOP_Where {
 
     $this->do_Assert( $query, $mongoDBQuery,
         { 'PREFERENCE.__RAW_ARRAY' => { '$elemMatch' => {'name' => 'SVEN' }}}
+        );
+}
+#
+sub test_hoistOP_Where1 {
+    my $this        = shift;
+    my $s           = "fields[value='FrequentlyAskedQuestion'";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+# db.current.find({ 'PREFERENCE.__RAW_ARRAY' : { '$elemMatch' : {'name' : 'SVEN' }}})
+
+    $this->do_Assert( $query, $mongoDBQuery,
+        {
+          'FIELD.__RAW_ARRAY' => {
+                                                    '$elemMatch' => {
+                                                                      'value' => 'FrequentlyAskedQuestion'
+                                                                    }
+                                                  }
+                                              }
+        );
+}
+sub test_hoistOP_Where2 {
+    my $this        = shift;
+    my $s           = "META:FIELD[value='FrequentlyAskedQuestion'";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+# db.current.find({ 'PREFERENCE.__RAW_ARRAY' : { '$elemMatch' : {'name' : 'SVEN' }}})
+
+    $this->do_Assert( $query, $mongoDBQuery,
+        {
+          'FIELD.__RAW_ARRAY' => {
+                                                    '$elemMatch' => {
+                                                                      'value' => 'FrequentlyAskedQuestion'
+                                                                    }
+                                                  }
+                                              }
+        );
+}
+sub test_hoistOP_Where3 {
+    my $this        = shift;
+    my $s           = "META:FIELD[name='TopicClassification' AND value='FrequentlyAskedQuestion'";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+# db.current.find({ 'PREFERENCE.__RAW_ARRAY' : { '$elemMatch' : {'name' : 'SVEN' }}})
+
+    $this->do_Assert( $query, $mongoDBQuery,
+    {
+          'FIELD.__RAW_ARRAY' => {
+                                   '$elemMatch' => {
+                                                     'value' => 'FrequentlyAskedQuestion',
+                                                     'name' => 'TopicClassification'
+                                                   }
+                                 }
+        }
         );
 }
 #i think this is meaninless, but i'm not sure.

@@ -126,7 +126,6 @@ sub _hoist {
         or defined( $node->{inWhere} ) 
         )
     {
-print STDERR "[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]";
         $node->{params}[0]->{inWhere} = $node->{inWhere}
           if ( defined( $node->{params}[0] ) and (ref($node->{params}[0]) ne ''));
         $node->{params}[1]->{inWhere} = ( $node->{inWhere} || $node )
@@ -416,15 +415,10 @@ hoist ~ into a mongoDB ixHash query
 =cut
 
 package Foswiki::Query::OP_dot;
-our %aliases = (
+use Foswiki::Meta;
 
-    #    attachments => 'META:FILEATTACHMENT',
-    #    fields      => 'META:FIELD',
-    #    form        => 'META:FORM',
-    #    info        => 'META:TOPICINFO',
-    #    moved       => 'META:TOPICMOVED',
-    #    parent      => 'META:TOPICPARENT',
-    #    preferences => 'META:PREFERENCE',
+#mongo specific aliases
+our %aliases = (
     name => '_topic',
     web  => '_web',
     text => '_text'
@@ -454,28 +448,21 @@ sub hoistMongoDB {
         #return;
     }
 
+#TODO: both the net 2 should only work form registered META - including what params are allowed. (except we don't do that for FIELDS :(
     if ( ref( $node->{op} ) ) {
-
+        
         #an actual OP_dot
-        my $lhs = $node->{params}[0];
-        my $rhs = $node->{params}[1];
-
-        #        ASSERT( !ref( $lhs->{op} ) ) if DEBUG;
-        #        ASSERT( !ref( $rhs->{op} ) ) if DEBUG;
-        #        ASSERT( $lhs->{op} eq Foswiki::Infix::Node::NAME ) if DEBUG;
-        #        ASSERT( $rhs->{op} eq Foswiki::Infix::Node::NAME )
-        #          if DEBUG;
-
-        $lhs = $lhs->{params}[0];
-        $rhs = $rhs->{params}[0];
+        my $lhs = $node->{params}[0]->{params}[0];
+        my $rhs = $node->{params}[1]->{params}[0];
+        
         my $mappedName = mapAlias($lhs);
 
-        print STDERR "-------------------------------- hoist OP_dot("
-          . ref( $node->{op} ) . ", "
-          . Data::Dumper::Dumper($node)
-          . ")\n INTO "
-          . $mappedName . '.'
-          . $rhs . "\n";
+        #print STDERR "-------------------------------- hoist OP_dot("
+        #  . ref( $node->{op} ) . ", "
+        #  . Data::Dumper::Dumper($node)
+        #  . ")\n  INTO "
+        #  . $mappedName . '.'
+        #  . $rhs . "\n";
 
         if ( $mappedName ne $lhs ) {
             return $mappedName . '.' . $rhs;
@@ -489,13 +476,20 @@ sub hoistMongoDB {
     elsif ( $node->{op} == Foswiki::Infix::Node::NAME ) {
 
         #if we're in a where, this is a bit transmissive
-        print STDERR "============================= hoist OP_dot("
-          . $node->{op} . ", "
-          . $node->{params}[0] . ', '
-          . (defined($node->{inWhere})?'inwhere':'notinwhere'). ")\n";
+        #print STDERR "============================= hoist OP_dot("
+        #  . $node->{op} . ", "
+        #  . $node->{params}[0] . ', '
+        #  . (defined($node->{inWhere})?'inwhere':'notinwhere'). ")\n";
           
         #if we're in a 'where' eg preferences[name = 'Summary'] then don't aliases
         return $node->{params}[0] if (defined($node->{inWhere}));
+
+        #if its a registered META, just return it.
+        if ($node->{params}[0] =~ /META:(.*)/) {
+            return $1 if (defined($Foswiki::Meta::VALIDATE{$1}));
+        }
+
+
 
         my $mappedName = mapAlias($node->{params}[0]);
         if ($mappedName ne $node->{params}[0]) {
