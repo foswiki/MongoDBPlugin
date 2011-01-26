@@ -246,8 +246,8 @@ sub _webQuery {
 
     #remove pointless regex..
     #TODO: need to work out wtf '\.*'
-    $raw_searchString = undef if ($raw_searchString eq '.*');
-    $topic_searchString = undef if ($topic_searchString eq '.*');
+    $raw_searchString = undef if (defined($raw_searchString) and $raw_searchString eq '.*');
+    $topic_searchString = undef if (defined($topic_searchString) and $topic_searchString eq '.*');
         
         if ($counter == 0) {
             my $raw_text_regex = convertQueryToMongoRegex ($raw_searchString, $casesensitive, $invertSearch);
