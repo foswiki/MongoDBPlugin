@@ -82,6 +82,17 @@ sub kludge {
 
     foreach my $key ( keys(%$node) ) {
         my $value = $node->{$key};
+#TODO: MUST DETECT IF THERE ALREADY IS A $where, and MERGE
+#	    if ($key =~ /^#/) {
+#		    #foswiki command we know we can't do in mongodb atm.
+#
+#            #need to pop out and replace the entire node with javascript.
+#            #TODO: mmmm, move to _hoist
+#
+#            $node->{'$where'} = convertToJavascript( { $key => $value } );
+#
+#		    next;
+#	    }
         my $thisIsOr = ( $key eq '$or' );
         if ( $inOr and $thisIsOr ) {
 
@@ -140,21 +151,28 @@ sub _hoist {
         return Foswiki::Query::OP_dot::hoistMongoDB( $node->{op}, $node );
     }
 
-
+    my $containsQueryFunctions = 0;
     #TODO: if 2 constants(NUMBER,STRING) ASSERT
     #TODO: if the first is a constant, swap
+    if ( $node->{op}->{arity} > 0 ) {
+        $node->{lhs} = _hoist( $node->{params}[0] );
+        if (ref($node->{lhs}) ne '') {
+#print STDERR "ref($node->{lhs}) == ".ref($node->{lhs})."\n";
+            $node->{ERROR} = $node->{lhs}->{ERROR}  if (defined( $node->{lhs}->{ERROR} ) );
+            $containsQueryFunctions |= defined($node->{lhs}->{'####need_function'});
+        }
+    }
 
-    $node->{lhs} = _hoist( $node->{params}[0] )
-      if ( $node->{op}->{arity} > 0 );
-    $node->{ERROR} = $node->{lhs}->{ERROR}
-      if ( ref( $node->{lhs} ) and defined( $node->{lhs}->{ERROR} ) );
 
-    $node->{rhs} = _hoist( $node->{params}[1] )
-      if ( $node->{op}->{arity} > 1 );
-    $node->{ERROR} = $node->{rhs}->{ERROR}
-      if ( ref( $node->{rhs} ) and defined( $node->{rhs}->{ERROR} ) );
+    if ( $node->{op}->{arity} > 1 ) {
+        $node->{rhs} = _hoist( $node->{params}[1] );
+        if (ref($node->{rhs}) ne '') {
+            $node->{ERROR} = $node->{rhs}->{ERROR} if ( defined( $node->{rhs}->{ERROR} ) );
+            $containsQueryFunctions |= defined($node->{rhs}->{'####need_function'});
+        }
+    }
 
-    monitor($node);
+    monitor($node) if MONITOR;
 
 #DAMMIT, I presume we have oddly nested eval/try catch so throwing isn't working
 #throw Error::Simple( 'failed to Hoist ' . ref( $node->{op} ) . "\n" )
@@ -164,7 +182,14 @@ sub _hoist {
     }
     if ( defined( $node->{ERROR} ) ) {
         print STDERR "HOIST ERROR: " . $node->{ERROR};
+        die  "HOIST ERROR: " . $node->{ERROR};
         return $node;
+    }
+    #need to convert to js for lc/uc/length  etc :(
+    # '####need_function'
+    if ($containsQueryFunctions) {
+        $node->{lhs} = convertToJavascript($node->{lhs}) if (ref($node->{lhs}) eq 'HASH');
+        return {'$where' => convertToJavascript($node->{op}->hoistMongoDB($node)) };
     }
 
     return $node->{op}->hoistMongoDB($node);
@@ -174,19 +199,21 @@ sub monitor {
     my $node = shift;
 
     print STDERR "\nparam0(" . $node->{params}[0]->{op} . "): ",
-      Data::Dumper::Dumper( $node->{params}[0] ), "\n"
-      if MONITOR;
-    print STDERR "\nparam1(" . $node->{params}[1]->{op} . "): ",
-      Data::Dumper::Dumper( $node->{params}[1] ), "\n"
-      if MONITOR;
-
+      Data::Dumper::Dumper( $node->{params}[0] ), "\n";
+    if ( $node->{op}->{arity} > 1 ) {
+        print STDERR "\nparam1(" . $node->{params}[1]->{op} . "): ",
+          Data::Dumper::Dumper( $node->{params}[1] ), "\n"
+          ;
+    }
     #TODO: mmm, do we only have unary and binary ops?
 
     print STDERR "----lhs: "
-      . Data::Dumper::Dumper( $node->{lhs} )
-      . "----rhs: "
-      . Data::Dumper::Dumper( $node->{rhs} ) . " \n"
-      if MONITOR;
+      . Data::Dumper::Dumper( $node->{lhs} )    ;
+    if ( $node->{op}->{arity} > 1 ) {
+        print STDERR "----rhs: "
+      . Data::Dumper::Dumper( $node->{rhs} ) ;
+      }
+      print STDERR " \n";
 
 #print STDERR "HoistS ",$query->stringify()," -> /",Dumper($mongoDBQuery),"/\n";
 
@@ -194,7 +221,7 @@ sub monitor {
       . Dumper( $node->{op} )
       . " ref(node->op)="
       . ref( $node->{op} ) . "\n"
-      if MONITOR;
+;
 }
 
 #map mongodb $ops to javascript logic
@@ -212,36 +239,77 @@ my %js_op_map = (
     #'' => '',
 );
 
+my %js_func_map = (
+	'#lc' => '.toLowerCase()', 
+	'#uc' => '.toUpperCase()', 
+	'#length' => '.toLowerCase()', 		#er, what?
+	'#d2n' => '.foswikiD2N()', 
+);
+
+my $fields = '('.join('|', keys(%Foswiki::Meta::VALIDATE)).')';
+
+sub convertStringToJS {
+    my $string = shift;
+    
+    return convertToJavascript($string) if (ref($string) eq 'HASH');
+    
+    return $string if ($string =~ /^this\./);
+    
+    # all registered meta type prefixes use a this. in js
+    return 'this.'.$string if ($string =~ /^$fields/);
+
+
+    return 'this.'.$string if ($string eq '_web');
+    return 'this.'.$string if ($string eq '_topic');
+    return 'this.'.$string if ($string eq '_text');
+
+    
+    return '\''.$string.'\'';
+}
+
 #converts a mongodb query hash into a $where clause
 #frustratingly, both (field:value) and {field:{$op,value}} and {$op, {nodes}} and {$op, []} are valid, making it a little messy
 #and {$op, []} might refer to the key outside it (as in $nin), or not, as in $or
 sub convertToJavascript {
     my $node      = shift;
     my $statement = '';
+    
+    #TODO: for some reason the Dumper call makes the HoistMongoDBsTests::test_hoistLcRHSName test succeed - have to work out what i've broken.
+    my $dump = Dumper($node);
 
-    #print STDERR "\n..............DUMPER: ".Dumper($node)."\n";
+#    print STDERR "\n...convertToJavascript...........DUMPER: ".Dumper($node)."\n";
 
     while ( my ( $key, $value ) = each(%$node) ) {
+        next if ($key eq '####need_function');
         $statement .= ' && ' if ( $statement ne '' );
+        
+        #BEWARE: if ref($node->{lhs}) eq 'HASH' then $key is going to be wrong.
+        if (ref($node->{lhs}) eq 'HASH') {
+            die 'unexpectedly';
+            $key = convertToJavascript($node->{lhs});
+        }
 
         #convert $ops into js ones
         my $js_key = $key;
+
         $js_key = $js_op_map{$key} if ( defined( $js_op_map{$key} ) );
+#print STDERR "key = $key (".ref($js_key).", $js_key), value = $value\n";
+
 
         if ( ref($value) eq 'HASH' ) {
             my ( $k, $v ) = each(%$value);
             if ( ( $k eq '$in' ) or ( $k eq '$nin' ) ) {
 
-#TODO: look up to see if javascrip thas an value.in(list) or ARRAY.contains(value)
+#TODO: look up to see if javascript thas an value.in(list) or ARRAY.contains(value)
                 $statement .=
-                  ' ( ' . join( ' || ', map { "$js_key == $_" } @$v ) . ' ) ';
+                  ' ( ' . join( ' || ', map { convertStringToJS($js_key).' == '.convertStringToJS($_) } @$v ) . ' ) ';
                 $statement =
                   ( ( $key eq '$nin' ) ? '!' : '' ) . " ($statement) ";
             }
             else {
                 $value = convertToJavascript($value);
 
-                $statement .= "$js_key $value";
+                $statement .= convertStringToJS($js_key)." == $value";
             }
         }
         elsif ( ref($value) eq 'ARRAY' ) {
@@ -254,13 +322,14 @@ sub convertToJavascript {
                 #er, assuming $key == $or - $in and $nin will kick me
                 $statement .= ' ( '
                   . join(
-                    ' ' . $js_key . ' ',
+                    ' ' . convertStringToJS($js_key) . ' ',
                     map { convertToJavascript($_) } @$value
                   ) . ' ) ';
 
                 #$statement = " ($statement) ";
-            }
-            else {
+            } elsif ($key =~ /^#/) {
+                die "not quite where i thought i'd be $key\n";
+            } else {
                 die 'sadly ' . $key;
             }
 
@@ -273,13 +342,16 @@ sub convertToJavascript {
 
             #value isa string..
             #TODO: argh, string or number, er, or regex?
-            #print STDERR "convertToJavascript - $value is a ".ref($value)."\n";
+#print STDERR "convertToJavascript - $key => $value is a ".ref($value)."\n";
                 if ( ref($value) eq 'Regexp' ) {
                     $value =~ /\(\?-xism:(.*)\)/;    #TODO: er, regex options?
-                    $statement .= "( /$1/.test(this.$js_key) )";
-                }
-                else {
-                    $statement .= "this.$js_key == '$value'";
+                    $statement .= "( /$1/.test(".convertStringToJS($js_key).") )";
+                } elsif ($key =~ /^\#/) {
+                    #TODO: can't presume that the 'value' is a constant - it might be a META value name
+                    $statement .= convertStringToJS($value).$js_func_map{$key};
+                } else {
+                    #TODO: can't presume that the 'value' is a constant - it might be a META value name
+                    $statement .= convertStringToJS($js_key).' == '.convertStringToJS($value);
                 }
             }
         }
@@ -397,11 +469,16 @@ package Foswiki::Query::OP_like;
 sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
+    
+    unless (ref($node->{rhs}) eq '') {
+        #TODO: need to try to evaluate to a constant (eg lc('SomeText')
+            die 'er, no, can\'t regex on a function';
+    }
 
     my $rhs = quotemeta( $node->{rhs} );
     $rhs =~ s/\\\?/./g;
     $rhs =~ s/\\\*/.*/g;
-    $rhs = qr/$rhs/;
+    $rhs = qr/^$rhs$/;
 
     return { $node->{lhs} => $rhs };
 }
@@ -410,7 +487,6 @@ sub hoistMongoDB {
 
 ---++ ObjectMethod Foswiki::Query::OP_dot::hoistMongoDB($node) -> $ref to IxHash
 
-hoist ~ into a mongoDB ixHash query
 
 =cut
 
@@ -500,8 +576,11 @@ sub hoistMongoDB {
             return 'FIELD.' . $node->{params}[0] . '.value';
         }
     }
-    elsif (( $node->{op} == Foswiki::Infix::Node::NUMBER )
-        or ( $node->{op} == Foswiki::Infix::Node::STRING ) )
+    elsif ( $node->{op} == Foswiki::Infix::Node::NUMBER ) {
+        #TODO: would love to convert to numbers, don't think i can yet.
+        return $node->{params}[0];
+    }
+    elsif ( $node->{op} == Foswiki::Infix::Node::STRING )
     {
         return $node->{params}[0];
     }
@@ -583,11 +662,12 @@ sub hoistMongoDB {
 
          #TODO: how about minimising 2 identical non-simple queries ANDed?
          #this eq test below doesn't do identical regex, nor identical $ne etc..
-                print STDERR "----+++++++++++++++++ ||"
-                  . $andHash{$key} . "||"
-                  . $node->{rhs}->{$key} . "||"
-                  . ref( $andHash{$key} ) . "||"
-                  . ref( $node->{rhs}->{$key} ) . "||\n";
+#                print STDERR "----+++++++++++++++++ ||"
+#                  . $andHash{$key} . "||"
+#                  . $node->{rhs}->{$key} . "||"
+#                  . ref( $andHash{$key} ) . "||"
+#                  . ref( $node->{rhs}->{$key} ) . "||\n";
+
                 if (    ( ref( $andHash{$key} ) eq '' )
                     and ( ref( $node->{rhs}->{$key} ) eq '' )
                     and ( $andHash{$key} eq $node->{rhs}->{$key} ) )
@@ -595,7 +675,7 @@ sub hoistMongoDB {
 
                     #they're the same, ignore the second..
                     $conflictResolved = 1;
-                    print STDERR "bump\n";
+                    #print STDERR "bump - de-duplicate\n";
                 }
                 elsif ( ( ref( $andHash{$key} ) eq 'HASH' )
                     and ( ref( $node->{rhs}->{$key} ) eq 'HASH' )
@@ -721,6 +801,7 @@ sub hoistMongoDB {
 }
 
 package Foswiki::Query::OP_match;
+#hoist =~ into a mongoDB ixHash query
 
 sub hoistMongoDB {
     my $op   = shift;
@@ -757,16 +838,6 @@ sub hoistMongoDB {
     return $node->{lhs};
 }
 
-package Foswiki::Query::OP_d2n;
-
-package Foswiki::Query::OP_lc;
-
-package Foswiki::Query::OP_length;
-
-package Foswiki::Query::OP_ref;
-
-package Foswiki::Query::OP_uc;
-
 package Foswiki::Query::OP_where;
 
 sub hoistMongoDB {
@@ -781,10 +852,47 @@ sub hoistMongoDB {
 #and thus, need to re-do the mongodb schema so that meta 'arrays' are arrays again.
 #and that means the FIELD: name based shorcuts need to be re-written :/ de-indexing the queries :(
 
-    print "************************************* giber splat";
-
     return { $node->{lhs}.'.__RAW_ARRAY' => { '$elemMatch' => $node->{rhs} } };
 }
+
+package Foswiki::Query::OP_d2n;
+sub hoistMongoDB {
+    my $op   = shift;
+    my $node = shift;
+
+    return { '#d2n' => $node->{lhs}, '####need_function' => 1 };
+}
+
+package Foswiki::Query::OP_lc;
+sub hoistMongoDB {
+    my $op   = shift;
+    my $node = shift;
+
+    return { '#lc' => $node->{lhs}, '####need_function' => 1 };
+}
+
+package Foswiki::Query::OP_length;
+sub hoistMongoDB {
+    my $op   = shift;
+    my $node = shift;
+
+    return { '#length' => $node->{lhs}, '####need_function' => 1 };
+}
+
+package Foswiki::Query::OP_uc;
+sub hoistMongoDB {
+    my $op   = shift;
+    my $node = shift;
+
+    return { '#uc' => $node->{lhs}, '####need_function' => 1 };
+}
+
+######################################
+package Foswiki::Query::OP_ref;
+#oh what a disaster.
+# this has to be implemented as a compound query, so that we're querying against constants
+######################################
+
 
 1;
 __DATA__

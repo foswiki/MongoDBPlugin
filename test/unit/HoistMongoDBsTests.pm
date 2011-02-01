@@ -11,6 +11,8 @@ use Foswiki::Meta;
 use Data::Dumper;
 use strict;
 
+use constant MONITOR => 0;
+
 #list of operators we can output
 my @MongoOperators = qw/$or $not $nin $in/;
 #list of all Query ops
@@ -28,13 +30,13 @@ sub do_Assert {
     my $expectedMongoDBQuery = shift;
 
     #    print STDERR "HoistS ",$query->stringify();
-    print STDERR "HoistS ", Dumper($query);
-    print STDERR "\n -> /", Dumper($mongoDBQuery), "/\n";
+    print STDERR "HoistS ", Dumper($query) if MONITOR;
+    print STDERR "\n -> /", Dumper($mongoDBQuery), "/\n" if MONITOR;
 
     $this->assert_deep_equals( $expectedMongoDBQuery, $mongoDBQuery );
 
    #try out converttoJavascript
-   print STDERR "\nconvertToJavascript: \n".Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::convertToJavascript($mongoDBQuery)."\n";
+   print STDERR "\nconvertToJavascript: \n".Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::convertToJavascript($mongoDBQuery)."\n" if MONITOR;
 }
 
 sub set_up {
@@ -690,5 +692,82 @@ sub test_hoistORANDOR {
         }
     );
 }
+
+sub test_hoistLcRHSName {
+    my $this        = shift;
+    my $s           = "name = lc('WebHome')";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert( $query, $mongoDBQuery,
+        {
+            '$where' => 'this._topic == \'WebHome\'.toLowerCase()'
+        }
+        );
+}
+
+
+sub test_hoistLcLHSField {
+    my $this        = shift;
+    my $s           = "lc(Subject) = 'WebHome'";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert( $query, $mongoDBQuery,
+        {
+            '$where' => 'this.FIELD.Subject.value.toLowerCase() == \'WebHome\''
+        }
+        );
+}
+
+sub test_hoistLcLHSName {
+    my $this        = shift;
+    my $s           = "lc(name) = 'WebHome'";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert( $query, $mongoDBQuery,
+        {
+            '$where' => 'this._topic.toLowerCase() == \'WebHome\''
+        }
+        );
+}
+
+sub DISABLEtest_hoistLcRHSLikeName {
+#TODO: this requires the hoister to notice that its a constant and that it can pre-evaluate it
+    my $this        = shift;
+    my $s           = "name ~ lc('Web*')";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert( $query, $mongoDBQuery,
+        { '_topic' => qr/(?-xism:web.*)/ } );
+}
+
+
+sub test_hoistLcLHSLikeName {
+    my $this        = shift;
+    my $s           = "lc(name) ~ 'Web*'";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert( $query, $mongoDBQuery,
+        {
+            '$where' => '( /^Web.*$/.test(this._topic.toLowerCase()) )'
+        }
+        );
+}
+
+
 
 1;
