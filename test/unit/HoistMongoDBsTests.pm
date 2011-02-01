@@ -768,6 +768,48 @@ sub test_hoistLcLHSLikeName {
         );
 }
 
+sub test_hoistLengthLHSName {
+    my $this        = shift;
+    my $s           = "length(name) = 12";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
 
+    $this->do_Assert( $query, $mongoDBQuery,
+        {
+            '$where' => 'this._topic.length == \'12\''
+        }
+        );
+}
+sub test_hoistLengthLHSString {
+    my $this        = shift;
+    my $s           = "length('something') = 9";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert( $query, $mongoDBQuery,
+        {
+            '$where' => '\'something\'.length == \'9\''
+        }
+        );
+}
+
+sub test_hoistLengthLHSNameGT {
+    my $this        = shift;
+    my $s           = "length(name) < 12";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert( $query, $mongoDBQuery,
+        {
+            '$where' => 'this._topic.length < \'12\''
+        }
+        );
+}
 
 1;

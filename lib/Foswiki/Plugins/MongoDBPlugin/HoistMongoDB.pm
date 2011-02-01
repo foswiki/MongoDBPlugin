@@ -242,22 +242,27 @@ my %js_op_map = (
 my %js_func_map = (
 	'#lc' => '.toLowerCase()', 
 	'#uc' => '.toUpperCase()', 
-	'#length' => '.toLowerCase()', 		#er, what?
+	'#length' => '.length', 
 	'#d2n' => '.foswikiD2N()', 
 );
 
 my $fields = '('.join('|', keys(%Foswiki::Meta::VALIDATE)).')';
+my $ops = '('.join('|', values(%js_op_map)).')';
 
 sub convertStringToJS {
     my $string = shift;
+print STDERR "  convertStringToJS($string)\n" if MONITOR;
     
     return convertToJavascript($string) if (ref($string) eq 'HASH');
     
+    return $string if ($string =~ /'.*'/);
     return $string if ($string =~ /^this\./);
     
     # all registered meta type prefixes use a this. in js
     return 'this.'.$string if ($string =~ /^$fields/);
-
+    return $string if ($string =~ /^$ops$/);    #for ops, we only want the entirety
+    
+    return $js_op_map{$string} if ( defined( $js_op_map{$string} ) );
 
     return 'this.'.$string if ($string eq '_web');
     return 'this.'.$string if ($string eq '_topic');
@@ -277,7 +282,7 @@ sub convertToJavascript {
     #TODO: for some reason the Dumper call makes the HoistMongoDBsTests::test_hoistLcRHSName test succeed - have to work out what i've broken.
     my $dump = Dumper($node);
 
-#    print STDERR "\n...convertToJavascript...........DUMPER: ".Dumper($node)."\n";
+    print STDERR "\n...convertToJavascript...........DUMPER: ".Dumper($node)."\n" if MONITOR;
 
     while ( my ( $key, $value ) = each(%$node) ) {
         next if ($key eq '####need_function');
@@ -293,7 +298,7 @@ sub convertToJavascript {
         my $js_key = $key;
 
         $js_key = $js_op_map{$key} if ( defined( $js_op_map{$key} ) );
-#print STDERR "key = $key (".ref($js_key).", $js_key), value = $value\n";
+print STDERR "key = $key (".ref($js_key).", $js_key), value = $value\n" if MONITOR;
 
 
         if ( ref($value) eq 'HASH' ) {
@@ -306,10 +311,14 @@ sub convertToJavascript {
                 $statement =
                   ( ( $key eq '$nin' ) ? '!' : '' ) . " ($statement) ";
             }
-            else {
-                $value = convertToJavascript($value);
+            elsif ( $k =~ /^\$/ ) {
+                $statement .= convertStringToJS($js_key).' '.convertToJavascript($value);
+            } else {
+                #$value = convertToJavascript($value);
+                #shit. need to know if we need an == inserted here too? thats shite.
 
-                $statement .= convertStringToJS($js_key)." == $value";
+                #$statement .= "[X $key $value X]".convertStringToJS($js_key).' '.convertToJavascript($value);
+                $statement .= convertStringToJS($js_key).' == '.convertToJavascript($value);
             }
         }
         elsif ( ref($value) eq 'ARRAY' ) {
@@ -342,13 +351,15 @@ sub convertToJavascript {
 
             #value isa string..
             #TODO: argh, string or number, er, or regex?
-#print STDERR "convertToJavascript - $key => $value is a ".ref($value)."\n";
+print STDERR "convertToJavascript - $key => $value is a ".ref($value)."\n" if MONITOR;
                 if ( ref($value) eq 'Regexp' ) {
                     $value =~ /\(\?-xism:(.*)\)/;    #TODO: er, regex options?
                     $statement .= "( /$1/.test(".convertStringToJS($js_key).") )";
                 } elsif ($key =~ /^\#/) {
                     #TODO: can't presume that the 'value' is a constant - it might be a META value name
                     $statement .= convertStringToJS($value).$js_func_map{$key};
+                } elsif ($key =~ /^\$/ and defined( $js_op_map{$key})) {
+                    $statement .= ($js_key).' '.convertStringToJS($value);
                 } else {
                     #TODO: can't presume that the 'value' is a constant - it might be a META value name
                     $statement .= convertStringToJS($js_key).' == '.convertStringToJS($value);
@@ -356,6 +367,7 @@ sub convertToJavascript {
             }
         }
     }
+print STDERR "----returning $statement\n" if MONITOR;
     return $statement;
 }
 
