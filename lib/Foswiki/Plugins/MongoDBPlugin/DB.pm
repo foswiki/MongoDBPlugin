@@ -201,6 +201,25 @@ sub remove {
     $collection->remove($mongoDbQuery);
 }
 
+sub updateSystemJS {
+    my $self = shift;
+    my $functionname = shift;
+    my $sourcecode = shift;
+    
+    my $collection = $self->_getCollection('system.js');
+
+use MongoDB::Code;
+    my $code = MongoDB::Code->new('code' => $sourcecode);
+   
+    $collection->save(
+        {
+            _id => $functionname,
+            value => $code
+        }
+    );
+}
+
+
 #######################################################
 #Webname?
 sub _getCollection {

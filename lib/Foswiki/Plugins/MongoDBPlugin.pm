@@ -61,6 +61,7 @@ sub initPlugin {
 
     Foswiki::Func::registerTagHandler( 'MONGODB', \&_MONGODB );
     Foswiki::Func::registerRESTHandler( 'update', \&_update );
+    Foswiki::Func::registerRESTHandler( 'updateDatabase', \&_updateDatabase );
 
     return 1;
 }
@@ -152,6 +153,10 @@ sub _update {
     my $session = shift;
     my $query   = Foswiki::Func::getCgiQuery();
     my $web     = $query->param('updateweb') || 'Sandbox';
+    
+    
+    #lets make sure we have the javascript we'll rely on later
+    _updateDatabase($session, $query);
 
     my @topicList = Foswiki::Func::getTopicList($web);
 
@@ -290,6 +295,23 @@ sub _updateTopic {
 
     my $ret = getMongoDB()->update( 'current', "$web.$topic", $meta );
 }
+
+#restHandler used to update the javascript saved in MongoDB
+sub _updateDatabase {
+    my $session = shift;
+    my $query   = Foswiki::Func::getCgiQuery();
+    
+    #load from topic..
+    my $meta = Foswiki::Func::readTopic('Sandbox', 'TestParseTime');
+    
+    Foswiki::Func::loadTemplate('mongodb_js');
+    my $foswiki_d2n_js = Foswiki::Func::expandTemplate('foswiki_d2n_js');
+    
+print STDERR "_updateDatabase\n".$foswiki_d2n_js."\n";
+
+    getMongoDB()->updateSystemJS('foswiki_d2n', $foswiki_d2n_js);
+}
+
 
 # The function used to handle the %EXAMPLETAG{...}% macro
 # You would have one of these for each macro you want to process.

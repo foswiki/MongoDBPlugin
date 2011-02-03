@@ -812,4 +812,20 @@ sub test_hoistLengthLHSNameGT {
         );
 }
 
+sub test_hoist_d2n {
+    my $this        = shift;
+    my $s           = "d2n(name) < d2n('1998-11-23')";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert( $query, $mongoDBQuery,
+        {
+            '$where' => "foswiki_d2n(this._topic) < foswiki_d2n('1998-11-23')"
+        }
+        );
+}
+
+
 1;

@@ -1,6 +1,10 @@
 # Release manifest for MongoDBPlugin
 data/System/MongoDBPlugin.txt 0644 Documentation
 data/System/MongoDBLoadWebs.txt 0644 Utility Topic
+data/Sandbox/TestParseTime.txt 0644 javascript and tests for implementation of Foswiki::Time::parseTime for d2n()
+templates/mongodb_js.tmpl 0644 the javascript we load into mongodb
+
+
 lib/Foswiki/Plugins/MongoDBPlugin.pm 0644 Perl module
 lib/Foswiki/Plugins/MongoDBPlugin/DB.pm 0644 Perl module
 lib/Foswiki/Plugins/MongoDBPlugin/Meta.pm 0644 Perl module

@@ -243,8 +243,15 @@ my %js_func_map = (
 	'#lc' => '.toLowerCase()', 
 	'#uc' => '.toUpperCase()', 
 	'#length' => '.length', 
-	'#d2n' => '.foswikiD2N()', 
+	'#d2n' => 'foswiki_d2n', 
 );
+sub convertFunction {
+    my ($value, $key) = @_;
+    if ($key eq '#d2n') {
+        return $js_func_map{$key}.'('.convertStringToJS($value).')';
+    }
+    return convertStringToJS($value).$js_func_map{$key};
+}
 
 my $fields = '('.join('|', keys(%Foswiki::Meta::VALIDATE)).')';
 my $ops = '('.join('|', values(%js_op_map)).')';
@@ -263,6 +270,8 @@ print STDERR "  convertStringToJS($string)\n" if MONITOR;
     return $string if ($string =~ /^$ops$/);    #for ops, we only want the entirety
     
     return $js_op_map{$string} if ( defined( $js_op_map{$string} ) );
+    #TODO: generalise
+    return $string if ($string =~ /^foswiki_d2n\(.*/);
 
     return 'this.'.$string if ($string eq '_web');
     return 'this.'.$string if ($string eq '_topic');
@@ -313,6 +322,8 @@ print STDERR "key = $key (".ref($js_key).", $js_key), value = $value\n" if MONIT
             }
             elsif ( $k =~ /^\$/ ) {
                 $statement .= convertStringToJS($js_key).' '.convertToJavascript($value);
+            } elsif ($key =~ /^\$/ and defined( $js_op_map{$key})) {
+                $statement .= ($js_key).' '.convertStringToJS($value);
             } else {
                 #$value = convertToJavascript($value);
                 #shit. need to know if we need an == inserted here too? thats shite.
@@ -356,8 +367,8 @@ print STDERR "convertToJavascript - $key => $value is a ".ref($value)."\n" if MO
                     $value =~ /\(\?-xism:(.*)\)/;    #TODO: er, regex options?
                     $statement .= "( /$1/.test(".convertStringToJS($js_key).") )";
                 } elsif ($key =~ /^\#/) {
-                    #TODO: can't presume that the 'value' is a constant - it might be a META value name
-                    $statement .= convertStringToJS($value).$js_func_map{$key};
+                    #$statement .= convertStringToJS($value).$js_func_map{$key};
+                    $statement .= convertFunction($value, $key);
                 } elsif ($key =~ /^\$/ and defined( $js_op_map{$key})) {
                     $statement .= ($js_key).' '.convertStringToJS($value);
                 } else {
