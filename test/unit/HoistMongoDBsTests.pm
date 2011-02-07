@@ -11,7 +11,7 @@ use Foswiki::Meta;
 use Data::Dumper;
 use strict;
 
-use constant MONITOR => 0;
+use constant MONITOR => 1;
 
 #list of operators we can output
 my @MongoOperators = qw/$or $not $nin $in/;
@@ -827,5 +827,48 @@ sub test_hoist_d2n {
         );
 }
 
+sub test_hoist_Item10323_1 {
+    my $this        = shift;
+    my $s           = "lc(TermGroup)=~'bio'";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert( $query, $mongoDBQuery,
+        {
+               '$where' => '( /bio/.test(this.FIELD.TermGroup.value.toLowerCase()) )'
+        }
+        );
+}
+sub test_hoist_Item10323_2 {
+    my $this        = shift;
+    my $s           = "lc(TermGroup)=~lc('bio')";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert( $query, $mongoDBQuery,
+        {
+          '$where' => ' (Regex(\'bio\'.toLowerCase(), \'\').test(this.FIELD.TermGroup.value.toLowerCase())) '
+        }
+        );
+}
+
+sub test_hoist_Item10323 {
+    my $this        = shift;
+    my $s           = "form.name~'*TermForm' AND lc(Namespace)=~lc('ant') AND lc(TermGroup)=~lc('bio')";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert( $query, $mongoDBQuery,
+        {
+            '$where' => "foswiki_d2n(this._topic) < foswiki_d2n('1998-11-23')"
+        }
+        );
+}
 
 1;

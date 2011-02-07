@@ -22,8 +22,8 @@ use Assert;
 
 use Foswiki::Query::HoistREs ();
 
-use constant MONITOR => 0;
-use constant WATCH   => 0;
+use constant MONITOR => 1;
+use constant WATCH   => 1;
 
 =begin TML
 
@@ -82,17 +82,18 @@ sub kludge {
 
     foreach my $key ( keys(%$node) ) {
         my $value = $node->{$key};
-#TODO: MUST DETECT IF THERE ALREADY IS A $where, and MERGE
-#	    if ($key =~ /^#/) {
-#		    #foswiki command we know we can't do in mongodb atm.
-#
-#            #need to pop out and replace the entire node with javascript.
-#            #TODO: mmmm, move to _hoist
-#
-#            $node->{'$where'} = convertToJavascript( { $key => $value } );
-#
-#		    next;
-#	    }
+
+     #TODO: MUST DETECT IF THERE ALREADY IS A $where, and MERGE
+     #	    if ($key =~ /^#/) {
+     #		    #foswiki command we know we can't do in mongodb atm.
+     #
+     #            #need to pop out and replace the entire node with javascript.
+     #            #TODO: mmmm, move to _hoist
+     #
+     #            $node->{'$where'} = convertToJavascript( { $key => $value } );
+     #
+     #		    next;
+     #	    }
         my $thisIsOr = ( $key eq '$or' );
         if ( $inOr and $thisIsOr ) {
 
@@ -131,16 +132,17 @@ sub _hoist {
     die 'node eq undef' unless defined($node);
 
     print STDERR "???????" . ref( $node->{op} ) . "\n" if MONITOR or WATCH;
-    
+
     #forward propogate that we're inside a 'where' - eg lhs[rhs]
-    if (( ref( $node->{op} ) eq 'Foswiki::Query::OP_where' )
-        or defined( $node->{inWhere} ) 
-        )
+    if ( ( ref( $node->{op} ) eq 'Foswiki::Query::OP_where' )
+        or defined( $node->{inWhere} ) )
     {
         $node->{params}[0]->{inWhere} = $node->{inWhere}
-          if ( defined( $node->{params}[0] ) and (ref($node->{params}[0]) ne ''));
+          if ( defined( $node->{params}[0] )
+            and ( ref( $node->{params}[0] ) ne '' ) );
         $node->{params}[1]->{inWhere} = ( $node->{inWhere} || $node )
-          if ( defined( $node->{params}[1] )  and (ref($node->{params}[1]) ne '') );
+          if ( defined( $node->{params}[1] )
+            and ( ref( $node->{params}[1] ) ne '' ) );
     }
 
     #name, or constants.
@@ -152,23 +154,28 @@ sub _hoist {
     }
 
     my $containsQueryFunctions = 0;
+
     #TODO: if 2 constants(NUMBER,STRING) ASSERT
     #TODO: if the first is a constant, swap
     if ( $node->{op}->{arity} > 0 ) {
         $node->{lhs} = _hoist( $node->{params}[0] );
-        if (ref($node->{lhs}) ne '') {
-#print STDERR "ref($node->{lhs}) == ".ref($node->{lhs})."\n";
-            $node->{ERROR} = $node->{lhs}->{ERROR}  if (defined( $node->{lhs}->{ERROR} ) );
-            $containsQueryFunctions |= defined($node->{lhs}->{'####need_function'});
+        if ( ref( $node->{lhs} ) ne '' ) {
+
+            #print STDERR "ref($node->{lhs}) == ".ref($node->{lhs})."\n";
+            $node->{ERROR} = $node->{lhs}->{ERROR}
+              if ( defined( $node->{lhs}->{ERROR} ) );
+            $containsQueryFunctions |=
+              defined( $node->{lhs}->{'####need_function'} );
         }
     }
 
-
     if ( $node->{op}->{arity} > 1 ) {
         $node->{rhs} = _hoist( $node->{params}[1] );
-        if (ref($node->{rhs}) ne '') {
-            $node->{ERROR} = $node->{rhs}->{ERROR} if ( defined( $node->{rhs}->{ERROR} ) );
-            $containsQueryFunctions |= defined($node->{rhs}->{'####need_function'});
+        if ( ref( $node->{rhs} ) ne '' ) {
+            $node->{ERROR} = $node->{rhs}->{ERROR}
+              if ( defined( $node->{rhs}->{ERROR} ) );
+            $containsQueryFunctions |=
+              defined( $node->{rhs}->{'####need_function'} );
         }
     }
 
@@ -182,14 +189,18 @@ sub _hoist {
     }
     if ( defined( $node->{ERROR} ) ) {
         print STDERR "HOIST ERROR: " . $node->{ERROR};
-        die  "HOIST ERROR: " . $node->{ERROR};
+        die "HOIST ERROR: " . $node->{ERROR};
         return $node;
     }
+
     #need to convert to js for lc/uc/length  etc :(
     # '####need_function'
     if ($containsQueryFunctions) {
-        $node->{lhs} = convertToJavascript($node->{lhs}) if (ref($node->{lhs}) eq 'HASH');
-        return {'$where' => convertToJavascript($node->{op}->hoistMongoDB($node)) };
+        $node->{lhs} = convertToJavascript( $node->{lhs} )
+          if ( ref( $node->{lhs} ) eq 'HASH' );
+        return {
+            '$where' => convertToJavascript( $node->{op}->hoistMongoDB($node) )
+        };
     }
 
     return $node->{op}->hoistMongoDB($node);
@@ -202,26 +213,23 @@ sub monitor {
       Data::Dumper::Dumper( $node->{params}[0] ), "\n";
     if ( $node->{op}->{arity} > 1 ) {
         print STDERR "\nparam1(" . $node->{params}[1]->{op} . "): ",
-          Data::Dumper::Dumper( $node->{params}[1] ), "\n"
-          ;
+          Data::Dumper::Dumper( $node->{params}[1] ), "\n";
     }
+
     #TODO: mmm, do we only have unary and binary ops?
 
-    print STDERR "----lhs: "
-      . Data::Dumper::Dumper( $node->{lhs} )    ;
+    print STDERR "----lhs: " . Data::Dumper::Dumper( $node->{lhs} );
     if ( $node->{op}->{arity} > 1 ) {
-        print STDERR "----rhs: "
-      . Data::Dumper::Dumper( $node->{rhs} ) ;
-      }
-      print STDERR " \n";
+        print STDERR "----rhs: " . Data::Dumper::Dumper( $node->{rhs} );
+    }
+    print STDERR " \n";
 
 #print STDERR "HoistS ",$query->stringify()," -> /",Dumper($mongoDBQuery),"/\n";
 
     print STDERR "Hoist node->op="
       . Dumper( $node->{op} )
       . " ref(node->op)="
-      . ref( $node->{op} ) . "\n"
-;
+      . ref( $node->{op} ) . "\n";
 }
 
 #map mongodb $ops to javascript logic
@@ -240,45 +248,59 @@ my %js_op_map = (
 );
 
 my %js_func_map = (
-	'#lc' => '.toLowerCase()', 
-	'#uc' => '.toUpperCase()', 
-	'#length' => '.length', 
-	'#d2n' => 'foswiki_d2n', 
+    '#lc'     => '.toLowerCase()',
+    '#uc'     => '.toUpperCase()',
+    '#length' => '.length',
+    '#d2n'    => 'foswiki_d2n',
+    '#match'  => 'MATCHBANG',
+    '#like'   => 'LIKEBANG',
 );
+
 sub convertFunction {
-    my ($value, $key) = @_;
-    if ($key eq '#d2n') {
-        return $js_func_map{$key}.'('.convertStringToJS($value).')';
+    my ( $value, $key ) = @_;
+    if ( $key eq '#d2n' ) {
+        return $js_func_map{$key} . '(' . convertStringToJS($value) . ')';
     }
-    return convertStringToJS($value).$js_func_map{$key};
+    if ( $key eq '#match' ) {
+        my $regex = convertStringToJS($value);
+        my $regexoptions = '\'\'';
+        return "Regex($regex, $regexoptions).test";#(this.\$scope);";
+    }
+    if ( $key eq '#like' ) {
+        my $regex = convertStringToJS($value);
+        my $regexoptions = '\'\'';
+        return "Regex('^'+$regex+'$', $regexoptions).test";#(this.\$scope);";
+    }
+    return convertStringToJS($value) . $js_func_map{$key};
 }
 
-my $fields = '('.join('|', keys(%Foswiki::Meta::VALIDATE)).')';
-my $ops = '('.join('|', values(%js_op_map)).')';
+my $fields = '(' . join( '|', keys(%Foswiki::Meta::VALIDATE) ) . ')';
+my $ops    = '(' . join( '|', values(%js_op_map) ) . ')';
 
 sub convertStringToJS {
     my $string = shift;
-print STDERR "  convertStringToJS($string)\n" if MONITOR;
-    
-    return convertToJavascript($string) if (ref($string) eq 'HASH');
-    
-    return $string if ($string =~ /'.*'/);
-    return $string if ($string =~ /^this\./);
-    
+    print STDERR "  convertStringToJS($string)\n" if MONITOR;
+
+    return convertToJavascript($string) if ( ref($string) eq 'HASH' );
+
+    return $string if ( $string =~ /'.*'/ );
+    return $string if ( $string =~ /^this\./ );
+
     # all registered meta type prefixes use a this. in js
-    return 'this.'.$string if ($string =~ /^$fields/);
-    return $string if ($string =~ /^$ops$/);    #for ops, we only want the entirety
-    
+    return 'this.' . $string if ( $string =~ /^$fields/ );
+    return $string
+      if ( $string =~ /^$ops$/ );    #for ops, we only want the entirety
+
     return $js_op_map{$string} if ( defined( $js_op_map{$string} ) );
+
     #TODO: generalise
-    return $string if ($string =~ /^foswiki_d2n\(.*/);
+    return $string if ( $string =~ /^foswiki_d2n\(.*/ );
 
-    return 'this.'.$string if ($string eq '_web');
-    return 'this.'.$string if ($string eq '_topic');
-    return 'this.'.$string if ($string eq '_text');
+    return 'this.' . $string if ( $string eq '_web' );
+    return 'this.' . $string if ( $string eq '_topic' );
+    return 'this.' . $string if ( $string eq '_text' );
 
-    
-    return '\''.$string.'\'';
+    return '\'' . $string . '\'';
 }
 
 #converts a mongodb query hash into a $where clause
@@ -287,49 +309,70 @@ print STDERR "  convertStringToJS($string)\n" if MONITOR;
 sub convertToJavascript {
     my $node      = shift;
     my $statement = '';
-    
-    #TODO: for some reason the Dumper call makes the HoistMongoDBsTests::test_hoistLcRHSName test succeed - have to work out what i've broken.
+
+#TODO: for some reason the Dumper call makes the HoistMongoDBsTests::test_hoistLcRHSName test succeed - have to work out what i've broken.
     my $dump = Dumper($node);
 
-    print STDERR "\n...convertToJavascript...........DUMPER: ".Dumper($node)."\n" if MONITOR;
+    print STDERR "\n...convertToJavascript...........DUMPER: "
+      . Dumper($node) . "\n"
+      if MONITOR;
 
     while ( my ( $key, $value ) = each(%$node) ) {
-        next if ($key eq '####need_function');
+        next if ( $key eq '####need_function' );
         $statement .= ' && ' if ( $statement ne '' );
-        
+
         #BEWARE: if ref($node->{lhs}) eq 'HASH' then $key is going to be wrong.
-        if (ref($node->{lhs}) eq 'HASH') {
+        if ( ref( $node->{lhs} ) eq 'HASH' ) {
             die 'unexpectedly';
-            $key = convertToJavascript($node->{lhs});
+            $key = convertToJavascript( $node->{lhs} );
         }
 
         #convert $ops into js ones
         my $js_key = $key;
 
         $js_key = $js_op_map{$key} if ( defined( $js_op_map{$key} ) );
-print STDERR "key = $key (".ref($js_key).", $js_key), value = $value\n" if MONITOR;
-
+        print STDERR "key = $key ("
+          . ref($js_key)
+          . ", $js_key), value = $value\n"
+          if MONITOR;
 
         if ( ref($value) eq 'HASH' ) {
             my ( $k, $v ) = each(%$value);
             if ( ( $k eq '$in' ) or ( $k eq '$nin' ) ) {
 
 #TODO: look up to see if javascript thas an value.in(list) or ARRAY.contains(value)
-                $statement .=
-                  ' ( ' . join( ' || ', map { convertStringToJS($js_key).' == '.convertStringToJS($_) } @$v ) . ' ) ';
+                $statement .= ' ( ' . join(
+                    ' || ',
+                    map {
+                        convertStringToJS($js_key) . ' == '
+                          . convertStringToJS($_)
+                      } @$v
+                ) . ' ) ';
                 $statement =
                   ( ( $key eq '$nin' ) ? '!' : '' ) . " ($statement) ";
             }
-            elsif ( $k =~ /^\$/ ) {
-                $statement .= convertStringToJS($js_key).' '.convertToJavascript($value);
-            } elsif ($key =~ /^\$/ and defined( $js_op_map{$key})) {
-                $statement .= ($js_key).' '.convertStringToJS($value);
-            } else {
-                #$value = convertToJavascript($value);
-                #shit. need to know if we need an == inserted here too? thats shite.
+            elsif ( $key =~ /^\#/ ) {
 
-                #$statement .= "[X $key $value X]".convertStringToJS($js_key).' '.convertToJavascript($value);
-                $statement .= convertStringToJS($js_key).' == '.convertToJavascript($value);
+                $statement .= convertFunction( $value, $key );
+            }
+            elsif (($k eq '#match') or ($k eq '#like')) {
+                #this is essentially an operator lookahead
+                $statement .=
+                  convertToJavascript($value).'('.convertStringToJS($js_key).')';
+            }
+            elsif ( ($k =~ /^\$/)) {
+                #this is essentially an operator lookahead
+                $statement .=
+                    convertStringToJS($js_key) . ' '
+                  . convertToJavascript($value);
+            }
+            elsif ( $key =~ /^\$/ and defined( $js_op_map{$key} ) ) {
+                $statement .= ($js_key) . ' ' . convertStringToJS($value);
+            }
+            else {
+                $statement .=
+                    convertStringToJS($js_key) . ' == '
+                  . convertToJavascript($value);
             }
         }
         elsif ( ref($value) eq 'ARRAY' ) {
@@ -347,9 +390,11 @@ print STDERR "key = $key (".ref($js_key).", $js_key), value = $value\n" if MONIT
                   ) . ' ) ';
 
                 #$statement = " ($statement) ";
-            } elsif ($key =~ /^#/) {
+            }
+            elsif ( $key =~ /^#/ ) {
                 die "not quite where i thought i'd be $key\n";
-            } else {
+            }
+            else {
                 die 'sadly ' . $key;
             }
 
@@ -360,25 +405,35 @@ print STDERR "key = $key (".ref($js_key).", $js_key), value = $value\n" if MONIT
             }
             else {
 
-            #value isa string..
-            #TODO: argh, string or number, er, or regex?
-print STDERR "convertToJavascript - $key => $value is a ".ref($value)."\n" if MONITOR;
+                #value isa string..
+                #TODO: argh, string or number, er, or regex?
+                print STDERR "convertToJavascript - $key => $value is a "
+                  . ref($value) . "\n"
+                  if MONITOR;
                 if ( ref($value) eq 'Regexp' ) {
                     $value =~ /\(\?-xism:(.*)\)/;    #TODO: er, regex options?
-                    $statement .= "( /$1/.test(".convertStringToJS($js_key).") )";
-                } elsif ($key =~ /^\#/) {
-                    #$statement .= convertStringToJS($value).$js_func_map{$key};
-                    $statement .= convertFunction($value, $key);
-                } elsif ($key =~ /^\$/ and defined( $js_op_map{$key})) {
-                    $statement .= ($js_key).' '.convertStringToJS($value);
-                } else {
-                    #TODO: can't presume that the 'value' is a constant - it might be a META value name
-                    $statement .= convertStringToJS($js_key).' == '.convertStringToJS($value);
+                    $statement .=
+                      "( /$1/.test(" . convertStringToJS($js_key) . ") )";
+
+                }
+                elsif ( $key =~ /^\#/ ) {
+
+                    $statement .= convertFunction( $value, $key );
+                }
+                elsif ( $key =~ /^\$/ and defined( $js_op_map{$key} ) ) {
+                    $statement .= ($js_key) . ' ' . convertStringToJS($value);
+                }
+                else {
+
+#TODO: can't presume that the 'value' is a constant - it might be a META value name
+                    $statement .=
+                        convertStringToJS($js_key) . ' == '
+                      . convertStringToJS($value);
                 }
             }
         }
     }
-print STDERR "----returning $statement\n" if MONITOR;
+    print STDERR "----returning $statement\n" if MONITOR;
     return $statement;
 }
 
@@ -479,29 +534,62 @@ sub hoistMongoDB {
     return { $node->{lhs} => $node->{rhs} };
 }
 
-=begin TML
-
----++ ObjectMethod Foswiki::Query::OP_like::hoistMongoDB($node) -> $ref to IxHash
-
-hoist ~ into a mongoDB ixHash query
-
-=cut
-
 package Foswiki::Query::OP_like;
+
+#hoist ~ into a mongoDB ixHash query
 
 sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
-    
-    unless (ref($node->{rhs}) eq '') {
-        #TODO: need to try to evaluate to a constant (eg lc('SomeText')
-            die 'er, no, can\'t regex on a function';
+
+    unless ( ref( $node->{rhs} ) eq '' ) {
+
+        #            die 'er, no, can\'t regex on a function';
+        # re-write one as $where
+        return {
+            '$where' =>
+              Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::convertToJavascript(
+                { $node->{lhs} => { '#like' => $node->{rhs} } }
+              )
+        };
     }
 
     my $rhs = quotemeta( $node->{rhs} );
     $rhs =~ s/\\\?/./g;
     $rhs =~ s/\\\*/.*/g;
     $rhs = qr/^$rhs$/;
+
+    return { $node->{lhs} => $rhs };
+}
+
+package Foswiki::Query::OP_match;
+
+#hoist =~ into a mongoDB ixHash query
+
+sub hoistMongoDB {
+    my $op   = shift;
+    my $node = shift;
+
+    unless ( ref( $node->{rhs} ) eq '' ) {
+
+        #            die 'er, no, can\'t regex on a function';
+        # re-write one as $where
+        return {
+            '$where' =>
+              Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::convertToJavascript(
+                { $node->{lhs} => { '#match' => $node->{rhs} } }
+              )
+        };
+    }
+
+    my $rhs = quotemeta( $node->{rhs} );
+    $rhs =~ s/\\\././g;
+    $rhs =~ s/\\\*/*/g;
+
+    #marginal speedup, but still every straw
+    return {} if ( $rhs eq '.*' );
+
+    $rhs = qr/$rhs/;
 
     return { $node->{lhs} => $rhs };
 }
@@ -527,9 +615,10 @@ sub mapAlias {
     my $name = shift;
 
     #TODO: map to the MongoDB field names (name, web, text, fieldname)
-      if ( defined( $aliases{ $name  }) ) {
-        $name = $aliases{ $name };
-      } elsif ( defined( $Foswiki::Query::Node::aliases{$name} ) ) {
+    if ( defined( $aliases{$name} ) ) {
+        $name = $aliases{$name};
+    }
+    elsif ( defined( $Foswiki::Query::Node::aliases{$name} ) ) {
         $name = $Foswiki::Query::Node::aliases{$name};
         $name =~ s/^META://;    #might remove this fomr the mongodb schema
     }
@@ -547,13 +636,13 @@ sub hoistMongoDB {
         #return;
     }
 
-#TODO: both the net 2 should only work form registered META - including what params are allowed. (except we don't do that for FIELDS :(
+#TODO: both the next 2 should only work form registered META - including what params are allowed. (except we don't do that for FIELDS :(
     if ( ref( $node->{op} ) ) {
-        
+
         #an actual OP_dot
         my $lhs = $node->{params}[0]->{params}[0];
         my $rhs = $node->{params}[1]->{params}[0];
-        
+
         my $mappedName = mapAlias($lhs);
 
         #print STDERR "-------------------------------- hoist OP_dot("
@@ -579,32 +668,32 @@ sub hoistMongoDB {
         #  . $node->{op} . ", "
         #  . $node->{params}[0] . ', '
         #  . (defined($node->{inWhere})?'inwhere':'notinwhere'). ")\n";
-          
-        #if we're in a 'where' eg preferences[name = 'Summary'] then don't aliases
-        return $node->{params}[0] if (defined($node->{inWhere}));
+
+      #if we're in a 'where' eg preferences[name = 'Summary'] then don't aliases
+        return $node->{params}[0] if ( defined( $node->{inWhere} ) );
 
         #if its a registered META, just return it.
-        if ($node->{params}[0] =~ /META:(.*)/) {
-            return $1 if (defined($Foswiki::Meta::VALIDATE{$1}));
+        if ( $node->{params}[0] =~ /META:(.*)/ ) {
+            return $1 if ( defined( $Foswiki::Meta::VALIDATE{$1} ) );
         }
 
-
-
-        my $mappedName = mapAlias($node->{params}[0]);
-        if ($mappedName ne $node->{params}[0]) {
+        my $mappedName = mapAlias( $node->{params}[0] );
+        if ( $mappedName ne $node->{params}[0] ) {
             $mappedName =~ s/^META://;
             return $mappedName;
-        } else {
+        }
+        else {
+
             #no idea - so we treat it like a field
             return 'FIELD.' . $node->{params}[0] . '.value';
         }
     }
     elsif ( $node->{op} == Foswiki::Infix::Node::NUMBER ) {
+
         #TODO: would love to convert to numbers, don't think i can yet.
         return $node->{params}[0];
     }
-    elsif ( $node->{op} == Foswiki::Infix::Node::STRING )
-    {
+    elsif ( $node->{op} == Foswiki::Infix::Node::STRING ) {
         return $node->{params}[0];
     }
 }
@@ -685,11 +774,11 @@ sub hoistMongoDB {
 
          #TODO: how about minimising 2 identical non-simple queries ANDed?
          #this eq test below doesn't do identical regex, nor identical $ne etc..
-#                print STDERR "----+++++++++++++++++ ||"
-#                  . $andHash{$key} . "||"
-#                  . $node->{rhs}->{$key} . "||"
-#                  . ref( $andHash{$key} ) . "||"
-#                  . ref( $node->{rhs}->{$key} ) . "||\n";
+         #                print STDERR "----+++++++++++++++++ ||"
+         #                  . $andHash{$key} . "||"
+         #                  . $node->{rhs}->{$key} . "||"
+         #                  . ref( $andHash{$key} ) . "||"
+         #                  . ref( $node->{rhs}->{$key} ) . "||\n";
 
                 if (    ( ref( $andHash{$key} ) eq '' )
                     and ( ref( $node->{rhs}->{$key} ) eq '' )
@@ -698,6 +787,7 @@ sub hoistMongoDB {
 
                     #they're the same, ignore the second..
                     $conflictResolved = 1;
+
                     #print STDERR "bump - de-duplicate\n";
                 }
                 elsif ( ( ref( $andHash{$key} ) eq 'HASH' )
@@ -823,25 +913,6 @@ sub hoistMongoDB {
     return { $node->{lhs} => { '$lt' => $node->{rhs} } };
 }
 
-package Foswiki::Query::OP_match;
-#hoist =~ into a mongoDB ixHash query
-
-sub hoistMongoDB {
-    my $op   = shift;
-    my $node = shift;
-
-    my $rhs = quotemeta( $node->{rhs} );
-    $rhs =~ s/\\\././g;
-    $rhs =~ s/\\\*/*/g;
-
-    #marginal speedup, but still every straw
-    return {} if ( $rhs eq '.*' );
-
-    $rhs = qr/$rhs/;
-
-    return { $node->{lhs} => $rhs };
-}
-
 package Foswiki::Query::OP_ne;
 
 sub hoistMongoDB {
@@ -875,10 +946,12 @@ sub hoistMongoDB {
 #and thus, need to re-do the mongodb schema so that meta 'arrays' are arrays again.
 #and that means the FIELD: name based shorcuts need to be re-written :/ de-indexing the queries :(
 
-    return { $node->{lhs}.'.__RAW_ARRAY' => { '$elemMatch' => $node->{rhs} } };
+    return {
+        $node->{lhs} . '.__RAW_ARRAY' => { '$elemMatch' => $node->{rhs} } };
 }
 
 package Foswiki::Query::OP_d2n;
+
 sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
@@ -887,6 +960,7 @@ sub hoistMongoDB {
 }
 
 package Foswiki::Query::OP_lc;
+
 sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
@@ -895,6 +969,7 @@ sub hoistMongoDB {
 }
 
 package Foswiki::Query::OP_length;
+
 sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
@@ -903,6 +978,7 @@ sub hoistMongoDB {
 }
 
 package Foswiki::Query::OP_uc;
+
 sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
@@ -912,10 +988,10 @@ sub hoistMongoDB {
 
 ######################################
 package Foswiki::Query::OP_ref;
+
 #oh what a disaster.
 # this has to be implemented as a compound query, so that we're querying against constants
 ######################################
-
 
 1;
 __DATA__
