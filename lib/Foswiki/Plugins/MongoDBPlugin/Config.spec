@@ -25,4 +25,6 @@ $Foswiki::cfg{Store}{Listeners}{'Foswiki::Plugins::MongoDBPlugin::Listener'} = 1
 # **BOOLEAN**
 # enable debug logging
 $Foswiki::cfg{MONITOR}{'Foswiki::Plugins::MongoDBPlugin'} = 0;
-
+# **BOOLEAN**
+# enable hoisting
+$Foswiki::cfg{Plugins}{MongoDBPlugin}{ExperimentalCode} = 0;
