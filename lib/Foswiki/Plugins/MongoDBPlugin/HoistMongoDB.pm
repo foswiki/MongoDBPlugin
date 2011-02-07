@@ -22,8 +22,8 @@ use Assert;
 
 use Foswiki::Query::HoistREs ();
 
-use constant MONITOR => 1;
-use constant WATCH   => 1;
+use constant MONITOR => 0;
+use constant WATCH   => 0;
 
 =begin TML
 
@@ -313,7 +313,7 @@ sub convertToJavascript {
 #TODO: for some reason the Dumper call makes the HoistMongoDBsTests::test_hoistLcRHSName test succeed - have to work out what i've broken.
     my $dump = Dumper($node);
 
-    print STDERR "\n...convertToJavascript...........DUMPER: "
+    print STDERR "\n..............convertToJavascript "
       . Dumper($node) . "\n"
       if MONITOR;
 
@@ -401,7 +401,10 @@ sub convertToJavascript {
         }
         else {
             if ( $key eq '$where' ) {
-                $statement = " ($value) ";
+                $statement .= " ($value) ";
+            }
+            elsif ( $key eq '#where' ) {
+                $statement .= " ($value) ";
             }
             else {
 
@@ -764,7 +767,8 @@ sub hoistMongoDB {
 
                 }
                 else {
-                    print STDERR 'not here yet ' . $key;
+                    #i think it should be ok, but i've not seen it happen, so die
+                    die  'not here yet ' . $key if ($key ne '$where');
                 }
             }
             else {
@@ -816,16 +820,21 @@ sub hoistMongoDB {
             }
             if ( not $conflictResolved ) {
 
-            #i don't think i've implemented convertToJavascript to do $where too
-                die 'argh@' if ( defined( $andHash{'$where'} ) );
+                if ( defined( $andHash{'$where'} ) ) {
+                    # re-write one as $where
+                    $andHash{'$where'} =
+                      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::convertToJavascript(
+                        { 
+                            $key => $node->{rhs}->{$key},
+                            '#where' => $andHash{'$where'}
+                        } );
+                } else {
+                    # re-write one as $where
+                    $andHash{'$where'} =
+                      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::convertToJavascript(
+                        { $key => $node->{rhs}->{$key} } );
+                }
 
-                print STDERR
-                  "MongoDB cannot AND 2 queries with the same key ($key) \n";
-
-                # re-write one as $where
-                $andHash{'$where'} =
-                  Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::convertToJavascript(
-                    { $key => $node->{rhs}->{$key} } );
             }
         }
         else {

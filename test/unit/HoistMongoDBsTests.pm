@@ -11,7 +11,7 @@ use Foswiki::Meta;
 use Data::Dumper;
 use strict;
 
-use constant MONITOR => 1;
+use constant MONITOR => 0;
 
 #list of operators we can output
 my @MongoOperators = qw/$or $not $nin $in/;
@@ -866,7 +866,8 @@ sub test_hoist_Item10323 {
 
     $this->do_Assert( $query, $mongoDBQuery,
         {
-            '$where' => "foswiki_d2n(this._topic) < foswiki_d2n('1998-11-23')"
+          'FORM.name' => qr/(?-xism:^.*TermForm$)/,
+          '$where' => ' ( (Regex(\'ant\'.toLowerCase(), \'\').test(this.FIELD.Namespace.value.toLowerCase())) )  &&  ( (Regex(\'bio\'.toLowerCase(), \'\').test(this.FIELD.TermGroup.value.toLowerCase())) ) '
         }
         );
 }
