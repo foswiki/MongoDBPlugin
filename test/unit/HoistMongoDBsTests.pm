@@ -872,4 +872,19 @@ sub test_hoist_Item10323 {
         );
 }
 
+sub test_hoist_maths {
+    my $this        = shift;
+    my $s           = "(12-Namespace)<(24*60*60-5) AND (TermGroup DIV 12)>(WebScale*42.8)";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert( $query, $mongoDBQuery,
+        {
+           '$where' => ' ((\'12\')-(this.FIELD.Namespace.value) < (((\'24\')*(\'60\'))*(\'60\'))-(\'5\'))  &&  ((this.FIELD.TermGroup.value)/(\'12\') > (this.FIELD.WebScale.value)*(\'42.8\')) '
+        }
+        );
+}
+
 1;

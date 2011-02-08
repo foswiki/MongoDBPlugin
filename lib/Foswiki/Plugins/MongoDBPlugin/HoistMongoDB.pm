@@ -22,8 +22,8 @@ use Assert;
 
 use Foswiki::Query::HoistREs ();
 
-use constant MONITOR => 0;
-use constant WATCH   => 0;
+use constant MONITOR => 1;
+use constant WATCH   => 1;
 
 =begin TML
 
@@ -83,17 +83,6 @@ sub kludge {
     foreach my $key ( keys(%$node) ) {
         my $value = $node->{$key};
 
-     #TODO: MUST DETECT IF THERE ALREADY IS A $where, and MERGE
-     #	    if ($key =~ /^#/) {
-     #		    #foswiki command we know we can't do in mongodb atm.
-     #
-     #            #need to pop out and replace the entire node with javascript.
-     #            #TODO: mmmm, move to _hoist
-     #
-     #            $node->{'$where'} = convertToJavascript( { $key => $value } );
-     #
-     #		    next;
-     #	    }
         my $thisIsOr = ( $key eq '$or' );
         if ( $inOr and $thisIsOr ) {
 
@@ -153,33 +142,56 @@ sub _hoist {
         return Foswiki::Query::OP_dot::hoistMongoDB( $node->{op}, $node );
     }
 
+
     my $containsQueryFunctions = 0;
 
     #TODO: if 2 constants(NUMBER,STRING) ASSERT
     #TODO: if the first is a constant, swap
     if ( $node->{op}->{arity} > 0 ) {
-        $node->{lhs} = _hoist( $node->{params}[0] );
-        if ( ref( $node->{lhs} ) ne '' ) {
+            $node->{lhs} = _hoist( $node->{params}[0] );
+            if ( ref( $node->{lhs} ) ne '' ) {
 
-            #print STDERR "ref($node->{lhs}) == ".ref($node->{lhs})."\n";
-            $node->{ERROR} = $node->{lhs}->{ERROR}
-              if ( defined( $node->{lhs}->{ERROR} ) );
-            $containsQueryFunctions |=
-              defined( $node->{lhs}->{'####need_function'} );
+                #print STDERR "ref($node->{lhs}) == ".ref($node->{lhs})."\n";
+                $node->{ERROR} = $node->{lhs}->{ERROR}
+                  if ( defined( $node->{lhs}->{ERROR} ) );
+                $containsQueryFunctions |=
+                  defined( $node->{lhs}->{'####need_function'} );
+                $node->{'####delay_function'} = 1 if (defined($node->{lhs}->{'####delay_function'}));
         }
     }
 
     if ( $node->{op}->{arity} > 1 ) {
-        $node->{rhs} = _hoist( $node->{params}[1] );
-        if ( ref( $node->{rhs} ) ne '' ) {
-            $node->{ERROR} = $node->{rhs}->{ERROR}
-              if ( defined( $node->{rhs}->{ERROR} ) );
-            $containsQueryFunctions |=
-              defined( $node->{rhs}->{'####need_function'} );
+            $node->{rhs} = _hoist( $node->{params}[1] );
+            if ( ref( $node->{rhs} ) ne '' ) {
+                $node->{ERROR} = $node->{rhs}->{ERROR}
+                  if ( defined( $node->{rhs}->{ERROR} ) );
+                $containsQueryFunctions |=
+                  defined( $node->{rhs}->{'####need_function'} );
+                $node->{'####delay_function'} = 1 if (defined($node->{rhs}->{'####delay_function'}));
+            }
+    }
+    
+    monitor($node) if MONITOR;
+    
+    if (defined($node->{'####delay_function'})) {
+        #if we're maths, or a brace, return $node, and go for a further delay_function
+        if ( 
+            ( ref( $node->{op} ) eq 'Foswiki::Query::OP_ob' )  or
+            ( ref( $node->{op} ) eq 'Foswiki::Query::OP_minus' )  or
+            ( ref( $node->{op} ) eq 'Foswiki::Query::OP_plus' )  or
+            ( ref( $node->{op} ) eq 'Foswiki::Query::OP_times' )  or
+            ( ref( $node->{op} ) eq 'Foswiki::Query::OP_div' )  or
+            ( ref( $node->{op} ) eq 'Foswiki::Query::OP_pos' )  or
+            ( ref( $node->{op} ) eq 'Foswiki::Query::OP_neg' )  
+            ) {
+            print STDERR "POPOPOPOPOPOPOPOPOPOPOPOPOPOPOPOPOPOPOPOPOPOPOP\n";
+                return $node->{op}->hoistMongoDB($node);
+
+        } else {
+        #else, set $containsQueryFunctions
+            $containsQueryFunctions = 1;
         }
     }
-
-    monitor($node) if MONITOR;
 
 #DAMMIT, I presume we have oddly nested eval/try catch so throwing isn't working
 #throw Error::Simple( 'failed to Hoist ' . ref( $node->{op} ) . "\n" )
@@ -198,9 +210,18 @@ sub _hoist {
     if ($containsQueryFunctions) {
         $node->{lhs} = convertToJavascript( $node->{lhs} )
           if ( ref( $node->{lhs} ) eq 'HASH' );
-        return {
-            '$where' => convertToJavascript( $node->{op}->hoistMongoDB($node) )
-        };
+          
+        my $hoistedNode = $node->{op}->hoistMongoDB($node);
+        if (ref($hoistedNode) eq '') {
+            #could be a maths op - in which case, eeek?
+            #shite - or maths inside braces
+            #die 'here: '.$node->{op};
+            return $hoistedNode;
+        } else {
+            return {
+                '$where' => convertToJavascript( $hoistedNode )
+            };
+        }
     }
 
     return $node->{op}->hoistMongoDB($node);
@@ -208,6 +229,11 @@ sub _hoist {
 
 sub monitor {
     my $node = shift;
+    
+    print STDERR "MONITOR Hoist node->op="
+      . Dumper( $node->{op} )
+      . " ref(node->op)="
+      . ref( $node->{op} ) . "\n";
 
     print STDERR "\nparam0(" . $node->{params}[0]->{op} . "): ",
       Data::Dumper::Dumper( $node->{params}[0] ), "\n";
@@ -226,10 +252,7 @@ sub monitor {
 
 #print STDERR "HoistS ",$query->stringify()," -> /",Dumper($mongoDBQuery),"/\n";
 
-    print STDERR "Hoist node->op="
-      . Dumper( $node->{op} )
-      . " ref(node->op)="
-      . ref( $node->{op} ) . "\n";
+
 }
 
 #map mongodb $ops to javascript logic
@@ -252,13 +275,23 @@ my %js_func_map = (
     '#uc'     => '.toUpperCase()',
     '#length' => '.length',
     '#d2n'    => 'foswiki_d2n',
+    '#int'    => 'parseInt',
     '#match'  => 'MATCHBANG',
     '#like'   => 'LIKEBANG',
+    '#div'    => '/',
+    '#mult'    => '*',
+    '#plus'    => '+',
+    '#minus'    => '-',
+    '#pos'    => '+',
+    '#neg'    => '-',
 );
 
 sub convertFunction {
     my ( $value, $key ) = @_;
     if ( $key eq '#d2n' ) {
+        return $js_func_map{$key} . '(' . convertStringToJS($value) . ')';
+    }
+    if ( $key eq '#int' ) {
         return $js_func_map{$key} . '(' . convertStringToJS($value) . ')';
     }
     if ( $key eq '#match' ) {
@@ -271,6 +304,20 @@ sub convertFunction {
         my $regexoptions = '\'\'';
         return "Regex('^'+$regex+'$', $regexoptions).test";#(this.\$scope);";
     }
+    if (
+        ( $key eq '#div') or 
+        ( $key eq '#mult') or 
+        ( $key eq '#plus') or 
+        ( $key eq '#minus') or 
+        ( $key eq '#pos') or 
+        ( $key eq '#neg') 
+        ) {
+            #die 'asd';
+        return  '(' . convertStringToJS($$value[0]) . ')'.$js_func_map{$key} . '(' . convertStringToJS($$value[1]) . ')';
+    }
+    die "$key and $value is not a string? " if (ref($value) ne '');
+    die "$key is not in the js_func_map" if (not defined($js_func_map{$key}));
+print STDERR "\t\tconvertfunction($value, $key) => \n";
     return convertStringToJS($value) . $js_func_map{$key};
 }
 
@@ -280,6 +327,7 @@ my $ops    = '(' . join( '|', values(%js_op_map) ) . ')';
 sub convertStringToJS {
     my $string = shift;
     print STDERR "  convertStringToJS($string)\n" if MONITOR;
+    die 'here' if ($string eq '<');
 
     return convertToJavascript($string) if ( ref($string) eq 'HASH' );
 
@@ -293,8 +341,11 @@ sub convertStringToJS {
 
     return $js_op_map{$string} if ( defined( $js_op_map{$string} ) );
 
-    #TODO: generalise
+    #TODO: generalise - we should not clobber over js_func_map values
     return $string if ( $string =~ /^foswiki_d2n\(.*/ );
+    return $string if ( $string eq '<' );
+
+
 
     return 'this.' . $string if ( $string eq '_web' );
     return 'this.' . $string if ( $string eq '_topic' );
@@ -319,6 +370,7 @@ sub convertToJavascript {
 
     while ( my ( $key, $value ) = each(%$node) ) {
         next if ( $key eq '####need_function' );
+        next if ( $key eq '####delay_function' );
         $statement .= ' && ' if ( $statement ne '' );
 
         #BEWARE: if ref($node->{lhs}) eq 'HASH' then $key is going to be wrong.
@@ -355,10 +407,22 @@ sub convertToJavascript {
 
                 $statement .= convertFunction( $value, $key );
             }
-            elsif (($k eq '#match') or ($k eq '#like')) {
+            elsif (
+                ($k eq '#match') or 
+                ($k eq '#like') or
+                ( $k eq '#div') or 
+                ( $k eq '#mult') or 
+                ( $k eq '#plus') or 
+                ( $k eq '#minus') or 
+                ( $k eq '#pos') or 
+                ( $k eq '#neg') 
+                ) {
                 #this is essentially an operator lookahead
-                $statement .=
-                  convertToJavascript($value).'('.convertStringToJS($js_key).')';
+print STDERR ">>>>>>>>>>>>>>>>>>>> lookahead $key -> $k\n";
+                $statement .= ($js_key) . ' ' . convertStringToJS($value);
+                #$statement .= convertFunction( convertToJavascript($value), $key );
+#                $statement .=
+#                  convertToJavascript($value).'('.convertStringToJS($js_key).')';
             }
             elsif ( ($k =~ /^\$/)) {
                 #this is essentially an operator lookahead
@@ -392,7 +456,8 @@ sub convertToJavascript {
                 #$statement = " ($statement) ";
             }
             elsif ( $key =~ /^#/ ) {
-                die "not quite where i thought i'd be $key\n";
+                #maths ops
+                $statement .= convertFunction( $value, $key );
             }
             else {
                 die 'sadly ' . $key;
@@ -420,6 +485,7 @@ sub convertToJavascript {
 
                 }
                 elsif ( $key =~ /^\#/ ) {
+print STDERR ">>>>>>>>>>>>>>>>>>>> #hash - $key \n";
 
                     $statement .= convertFunction( $value, $key );
                 }
@@ -994,6 +1060,74 @@ sub hoistMongoDB {
 
     return { '#uc' => $node->{lhs}, '####need_function' => 1 };
 }
+
+package Foswiki::Query::OP_int;
+sub hoistMongoDB {
+    my $op   = shift;
+    my $node = shift;
+
+    return { '#int' => $node->{lhs}, '####need_function' => 1 };
+}
+
+#maths
+package Foswiki::Query::OP_div;
+sub hoistMongoDB {
+    my $op   = shift;
+    my $node = shift;
+
+    return { '#div' => [$node->{lhs}, $node->{rhs}], '####delay_function' => 1 };
+}
+package Foswiki::Query::OP_minus;
+sub hoistMongoDB {
+    my $op   = shift;
+    my $node = shift;
+
+    return { '#minus' => [$node->{lhs}, $node->{rhs}], '####delay_function' => 1 };
+}
+package Foswiki::Query::OP_plus;
+sub hoistMongoDB {
+    my $op   = shift;
+    my $node = shift;
+
+    return { '#plus' => [$node->{lhs}, $node->{rhs}], '####delay_function' => 1 };
+}
+package Foswiki::Query::OP_times;
+sub hoistMongoDB {
+    my $op   = shift;
+    my $node = shift;
+
+    return { '#mult' => [$node->{lhs}, $node->{rhs}], '####delay_function' => 1 };
+}
+
+package Foswiki::Query::OP_neg;
+sub hoistMongoDB {
+    my $op   = shift;
+    my $node = shift;
+
+    return { '#neg' => [$node->{lhs}, $node->{rhs}], '####delay_function' => 1 , '####numeric' => 1};
+}
+package Foswiki::Query::OP_pos;
+sub hoistMongoDB {
+    my $op   = shift;
+    my $node = shift;
+
+    return { '#pos' => [$node->{lhs}, $node->{rhs}], '####delay_function' => 1 , '####numeric' => 1};
+}
+
+
+package Foswiki::Query::OP_empty;
+#TODO: not sure this is the right answer..
+sub hoistMongoDB {
+    my $op   = shift;
+    my $node = shift;
+
+    return { };
+}
+
+#array ops from versions.. (m3 work)
+package Foswiki::Query::OP_comma;
+package Foswiki::Query::OP_in;
+
 
 ######################################
 package Foswiki::Query::OP_ref;
