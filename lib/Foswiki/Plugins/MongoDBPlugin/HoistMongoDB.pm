@@ -22,8 +22,8 @@ use Assert;
 
 use Foswiki::Query::HoistREs ();
 
-use constant MONITOR => 1;
-use constant WATCH   => 1;
+use constant MONITOR => 0;
+use constant WATCH   => 0;
 
 =begin TML
 
@@ -184,7 +184,7 @@ sub _hoist {
             ( ref( $node->{op} ) eq 'Foswiki::Query::OP_pos' )  or
             ( ref( $node->{op} ) eq 'Foswiki::Query::OP_neg' )  
             ) {
-            print STDERR "POPOPOPOPOPOPOPOPOPOPOPOPOPOPOPOPOPOPOPOPOPOPOP\n";
+            #print STDERR "POPOPOPOPOPOPOPOPOPOPOPOPOPOPOPOPOPOPOPOPOPOPOP\n";
                 return $node->{op}->hoistMongoDB($node);
 
         } else {
@@ -317,7 +317,7 @@ sub convertFunction {
     }
     die "$key and $value is not a string? " if (ref($value) ne '');
     die "$key is not in the js_func_map" if (not defined($js_func_map{$key}));
-print STDERR "\t\tconvertfunction($value, $key) => \n";
+print STDERR "\t\tconvertfunction($value, $key) => \n" if MONITOR;
     return convertStringToJS($value) . $js_func_map{$key};
 }
 
@@ -327,11 +327,15 @@ my $ops    = '(' . join( '|', values(%js_op_map) ) . ')';
 sub convertStringToJS {
     my $string = shift;
     print STDERR "  convertStringToJS($string)\n" if MONITOR;
-    die 'here' if ($string eq '<');
+    
+    return $string if ($string =~ /^\(.*\)$/);  #if we're doing braces, and they're not quoted leave things be
 
     return convertToJavascript($string) if ( ref($string) eq 'HASH' );
 
-    return $string if ( $string =~ /'.*'/ );
+    return $string if ( $string =~ /^'.*'^/ );
+    #TODO: i _think_ the line below is ok, its needed to make ::test_hoistLengthLHSString work
+    return $string if ( $string =~ /^\'.*/ );
+
     return $string if ( $string =~ /^this\./ );
 
     # all registered meta type prefixes use a this. in js
@@ -350,6 +354,10 @@ sub convertStringToJS {
     return 'this.' . $string if ( $string eq '_web' );
     return 'this.' . $string if ( $string eq '_topic' );
     return 'this.' . $string if ( $string eq '_text' );
+    
+    #if it looks like a number, lets try treating it like a number, and see what happens
+    #i _think_ this will result in js doing magic just like perl does, as the main diff seems to be that Perl('1'+'1'=2) and JS('1'+'1'='11')
+    return $string if ($string =~ /^[+-]?\d+(\.\d*)?$/);
 
     return '\'' . $string . '\'';
 }
@@ -407,8 +415,13 @@ sub convertToJavascript {
 
                 $statement .= convertFunction( $value, $key );
             }
+            elsif ($k eq '#match') {
+                #this is essentially an operator lookahead
+print STDERR ">>>>>>>>>>>>>>>>>>>> lookahead $key -> $k\n" if MONITOR;
+                $statement .=
+                  convertToJavascript($value).'('.convertStringToJS($js_key).')';
+            }
             elsif (
-                ($k eq '#match') or 
                 ($k eq '#like') or
                 ( $k eq '#div') or 
                 ( $k eq '#mult') or 
@@ -418,7 +431,7 @@ sub convertToJavascript {
                 ( $k eq '#neg') 
                 ) {
                 #this is essentially an operator lookahead
-print STDERR ">>>>>>>>>>>>>>>>>>>> lookahead $key -> $k\n";
+print STDERR ">>>>>>>>>>>>>>>>>>>> lookahead $key -> $k\n" if MONITOR;
                 $statement .= ($js_key) . ' ' . convertStringToJS($value);
                 #$statement .= convertFunction( convertToJavascript($value), $key );
 #                $statement .=
@@ -485,7 +498,7 @@ print STDERR ">>>>>>>>>>>>>>>>>>>> lookahead $key -> $k\n";
 
                 }
                 elsif ( $key =~ /^\#/ ) {
-print STDERR ">>>>>>>>>>>>>>>>>>>> #hash - $key \n";
+print STDERR ">>>>>>>>>>>>>>>>>>>> #hash - $key \n" if MONITOR;
 
                     $statement .= convertFunction( $value, $key );
                 }

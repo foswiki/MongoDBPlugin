@@ -778,7 +778,7 @@ sub test_hoistLengthLHSName {
 
     $this->do_Assert( $query, $mongoDBQuery,
         {
-            '$where' => 'this._topic.length == \'12\''
+            '$where' => 'this._topic.length == 12'
         }
         );
 }
@@ -792,7 +792,7 @@ sub test_hoistLengthLHSString {
 
     $this->do_Assert( $query, $mongoDBQuery,
         {
-            '$where' => '\'something\'.length == \'9\''
+            '$where' => '\'something\'.length == 9'
         }
         );
 }
@@ -807,7 +807,7 @@ sub test_hoistLengthLHSNameGT {
 
     $this->do_Assert( $query, $mongoDBQuery,
         {
-            '$where' => 'this._topic.length < \'12\''
+            '$where' => 'this._topic.length < 12'
         }
         );
 }
@@ -882,7 +882,51 @@ sub test_hoist_maths {
 
     $this->do_Assert( $query, $mongoDBQuery,
         {
-           '$where' => ' ((\'12\')-(this.FIELD.Namespace.value) < (((\'24\')*(\'60\'))*(\'60\'))-(\'5\'))  &&  ((this.FIELD.TermGroup.value)/(\'12\') > (this.FIELD.WebScale.value)*(\'42.8\')) '
+           '$where' => ' ((12)-(this.FIELD.Namespace.value) < (((24)*(60))*(60))-(5))  &&  ((this.FIELD.TermGroup.value)/(12) > (this.FIELD.WebScale.value)*(42.8)) '
+        }
+        );
+}
+
+sub test_hoist_concat {
+    my $this        = shift;
+    my $s           = "'asd' + 'qwe' = 'asdqwe'";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert( $query, $mongoDBQuery,
+        {
+           '$where' => '(\'asd\')+(\'qwe\') == \'asdqwe\''
+        }
+        );
+}
+#this one is a nasty perler-ism
+sub test_hoist_concat2 {
+    my $this        = shift;
+    my $s           = "'2' + '3' = '5'";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert( $query, $mongoDBQuery,
+        {
+           '$where' => '(2)+(3) == 5'
+        }
+        );
+}
+sub test_hoist_concat3 {
+    my $this        = shift;
+    my $s           = "2 + 3 = 5";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert( $query, $mongoDBQuery,
+        {
+           '$where' => '(2)+(3) == 5'
         }
         );
 }
