@@ -160,7 +160,7 @@ sub _webQuery {
                         $Foswiki::cfg{Plugins}{MongoDBPlugin}{ExperimentalCode}
                       )
                     {
-                        $orderBy = 'FIELD.' . $1 . 'value';
+                        $orderBy = 'FIELD.' . $1 . '.value';
                         $queryAttrs =
                           { sort_by => { $orderBy => $SortDirection } };
                     }
