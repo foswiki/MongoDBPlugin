@@ -20,7 +20,7 @@ speed and memory size. It also depends on the complexity of the query.
 package Foswiki::Store::QueryAlgorithms::MongoDB;
 
 use Foswiki::Store::Interfaces::QueryAlgorithm ();
-our @ISA = ( 'Foswiki::Store::Interfaces::QueryAlgorithm' );
+our @ISA = ('Foswiki::Store::Interfaces::QueryAlgorithm');
 
 use strict;
 use constant MONITOR => 0;
@@ -111,8 +111,6 @@ sub _webQuery {
           Foswiki::Search::InfoCache::getTopicListIterator( $webObject,
             $options );
     }
-    if ( defined( $Foswiki::cfg{Plugins}{MongoDBPlugin}{ExperimentalCode} )
-        and $Foswiki::cfg{Plugins}{MongoDBPlugin}{ExperimentalCode} )
     {
 
         #try HoistMongoDB first
@@ -120,7 +118,7 @@ sub _webQuery {
           Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
 
         if ( defined($mongoQuery) ) {
-            ASSERT(not(defined($mongoQuery->{ERROR}))) if DEBUG;
+            ASSERT( not( defined( $mongoQuery->{ERROR} ) ) ) if DEBUG;
 
             #TODO: where are we limiting the query to the $web?
             ASSERT( not defined( $mongoQuery->{'_web'} ) ) if DEBUG;
@@ -153,8 +151,19 @@ sub _webQuery {
                 if ( $options->{order} =~ /formfield\((.*)\)/ ) {
 
 #TODO: this will crash things - I need to work on indexes, and one collection per web/form_def
-#                    $orderBy = 'FIELD.' . $1.'value';
-#                    $queryAttrs = { sort_by => { $orderBy => $SortDirection } };
+                    if (
+                        defined(
+                            $Foswiki::cfg{Plugins}{MongoDBPlugin}
+                              {ExperimentalCode}
+                        )
+                        and
+                        $Foswiki::cfg{Plugins}{MongoDBPlugin}{ExperimentalCode}
+                      )
+                    {
+                        $orderBy = 'FIELD.' . $1 . 'value';
+                        $queryAttrs =
+                          { sort_by => { $orderBy => $SortDirection } };
+                    }
                 }
             }
 
@@ -163,8 +172,12 @@ sub _webQuery {
             return new Foswiki::Search::MongoDBInfoCache(
                 $Foswiki::Plugins::SESSION,
                 $web, $options, $cursor );
-        }
+        } else {
+		print STDERR "MongoDB QuerySearch - failed to hoist to MongoDB - please report the error to Sven.\n";
+		#falling through to old regex code
+	}
     }
+
 
     #fall back to HoistRe
     require Foswiki::Query::HoistREs;
@@ -174,7 +187,7 @@ sub _webQuery {
         and ( $hoistedREs->{name} ) )
     {
 
-        #set the 'includetopic' matcher..
+        #set the ' includetopic ' matcher..
         #dammit, i have to de-regex it? thats mad.
     }
 
@@ -183,7 +196,7 @@ sub _webQuery {
     #    if ( scalar(@$topics) > 6 ) {
     if ( defined( $hoistedREs->{text} ) ) {
         my $searchOptions = {
-            type                => 'regex',
+            type                => ' regex ',
             casesensitive       => 1,
             files_without_match => 1,
         };
@@ -193,9 +206,10 @@ sub _webQuery {
             $searchOptions );
         $topicSet->reset();
 
-#for now we're kicking down to regex to reduce the set we then brute force query.
-#next itr we start to HoistMongoDB
-        $topicSet =
+        #for now we're kicking down to regex to reduce the set we then brute force query .
+
+          #next itr we start to HoistMongoDB
+          $topicSet =
           Foswiki::Store::SearchAlgorithms::MongoDB::_webQuery( $searchQuery,
             $web, $topicSet, $session, $searchOptions );
     }
