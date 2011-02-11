@@ -154,6 +154,9 @@ sub _update {
     my $query   = Foswiki::Func::getCgiQuery();
     my $web     = $query->param('updateweb') || 'Sandbox';
     
+    #we need to deactivate any listeners :/ () at least stop the loadTopic one from triggering
+    $Foswiki::cfg{Store}{Listeners}{'Foswiki::Plugins::MongoDBPlugin::Listener'} = 0; 
+
     
     #lets make sure we have the javascript we'll rely on later
     _updateDatabase($session, $query);
@@ -232,7 +235,7 @@ sub _updateTopic {
         next if ( $key eq '_session' );
 
         #not totally sure if there's a benefit to using / not the _indices
-        next if ( $key eq '_indices' );
+        #next if ( $key eq '_indices' );
 
 #TODO: as of Oct 2010, mongodb can't sort on an element in an array, so we de-array the ARRAYs.
 #TODO: use the registered list of META elements, and the type that is registered.
@@ -263,6 +266,11 @@ sub _updateTopic {
                 $meta->{$key} = $savedMeta->{$key};
             }
             else {
+                if ($key eq '_indices') {
+                    #print STDERR "-indicies---($web . $topic) $key\n";
+                    $meta->{$key} = $savedMeta->{$key};
+                    next;
+                }
                 if ( ref( $savedMeta->{$key} ) ne 'ARRAY' ) {
 
   #i don't know why, but this is never triggered, but without it, i get a crash.

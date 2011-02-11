@@ -19,9 +19,12 @@
 =cut
 
 package Foswiki::Plugins::MongoDBPlugin::Meta;
-use Foswiki::Plugins::MongoDBPlugin::DB;
+use Foswiki::Plugins::MongoDBPlugin;
+#use Foswiki::Plugins::MongoDBPlugin::DB;
 
 use Foswiki::Meta;
+#use Foswiki::Form;
+#our @ISA = ('Foswiki::Form');
 
 our @ISA = ('Foswiki::Meta');
 
@@ -45,6 +48,7 @@ sub new {
 #doooooood, shouln't this be in the reload?
 #TODO: as of Oct 2010, mongodb can't sort on an element in an array, so we re-array the meta (see Foswiki::Plugins::MongoDBPlugin::_updateTopic).
     $meta->{_text} = $data->{_text};
+    $meta->{_indices} = $data->{_indices};
     foreach my $key ( keys(%Foswiki::Meta::VALIDATE) ) {
         if ( $Foswiki::Meta::isArrayType{$key} )
         {
@@ -84,7 +88,8 @@ revision is currently being viewed.
 
 #SMELL: its quite worrying that to over-ride this method, I have to reproduce most of it.
 
-TODO: obviously all I really need to do is push this into the Store imp's readTopic, and make a matching saveTopic and I should be golden enough
+TODO: obviously all I really need to do is push this into the Store imp's readTopic, 
+and make a matching saveTopic and I should be golden enough
 
 =cut
 
@@ -105,16 +110,32 @@ sub reload {
     $this->{FILEATTACHMENT} = [];
 
     my $collection =
-      $Foswiki::Func::SESSION->{MongoDB}->_getCollection('current');
+      Foswiki::Plugins::MongoDBPlugin::getMongoDB->_getCollection('current');
     my $data = $collection->find_one(
         { _web => $this->{_web}, _topic => $this->{_topic} } );
     my @validKeys = keys(%Foswiki::Meta::VALIDATE);
-    push( @validKeys, '_text' );
-    @$this{@validKeys} = @$data{@validKeys};
+    #push( @validKeys, '_text' );
+    #need to do more than this now
+    #@$this{@validKeys} = @$data{@validKeys};
+    foreach my $key (@validKeys) {
+        if ( $Foswiki::Meta::isArrayType{$key} ) {
+            #print STDERR "---- $key == many\n";
+            $this->{$key} = $data->{$key}->{'__RAW_ARRAY'};
+        } else {
+            #$meta->{$key} = $savedMeta->{$key}[0];
+            $this->{$key} = [];
+            push(@{$this->{$key}}, $data->{$key});
+        }
+    }
+#use Data::Dumper;
+#print STDERR "--- FIELD: ".Dumper($this->{FIELD}[0])."\n";
+    $this->{_text} = $data->{_text};
+    $this->{_indices} = $data->{_indices};
 
-    $this->{_loadedRev} =
+
+    $this->{_loadedRev} = 
       Foswiki::Store::cleanUpRevID( $this->{TOPICINFO}[0]->{version} );
-
+      
     # SMELL: removed see getLoadedRev - should remove any
     # non-numeric rev's (like the $rev stuff from svn)
     $this->{_preferences}->finish() if defined $this->{_preferences};
