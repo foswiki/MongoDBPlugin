@@ -69,6 +69,13 @@ sub hasNext {
 sub next {
     my $this = shift;
     my $obj  = $this->{_cursor}->next;
+    my $session = $this->{_session};
+    
+    if (not $session->search->metacache->hasCached( $obj->{_web}, $obj->{_topic})) {
+        my $meta = new Foswiki::Plugins::MongoDBPlugin::Meta($session, $obj->{_web}, $obj->{_topic}, $obj);
+#print STDERR "===== MongoDBInfoCache store in metacache (".$meta->web." , ".$meta->topic.", version)\n";
+        $session->search->metacache->addMeta( $meta->web, $meta->topic, $meta );
+    }
 
     return $obj->{_web}.'.'.$obj->{_topic};
 }

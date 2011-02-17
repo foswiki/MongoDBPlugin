@@ -45,36 +45,7 @@ sub new {
 
 #TODO: if $data is undef - see if its in mongoDB already, and if so, load it... ((OR... this should happen in the load/reload mess))
 
-#doooooood, shouln't this be in the reload?
-#TODO: as of Oct 2010, mongodb can't sort on an element in an array, so we re-array the meta (see Foswiki::Plugins::MongoDBPlugin::_updateTopic).
-    $meta->{_text} = $data->{_text};
-    $meta->{_indices} = $data->{_indices};
-    foreach my $key ( keys(%Foswiki::Meta::VALIDATE) ) {
-        if ( $Foswiki::Meta::isArrayType{$key} )
-        {
-            if ( defined( $data->{$key} ) ) {
-                my %FIELD = $data->{$key};
-                $meta->{$key} = [];
-                foreach my $elem ( keys(%FIELD) ) {
-                    push( @{ $meta->{$key} }, $FIELD{$elem} );
-                }
-            }
-        }
-        else {
-            if (ref(\$data->{$key}) eq 'SCALAR') {
-                $meta->{$key} = $data->{$key};
-            } else {
-                my $temp = $data->{$key};
-                $meta->{$key} = [];
-                if ( defined($temp) ) {
-                    push( @{ $meta->{$key} }, %$temp );
-                    undef $meta->{$key}{_authorWikiName} if ( $key eq 'TOPICINFO' );
-                }
-            }
-        }
-        
-    }
-
+    $meta->loadFromBSONData($data);
     return $meta;
 }
 
@@ -113,11 +84,20 @@ sub reload {
       Foswiki::Plugins::MongoDBPlugin::getMongoDB->_getCollection('current');
     my $data = $collection->find_one(
         { _web => $this->{_web}, _topic => $this->{_topic} } );
+    $this->loadFromBSONData($data);
+}
+        
+        
+sub loadFromBSONData {
+    my $this = shift;
+    my $data = shift;
+
     my @validKeys = keys(%Foswiki::Meta::VALIDATE);
     #push( @validKeys, '_text' );
     #need to do more than this now
     #@$this{@validKeys} = @$data{@validKeys};
     foreach my $key (@validKeys) {
+        next unless (defined($data->{$key}));
         if ( $Foswiki::Meta::isArrayType{$key} ) {
             #print STDERR "---- $key == many\n";
             $this->{$key} = $data->{$key}->{'__RAW_ARRAY'};
@@ -128,10 +108,9 @@ sub reload {
         }
     }
 #use Data::Dumper;
-#print STDERR "--- FIELD: ".Dumper($this->{FIELD}[0])."\n";
+#print STDERR "--- FIELD: ".Dumper($this->{TOPICINFO})."\n";
     $this->{_text} = $data->{_text};
     $this->{_indices} = $data->{_indices};
-
 
     $this->{_loadedRev} = 
       Foswiki::Store::cleanUpRevID( $this->{TOPICINFO}[0]->{version} );

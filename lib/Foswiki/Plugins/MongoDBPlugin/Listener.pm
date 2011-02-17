@@ -3,6 +3,9 @@ package Foswiki::Plugins::MongoDBPlugin::Listener;
 
 use Foswiki::Plugins::MongoDBPlugin       ();
 use Foswiki::Plugins::MongoDBPlugin::Meta ();
+use Foswiki::Search ();
+use Foswiki::Func ();
+
 
 use Assert;
 
@@ -112,10 +115,20 @@ NOTE: atm, this will only get called if the Store says yes, this meta item exist
 =cut
 
 sub loadTopic {
-    my $self    = shift;
-    my $meta    = shift;
-    my $version = shift;
+#    my $self    = shift;
+#    my $_[1]    = shift;
+#    my $_[2] = shift;
     
+    my $session = $_[1]->{_session};    #TODO: naughty, but we see to get called before Foswiki::Func::SESSION is set up :(
+
+$_[0]->{count} = {} unless (defined($_[0]->{count}));
+$_[0]->{count}{$_[1]->web} = {} unless (defined($_[0]->{count}{$_[1]->web}));
+$_[0]->{count}{$_[1]->web}{$_[1]->topic} = 0 unless (defined($_[0]->{count}{$_[1]->web}{$_[1]->topic}));
+
+$_[0]->{count}{$_[1]->web}{$_[1]->topic}++;
+die 'here' if ($_[0]->{count}{$_[1]->web}{$_[1]->topic} > 10); #sometime there is recursion, and this way i can track it down
+
+
     #allow the MongoDBPlugin to disable the listener when running a web update resthandler
     return if (not $Foswiki::cfg{Store}{Listeners}{'Foswiki::Plugins::MongoDBPlugin::Listener'});
 
@@ -124,36 +137,42 @@ sub loadTopic {
     {
 
         return
-          if ( defined($version) );   #not doing topic versioning in mongodb yet
-        return $session->{ $meta->web . '.' . $meta->topic }
-          if defined( $self->{ $meta->web . '.' . $meta->topic } );
+          if ( defined($_[2]) );   #not doing topic versioning in mongodb yet
+
+            if ($session->search->metacache->hasCached( $_[1]->web, $_[1]->topic )) {
+                return; #bugger, infinite loop time
+  #print STDERR "===== metacache hasCached(".$_[1]->web." , ".$_[1]->topic.", version)\n";
+                $_[1] =  $session->search->metacache->getMeta( $_[1]->web, $_[1]->topic );
+                return ($_[1]->getLoadedRev(),1);
+            }
 
         #this code can do nothing - ignore it
-        if (    ( $meta->web eq 'Sandbox' )
-            and ( $meta->topic eq 'SvenDoesNotExist' ) )
+        if (    ( $_[1]->web eq 'Sandbox' )
+            and ( $_[1]->topic eq 'SvenDoesNotExist' ) )
         {
-            $meta->text('This is not really a topic');
-            $meta->{_loadedRev}      = 1;
-            $meta->{_latestIsLoaded} = 1;
+            $_[1]->text('This is not really a topic');
+            $_[1]->{_loadedRev}      = 1;
+            $_[1]->{_latestIsLoaded} = 1;
             return ( 1, 1 );
         }
 
-  #print STDERR "===== loadTopic(".$meta->web." , ".$meta->topic.", version)\n";
+  #print STDERR "===== loadTopic(".$_[1]->web." , ".$_[1]->topic.", version)\n";
 
         #rebless into a mighter version of Meta
-        bless( $meta, 'Foswiki::Plugins::MongoDBPlugin::Meta' );
-        $meta->reload();    #get the latest version
-        if ( $meta->topic =~ /Form$/ ) {
+        bless( $_[1], 'Foswiki::Plugins::MongoDBPlugin::Meta' );
+        $_[1]->reload();    #get the latest version
+        $_[1]->{_latestIsLoaded} = 1;
+        if ( $_[1]->topic =~ /Form$/ ) {
             use Foswiki::Form;
-            bless( $meta, 'Foswiki::Form' );
+            bless( $_[1], 'Foswiki::Form' );
 
-            $session->{forms}->{ $meta->web . '.' . $meta->topic } = $meta;
-            print STDERR "------ init Form obj\n";
+            $session->{forms}->{ $_[1]->web . '.' . $_[1]->topic } = $_[1];
+            #print STDERR "------ init Form obj\n";
         }
 
-        $self->{ $meta->web . '.' . $meta->topic } = $meta;
+        $session->search->metacache->addMeta( $_[1]->web, $_[1]->topic, $_[1] );
 
-        return ( 1, 1 );
+        return ( $_[1]->getLoadedRev(), 1 );
     }
 }
 
