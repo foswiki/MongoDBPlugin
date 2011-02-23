@@ -90,7 +90,7 @@ sub update {
     my $hash           = shift;
 
     #    use Data::Dumper;
-    #print STDERR "+++++ mongo update $address == ".Dumper($hash)."\n";
+    print STDERR "+++++ mongo update $address == ".Dumper($hash)."\n" if MONITOR;
 
     my $collection = $self->_getCollection($collectionName);
 

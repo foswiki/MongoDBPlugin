@@ -23,7 +23,7 @@ use Foswiki::Store::Interfaces::QueryAlgorithm ();
 our @ISA = ('Foswiki::Store::Interfaces::QueryAlgorithm');
 
 use strict;
-use constant MONITOR => 1;
+use constant MONITOR => 0;
 
 BEGIN {
 

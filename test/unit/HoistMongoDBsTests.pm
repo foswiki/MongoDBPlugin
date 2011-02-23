@@ -593,7 +593,7 @@ sub test_hoistOP_Where {
 #
 sub test_hoistOP_Where1 {
     my $this        = shift;
-    my $s           = "fields[value='FrequentlyAskedQuestion'";
+    my $s           = "fields[value='FrequentlyAskedQuestion']";
     my $queryParser = new Foswiki::Query::Parser();
     my $query       = $queryParser->parse($s);
     my $mongoDBQuery =
@@ -613,7 +613,7 @@ sub test_hoistOP_Where1 {
 }
 sub test_hoistOP_Where2 {
     my $this        = shift;
-    my $s           = "META:FIELD[value='FrequentlyAskedQuestion'";
+    my $s           = "META:FIELD[value='FrequentlyAskedQuestion']";
     my $queryParser = new Foswiki::Query::Parser();
     my $query       = $queryParser->parse($s);
     my $mongoDBQuery =
@@ -633,7 +633,28 @@ sub test_hoistOP_Where2 {
 }
 sub test_hoistOP_Where3 {
     my $this        = shift;
-    my $s           = "META:FIELD[name='TopicClassification' AND value='FrequentlyAskedQuestion'";
+    my $s           = "META:FIELD[name='TopicClassification' AND value='FrequentlyAskedQuestion']";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+# db.current.find({ 'PREFERENCE.__RAW_ARRAY' : { '$elemMatch' : {'name' : 'SVEN' }}})
+
+    $this->do_Assert( $query, $mongoDBQuery,
+    {
+          'FIELD.__RAW_ARRAY' => {
+                                   '$elemMatch' => {
+                                                     'value' => 'FrequentlyAskedQuestion',
+                                                     'name' => 'TopicClassification'
+                                                   }
+                                 }
+        }
+        );
+}
+sub test_hoistOP_Where4 {
+    my $this        = shift;
+    my $s           = "META:FIELD[name='TopicClassification'][value='FrequentlyAskedQuestion']";
     my $queryParser = new Foswiki::Query::Parser();
     my $query       = $queryParser->parse($s);
     my $mongoDBQuery =
@@ -942,6 +963,84 @@ sub test_hoist_concat3 {
     $this->do_Assert( $query, $mongoDBQuery,
         {
            '$where' => '(2)+(3) == 5'
+        }
+        );
+}
+
+sub UNTRUE_test_hoist_shorthandPref {
+    my $this        = shift;
+    my $s           = "Red=12";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert( $query, $mongoDBQuery,
+        {
+                     'PREFERENCE.__RAW_ARRAY' => {
+                                        '$elemMatch' => {
+                                                          'value' => '12',
+                                                          'name' => 'Red'
+                                                        }
+                                      }
+        }
+        );
+}
+sub test_hoist_longhandPref {
+    my $this        = shift;
+    my $s           = "preferences[value=12].Red";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert( $query, $mongoDBQuery,
+        {
+                     'PREFERENCE.__RAW_ARRAY' => {
+                                        '$elemMatch' => {
+                                                          'value' => '12',
+                                                          'name' => 'Red'
+                                                        }
+                                      }
+        }
+        );
+}
+sub test_hoist_longhand2Pref {
+    my $this        = shift;
+    my $s           = "preferences[value=12 AND name='Red']";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert( $query, $mongoDBQuery,
+        {
+                     'PREFERENCE.__RAW_ARRAY' => {
+                                        '$elemMatch' => {
+                                                          'value' => '12',
+                                                          'name' => 'Red'
+                                                        }
+                                      }
+        }
+        );
+}
+
+sub BROKENtest_hoist_PrefPlusAccessor {
+    my $this        = shift;
+    my $s           = "preferences[value=12].name = 'Red'";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert( $query, $mongoDBQuery,
+        {
+                     'PREFERENCE.__RAW_ARRAY' => {
+                                        '$elemMatch' => {
+                                                          'value' => '12',
+                                                          'name' => 'Red'
+                                                        }
+                                      }
         }
         );
 }

@@ -22,8 +22,8 @@ use Assert;
 
 use Foswiki::Query::HoistREs ();
 
-use constant MONITOR => 1;
-use constant WATCH   => 1;
+use constant MONITOR => 0;
+use constant WATCH   => 0;
 
 =begin TML
 
@@ -49,6 +49,8 @@ sub hoist {
 
     $mongoDBQuery =
       Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::_hoist($node);
+
+    die $mongoDBQuery if (ref($mongoDBQuery) eq '');
 
 #TODO: sadly, the exception throwing wasn't working so I'm using a brutish propogate error
     if ( defined( $mongoDBQuery->{ERROR} ) ) {
@@ -119,12 +121,18 @@ sub kludge {
 
 sub _hoist {
     my $node = shift;
+    my $level = shift || '';
 
     die 'node eq undef' unless defined($node);
 
-    print STDERR "???????" . ref( $node->{op} ) . "\n" if MONITOR or WATCH;
+    print STDERR "HoistMongoDB::hoist from: ", $node->stringify(), "\n"
+      if MONITOR
+          or WATCH;
+
 
     #forward propogate that we're inside a 'where' - eg lhs[rhs]
+    #sadly, also need to treat a dot case : preferences[value=12].Red
+    #   which is the same as preferences[value=12 AND name='Red']
     if ( ( ref( $node->{op} ) eq 'Foswiki::Query::OP_where' )
         or defined( $node->{inWhere} ) )
     {
@@ -135,13 +143,58 @@ sub _hoist {
           if ( defined( $node->{params}[1] )
             and ( ref( $node->{params}[1] ) ne '' ) );
     }
+    print STDERR $level."???????" . ref( $node->{op} ) . " ".($node->{inWhere}?'inWhere':'')."\n" if MONITOR or WATCH;
+
 
     #name, or constants.
-    if ( !ref( $node->{op} ) ) {
+    if ( not ref( $node->{op} ) ) {
+        #use Data::Dumper;
+        #print STDERR "not an op (".Dumper($node).")\n" if MONITOR;
         return Foswiki::Query::OP_dot::hoistMongoDB( $node->{op}, $node );
     }
     if ( ref( $node->{op} ) eq 'Foswiki::Query::OP_dot' ) {
-        return Foswiki::Query::OP_dot::hoistMongoDB( $node->{op}, $node );
+        #print STDERR "OP_dot (". $node->{op}->{arity}.")\n" if MONITOR;
+        if ( ref( $node->{params}[0]->{op} ) eq 'Foswiki::Query::OP_where' ) {
+            #print STDERR "erkle ".Dumper($node->{params}[0])."\n";
+    print STDERR "pre erkle::hoist from: ", $node->stringify(), "\n"
+      if MONITOR
+          or WATCH;
+
+my $rhs_Id = $node->{params}[1]->{params}[0];
+if (    #TODO: this is why you can't do this - if the post . portion is an attr name, its not a where selector
+    ($rhs_Id ne 'name') and
+    ($rhs_Id ne 'val')
+                    ) {
+            #this is some pretty horrid mucking with reality
+            #the rhs of this OP_dot needs to go inside the OP_Where stuff
+            #as a name='$rhsval'
+            $node->{op}->{arity}--;
+            
+            
+            #TODO: Note - you can't do this - as it won't work if the $name is a registered attr
+            my $eq = new Foswiki::Query::OP_eq();
+            my $name_node = Foswiki::Query::Node->newLeaf( 'name', Foswiki::Infix::Node::NAME );
+            my $eq_node = Foswiki::Query::Node->newNode( $eq, ($name_node, $node->{params}[1]) );
+            my $and = new Foswiki::Query::OP_and();
+            my @params = $node->{params}[0]->{params}[1];
+            push(@params, $eq_node);
+            my $and_node = Foswiki::Query::Node->newNode( $and, $node->{params}[0]->{params}[1], $eq_node );
+
+            
+            $node->{params}[0]->{params} = [$node->{params}[0]->{params}[0], $and_node];
+
+           
+    print STDERR "POST erkle::hoist from: ", $node->stringify(), "\n"
+      if MONITOR
+          or WATCH;
+}
+
+            my $query = _hoist( $node->{params}[0] , $level.' ');
+            return $query;
+        } else {
+            #TODO: really should test for 'simple case' and barf elsewise
+            return Foswiki::Query::OP_dot::hoistMongoDB( $node->{op}, $node );
+        }
     }
 
     my $containsQueryFunctions = 0;
@@ -149,10 +202,11 @@ sub _hoist {
     #TODO: if 2 constants(NUMBER,STRING) ASSERT
     #TODO: if the first is a constant, swap
     if ( $node->{op}->{arity} > 0 ) {
-        $node->{lhs} = _hoist( $node->{params}[0] );
+        print STDERR "arity 1 \n" if MONITOR;
+        $node->{lhs} = _hoist( $node->{params}[0] , $level.' ');
         if ( ref( $node->{lhs} ) ne '' ) {
 
-            #print STDERR "ref($node->{lhs}) == ".ref($node->{lhs})."\n";
+            print STDERR "ref($node->{lhs}) == ".ref($node->{lhs})."\n" if MONITOR;
             $node->{ERROR} = $node->{lhs}->{ERROR}
               if ( defined( $node->{lhs}->{ERROR} ) );
             $containsQueryFunctions |=
@@ -162,8 +216,9 @@ sub _hoist {
         }
     }
 
-    if ( $node->{op}->{arity} > 1 ) {
-        $node->{rhs} = _hoist( $node->{params}[1] );
+    if (( $node->{op}->{arity} > 1 ) and (defined($node->{params}[1]))) {
+        print STDERR "arity 2 \n" if MONITOR;
+        $node->{rhs} = _hoist( $node->{params}[1] , $level.' ');
         if ( ref( $node->{rhs} ) ne '' ) {
             $node->{ERROR} = $node->{rhs}->{ERROR}
               if ( defined( $node->{rhs}->{ERROR} ) );
@@ -174,7 +229,7 @@ sub _hoist {
         }
     }
 
-    monitor($node) if MONITOR;
+    #monitor($node) if MONITOR;
 
     if ( defined( $node->{'####delay_function'} ) ) {
 
@@ -255,8 +310,6 @@ sub monitor {
         print STDERR "----rhs: " . Data::Dumper::Dumper( $node->{rhs} );
     }
     print STDERR " \n";
-
-#print STDERR "HoistS ",$query->stringify()," -> /",Dumper($mongoDBQuery),"/\n";
 
 }
 
@@ -603,11 +656,11 @@ sub convertOrToIn {
         #success - its an $in?
         ( $fieldname, $mongoInQuery ) = each( %{ $complex[0] } );
     }
-    use Data::Dumper;
-    print STDERR
-      "----------------------------------------------------- STUPENDIFY!! - ("
-      . Dumper($mongoInQuery) . ")\n"
-      if MONITOR;
+    #use Data::Dumper;
+    #print STDERR
+    #  "----------------------------------------------------- STUPENDIFY!! - ("
+    #  . Dumper($mongoInQuery) . ")\n"
+    #  if MONITOR;
     return ( $fieldname, $mongoInQuery,
         ( $failedToConvertToOnlyIn ? 0 : $numberOfElements ) );
 }
@@ -729,7 +782,7 @@ sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
 
-    if ( !defined( $node->{op} ) ) {
+    if ( not defined( $node->{op} ) ) {
         print STDERR 'CONFUSED: ' . Data::Dumper::Dumper($node) . "\n";
         die 'here';
 
@@ -876,12 +929,12 @@ sub hoistMongoDB {
 
          #TODO: how about minimising 2 identical non-simple queries ANDed?
          #this eq test below doesn't do identical regex, nor identical $ne etc..
-                    use Data::Dumper;
-                         print STDERR "----+++++++++++++++++ $key ||"
-                           . Dumper($andHash{$key}) . "||"
-                           . Dumper($node->{rhs}->{$key}) . "||"
-                           . ref( $andHash{$key} ) . "||"
-                           . ref( $node->{rhs}->{$key} ) . "||\n";
+#                    use Data::Dumper;
+#                         print STDERR "----+++++++++++++++++ $key ||"
+#                           . Dumper($andHash{$key}) . "||"
+#                           . Dumper($node->{rhs}->{$key}) . "||"
+#                           . ref( $andHash{$key} ) . "||"
+#                           . ref( $node->{rhs}->{$key} ) . "||\n";
 
                 if (    ( ref( $andHash{$key} ) eq '' )
                     and ( ref( $node->{rhs}->{$key} ) eq '' ) )
@@ -1107,6 +1160,18 @@ sub hoistMongoDB {
 #}
 #and thus, need to re-do the mongodb schema so that meta 'arrays' are arrays again.
 #and that means the FIELD: name based shorcuts need to be re-written :/ de-indexing the queries :(
+
+if (ref($node->{lhs}) ne '') {
+    #some darned bugger thought field[name="white"][value="black"] was worth parsing to
+    
+    #add $node->{rhs} to the lhs' $elemMatch
+    my @k = keys(%{$node->{lhs}});
+    my @v = each(%{$node->{rhs}});
+
+    $node->{lhs}->{$k[0]}->{'$elemMatch'}->{$v[0]} = $v[1];
+
+    return $node->{lhs};
+}
 
     return {
         $node->{lhs} . '.__RAW_ARRAY' => { '$elemMatch' => $node->{rhs} } };
