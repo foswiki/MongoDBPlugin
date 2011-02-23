@@ -936,8 +936,8 @@ sub hoistMongoDB {
 #                           . ref( $andHash{$key} ) . "||"
 #                           . ref( $node->{rhs}->{$key} ) . "||\n";
 
-                if (    ( ref( $andHash{$key} ) eq '' )
-                    and ( ref( $node->{rhs}->{$key} ) eq '' ) )
+                if (    ( ref( $andHash{$key} ) ne 'HASH' )
+                    and ( ref( $node->{rhs}->{$key} ) ne 'HASH' ) )
                 {
                     #simplest case - both are implicit 'eq'
                     
@@ -979,7 +979,7 @@ sub hoistMongoDB {
 die 'bonus';
                     }
                 }
-                elsif ( ( ref( $andHash{$key} ) eq 'HASH' )and ( ref( $node->{rhs}->{$key} ) eq '' )) {
+                elsif ( ( ref( $andHash{$key} ) eq 'HASH' )and ( ref( $node->{rhs}->{$key} ) ne 'HASH' )) {
                     #$andHash{$key} complex - beware.
                     #$node->{rhs}->{$key} simple - can we toss at $in
                     if (not defined($andHash{$key}->{'$in'})) {
@@ -987,22 +987,24 @@ die 'bonus';
                     }
                     push(@{$andHash{$key}->{'$in'}}, $node->{rhs}->{$key});
                     $conflictResolved = 1;
-                } elsif ( ( ref( $andHash{$key} ) eq '' )and ( ref( $node->{rhs}->{$key} ) eq 'HASH' )) {
+                } elsif ( ( ref( $andHash{$key} ) ne 'HASH' )and ( ref( $node->{rhs}->{$key} ) eq 'HASH' )) {
                          $andHash{$key} = {
                             '$in' => [
                                 $andHash{$key}
                             ]
                         };
-                        if (defined( $andHash{$key}->{'$ne'} )) {
-                            $andHash{$key}->{'$nin'} = [$andHash{$key}->{'$ne'}];
+                        if (defined( $node->{rhs}->{$key}->{'$ne'} )) {
+                            $andHash{$key}->{'$nin'} = [$node->{rhs}->{$key}->{'$ne'}];
+                            $conflictResolved = 1;
+                        }
+                        if (defined( $node->{rhs}->{$key}->{'$not'} )) {
+                            $andHash{$key}->{'$nin'} = [$node->{rhs}->{$key}->{'$not'}];
                             $conflictResolved = 1;
                         }
                 } else {
-                    #db.current.find({_web: 'Sandbox',  '_topic' : {$in : [/Web.*/], $nin : [/.*e$/]}}, {_topic:1})
-{
+
                     print STDERR 'what are we ?';
-die 'bonus2';
-}
+                    die 'bonus2';
                 }
             }
             if ( not $conflictResolved ) {

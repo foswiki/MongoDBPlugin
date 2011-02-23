@@ -1046,4 +1046,113 @@ sub BROKENtest_hoist_PrefPlusAccessor {
 }
 
 
+#this is basically a SEARCH with both the topic= and excludetopic= set
+sub test_hoistTopicNameIncludeANDExclude {
+    my $this = shift;
+    my $s =
+      "(name='Item' AND NOT name='ItemTemplate') AND (something=12 or something=999 or something=123)";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert(
+        $query,
+        $mongoDBQuery,
+        {
+          '$or' => [
+                     {
+                       'FIELD.something.value' => '12'
+                     },
+                     {
+                       'FIELD.something.value' => '999'
+                     },
+                     {
+                       'FIELD.something.value' => '123'
+                     }
+                   ],
+          '_topic' => {
+                        '$nin' => [
+                                    'ItemTemplate'
+                                  ],
+                        '$in' => [
+                                   'Item'
+                                 ]
+                      }
+            }
+    );
+}
+
+sub test_hoistTopicNameIncludeRegANDExclude {
+    my $this = shift;
+    my $s =
+      "(name~'Item*' AND NOT name='ItemTemplate') AND (something=12 or something=999 or something=123)";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert(
+        $query,
+        $mongoDBQuery,
+        {
+          '$or' => [
+                     {
+                       'FIELD.something.value' => '12'
+                     },
+                     {
+                       'FIELD.something.value' => '999'
+                     },
+                     {
+                       'FIELD.something.value' => '123'
+                     }
+                   ],
+          '_topic' => {
+                        '$nin' => [
+                                    'ItemTemplate'
+                                  ],
+                        '$in' => [
+                                   qr/(?-xism:^Item.*$)/
+                                 ]
+                      }
+            }
+    );
+}
+sub test_hoistTopicNameIncludeRegANDExcludeReg {
+    my $this = shift;
+    my $s =
+      "(name~'Item*' AND NOT name~'*Template') AND (something=12 or something=999 or something=123)";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert(
+        $query,
+        $mongoDBQuery,
+        {
+          '$or' => [
+                     {
+                       'FIELD.something.value' => '12'
+                     },
+                     {
+                       'FIELD.something.value' => '999'
+                     },
+                     {
+                       'FIELD.something.value' => '123'
+                     }
+                   ],
+          '_topic' => {
+                        '$nin' => [
+                                    qr/(?-xism:^.*Template$)/
+                                  ],
+                        '$in' => [
+                                   qr/(?-xism:^Item.*$)/
+                                 ]
+                      }
+            }
+    );
+}
+
+
 1;
