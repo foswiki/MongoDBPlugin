@@ -1049,6 +1049,7 @@ sub hoistMongoDB {
 
     my $lhs = $node->{lhs};
 
+    #TODO: should inspect to see if $in is more appropriate.
     #need to detect nested OR's and unwind them
     if ( defined( $lhs->{'$or'} ) ) {
         $lhs = $lhs->{'$or'};
@@ -1058,9 +1059,7 @@ sub hoistMongoDB {
     }
     elsif ( defined( $node->{rhs}->{'$or'} ) ) {
 
-        #i'm somewhat sure this can't happen.
         my $rhs = $node->{rhs}->{'$or'};
-        die "---+++--- TTHATS A SURPRISE: $rhs, " . ref($rhs) . "\n";
         $mongoQuery = { '$or' => [ $lhs, @$rhs ] };
     }
     else {
