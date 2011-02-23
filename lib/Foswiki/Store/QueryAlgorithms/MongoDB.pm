@@ -23,7 +23,7 @@ use Foswiki::Store::Interfaces::QueryAlgorithm ();
 our @ISA = ('Foswiki::Store::Interfaces::QueryAlgorithm');
 
 use strict;
-use constant MONITOR => 0;
+use constant MONITOR => 1;
 
 BEGIN {
 
@@ -44,6 +44,10 @@ use Foswiki::Search::InfoCache;
 use Foswiki::Plugins::MongoDBPlugin::HoistMongoDB;
 use Data::Dumper;
 use Assert;
+
+use Foswiki::Query::Node;
+use Foswiki::Query::OP_and;
+use Foswiki::Infix::Error;
 
 # See Foswiki::Query::QueryAlgorithms.pm for details
 sub query {
@@ -97,10 +101,117 @@ sub query {
 # Query over a single web
 sub _webQuery {
     my ( $query, $web, $inputTopicSet, $session, $options ) = @_;
+#TODO: what happens if / when the inputTopicSet exists?
+
+    #presuming that the inputTopicSet is not yet defined, we need to add the topics=, excludetopic= and web options to the query.
+    my $extra_query;
+    {
+        my @option_query = ("web='".$web."'");
+        if ($options->{topic}) {
+            push(@option_query, convertTopicPatternToLonghandQuery($options->{topic}));
+        }
+        if ($options->{excludetopic}) {
+            push(@option_query, 'NOT('.convertTopicPatternToLonghandQuery($options->{excludetopic}).')');
+
+            
+#> db.current.find({_web: 'Sandbox',  _topic : {'$nin' :[ /AjaxComment/]}}, {_topic:1})
+#> db.current.find({_web: 'Sandbox',  _topic : {'$nin' :[/Web.*/]}}, {_topic:1})
+
+        }
+        my $queryStr = join(' AND ', @option_query);
+        
+        require Foswiki::Query::Parser;
+        my $theParser = new Foswiki::Query::Parser();
+        $extra_query = $theParser->parse( $queryStr, $options );
+    }
 
 #SMELL: initialise the mongoDB hack. needed if the mondoPlugin is not enabled, but the algo is selected :/
     Foswiki::Plugins::MongoDBPlugin::getMongoDB();
 
+    if ( $query->evaluatesToConstant() ) {
+
+        # SMELL: use any old topic
+        my $cache = $Foswiki::Plugins::SESSION->search->metacache->get( $web,
+            'WebPreferences' );
+        my $meta = $cache->{tom};
+        my $queryIsAConstantFastpath =
+          $query->evaluate( tom => $meta, data => $meta );
+        if ( not $queryIsAConstantFastpath ) {
+
+            #false - return an empty resultset
+            return new Foswiki::Search::InfoCache( $Foswiki::Plugins::SESSION,
+                $web );
+        }
+        else {
+    #need to do the query - at least to eval topic= and excludetopic= and order=
+            $query = $extra_query;
+        }
+    } else {
+        my $and = new Foswiki::Query::OP_and();
+        $query = Foswiki::Query::Node->newNode( $and, ($extra_query, $query) );
+    }
+
+    #try HoistMongoDB first
+    my $mongoQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    if ( not defined($mongoQuery) ) {
+        print STDERR
+"MongoDB QuerySearch - failed to hoist to MongoDB - please report the error to Sven.\n";
+
+        #falling through to old regex code
+    }
+    else {
+        ASSERT( not( defined( $mongoQuery->{ERROR} ) ) ) if DEBUG;
+
+        #limit, skip, sort_by
+        my $SortDirection = Foswiki::isTrue( $options->{reverse} ) ? -1 : 1;
+
+        #ME bets casesensitive Sorting has no unit tests..
+        #order="topic"
+        #order="created"
+        #order="modified"
+        #order="editby"
+        #order="formfield(name)"
+        #reverse="on"
+        my %sortKeys = (
+            topic => '_topic',
+
+            #created => ,   #TODO: don't yet have topic histories in mongo
+            modified => 'TOPICINFO.date',
+            editby   => 'TOPICINFO.author',
+        );
+
+        my $queryAttrs = {};
+        my $orderBy = $sortKeys{ $options->{order} || 'topic' };
+        if ( defined($orderBy) ) {
+            $queryAttrs = { sort_by => { $orderBy => $SortDirection } };
+        }
+        else {
+            if ( $options->{order} =~ /formfield\((.*)\)/ ) {
+
+#TODO: this will crash things - I need to work on indexes, and one collection per web/form_def
+                if (
+                    defined(
+                        $Foswiki::cfg{Plugins}{MongoDBPlugin}{ExperimentalCode}
+                    )
+                    and $Foswiki::cfg{Plugins}{MongoDBPlugin}{ExperimentalCode}
+                  )
+                {
+                    $orderBy = 'FIELD.' . $1 . '.value';
+                    $queryAttrs = { sort_by => { $orderBy => $SortDirection } };
+                }
+            }
+        }
+
+        my $cursor = doMongoSearch( $web, $options, $mongoQuery, $queryAttrs );
+        return new Foswiki::Search::MongoDBInfoCache(
+            $Foswiki::Plugins::SESSION,
+            $web, $options, $cursor );
+    }
+
+    ######################################
+    #fall back to HoistRe
     my $topicSet = $inputTopicSet;
     if ( !defined($topicSet) ) {
 
@@ -111,75 +222,7 @@ sub _webQuery {
           Foswiki::Search::InfoCache::getTopicListIterator( $webObject,
             $options );
     }
-    {
-
-        #try HoistMongoDB first
-        my $mongoQuery =
-          Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
-
-        if ( defined($mongoQuery) ) {
-            ASSERT( not( defined( $mongoQuery->{ERROR} ) ) ) if DEBUG;
-
-            #TODO: where are we limiting the query to the $web?
-            ASSERT( not defined( $mongoQuery->{'_web'} ) ) if DEBUG;
-            $mongoQuery->{'_web'} = $web;
-
-            #limit, skip, sort_by
-            my $SortDirection = Foswiki::isTrue( $options->{reverse} ) ? -1 : 1;
-
-            #ME bets casesensitive Sorting has no unit tests..
-            #order="topic"
-            #order="created"
-            #order="modified"
-            #order="editby"
-            #order="formfield(name)"
-            #reverse="on"
-            my %sortKeys = (
-                topic => '_topic',
-
-                #created => ,   #TODO: don't yet have topic histories in mongo
-                modified => 'TOPICINFO.date',
-                editby   => 'TOPICINFO.author',
-            );
-
-            my $queryAttrs = {};
-            my $orderBy = $sortKeys{ $options->{order} || 'topic' };
-            if ( defined($orderBy) ) {
-                $queryAttrs = { sort_by => { $orderBy => $SortDirection } };
-            }
-            else {
-                if ( $options->{order} =~ /formfield\((.*)\)/ ) {
-
-#TODO: this will crash things - I need to work on indexes, and one collection per web/form_def
-                    if (
-                        defined(
-                            $Foswiki::cfg{Plugins}{MongoDBPlugin}
-                              {ExperimentalCode}
-                        )
-                        and
-                        $Foswiki::cfg{Plugins}{MongoDBPlugin}{ExperimentalCode}
-                      )
-                    {
-                        $orderBy = 'FIELD.' . $1 . '.value';
-                        $queryAttrs =
-                          { sort_by => { $orderBy => $SortDirection } };
-                    }
-                }
-            }
-
-            my $cursor =
-              doMongoSearch( $web, $options, $mongoQuery, $queryAttrs );
-            return new Foswiki::Search::MongoDBInfoCache(
-                $Foswiki::Plugins::SESSION,
-                $web, $options, $cursor );
-        } else {
-		print STDERR "MongoDB QuerySearch - failed to hoist to MongoDB - please report the error to Sven.\n";
-		#falling through to old regex code
-	}
-    }
-
-
-    #fall back to HoistRe
+    
     require Foswiki::Query::HoistREs;
     my $hoistedREs = Foswiki::Query::HoistREs::collatedHoist($query);
 
@@ -206,10 +249,10 @@ sub _webQuery {
             $searchOptions );
         $topicSet->reset();
 
-        #for now we're kicking down to regex to reduce the set we then brute force query .
+#for now we're kicking down to regex to reduce the set we then brute force query .
 
-          #next itr we start to HoistMongoDB
-          $topicSet =
+        #next itr we start to HoistMongoDB
+        $topicSet =
           Foswiki::Store::SearchAlgorithms::MongoDB::_webQuery( $searchQuery,
             $web, $topicSet, $session, $searchOptions );
     }
@@ -279,32 +322,26 @@ sub doMongoSearch {
     return $cursor;
 }
 
-sub convertQueryToJavascript {
-    my $name         = shift;
-    my $scope        = shift;
-    my $regex        = shift;
-    my $regexoptions = shift || '';
-    my $not          = shift || '';
-    my $invertedNot  = ( $not eq '!' ) ? '' : '!';
 
-    return '' if ( $regex eq '' );
+sub convertTopicPatternToLonghandQuery {
+    my ($topic) = @_;
+    return '' unless ($topic);
 
-    return <<"HERE";
-            { 
-                $name = /$regex/$regexoptions ; 
-                matched = $name.test(this.$scope);
-                if ($invertedNot(matched)) {
-                    return false; 
-                }
-             }
-HERE
-}
+    # 'Web*, FooBar' ==> ( 'Web*', 'FooBar' ) ==> ( 'Web.*', "FooBar" )
+    my @arr =
+      map { s/[^\*\_\-\+$Foswiki::regex{mixedAlphaNum}]//go; s/\*/\.\*/go; $_ }
+      split( /(?:,\s*|\|)/, $topic );
+    return '' unless (@arr);
 
-# Get a referenced topic
-# See Foswiki::Store::QueryAlgorithms.pm for details
-sub getRefTopic {
-    my ( $this, $relativeTo, $w, $t ) = @_;
-    return Foswiki::Meta->load( $relativeTo->session, $w, $t );
+    # ( 'Web.*', 'FooBar' ) ==> "^(Web.*|FooBar)$"
+    #return '^(' . join( '|', @arr ) . ')$';
+    return join(' AND ', map {
+                            if (/\.\*/) {
+                                "name =~ '".$_."'"
+                            } else {
+                                "name='".$_."'"
+                            }
+                        } @arr);
 }
 
 1;

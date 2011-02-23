@@ -12,12 +12,14 @@ use Data::Dumper;
 use constant MONITOR => 1;
 
 BEGIN {
-    #enable the MongoDBPlugin which keeps the mongodb uptodate with topics changes onsave 
-#TODO: make conditional - or figure out how to force this in the MongoDB search and query algo's 
-$Foswiki::cfg{Plugins}{MongoDBPlugin}{Module} = 'Foswiki::Plugins::MongoDBPlugin'; 
-$Foswiki::cfg{Plugins}{MongoDBPlugin}{Enabled} = 1; 
-$Foswiki::cfg{Plugins}{MongoDBPlugin}{EnableOnSaveUpdates} = 1; 
-print STDERR "****** starting MongoDBPlugin..\n" if MONITOR;
+
+#enable the MongoDBPlugin which keeps the mongodb uptodate with topics changes onsave
+#TODO: make conditional - or figure out how to force this in the MongoDB search and query algo's
+    $Foswiki::cfg{Plugins}{MongoDBPlugin}{Module} =
+      'Foswiki::Plugins::MongoDBPlugin';
+    $Foswiki::cfg{Plugins}{MongoDBPlugin}{Enabled}             = 1;
+    $Foswiki::cfg{Plugins}{MongoDBPlugin}{EnableOnSaveUpdates} = 1;
+    print STDERR "****** starting MongoDBPlugin..\n" if MONITOR;
 }
 
 =begin TML
@@ -39,7 +41,6 @@ DEPRECATED
 
 =cut
 
-
 sub search {
     my ( $searchString, $web, $inputTopicSet, $session, $options ) = @_;
 
@@ -60,8 +61,9 @@ sub search {
     # Convert GNU grep \< \> syntax to \b
     $searchString =~ s/(?<!\\)\\[<>]/\\b/g;
     $searchString =~ s/^(.*)$/\\b$1\\b/go if $options->{'wordboundaries'};
-#$searchString =~ s/\\"/./g;
-#$searchString =~ s/\\b//g;
+
+    #$searchString =~ s/\\"/./g;
+    #$searchString =~ s/\\b//g;
 
     my $casesensitive =
       defined( $options->{casesensitive} ) ? $options->{casesensitive} : 1;
@@ -71,18 +73,18 @@ sub search {
     push( @{ $elements{_web} }, $web );
 
     #dont' add a search for all..
-    if ($searchString ne '.*') {
+    if ( $searchString ne '.*' ) {
         push(
-                    @{ $elements{_raw_text} },
-                    {
-                        '$regex'   => $searchString,
-                        '$options' => ( $casesensitive ? '' : 'i' )
-                    }
-                );
+            @{ $elements{_raw_text} },
+            {
+                '$regex'   => $searchString,
+                '$options' => ( $casesensitive ? '' : 'i' )
             }
+        );
+    }
 
-    my $cursor =
-      Foswiki::Plugins::MongoDBPlugin::getMongoDB()->query('current',  \%elements);
+    my $cursor = Foswiki::Plugins::MongoDBPlugin::getMongoDB()
+      ->query( 'current', \%elements );
     return new Foswiki::Search::MongoDBInfoCache( $Foswiki::Plugins::SESSION,
         $web, $options, $cursor );
 }
@@ -105,8 +107,9 @@ sub query {
     my $isAdmin  = $session->{users}->isAdmin( $session->{user} );
 
     my $searchAllFlag = ( $webNames =~ /(^|[\,\s])(all|on)([\,\s]|$)/i );
-    my @webs = Foswiki::Plugins::MongoDBPlugin::_getListOfWebs( $webNames,
-        $recurse, $searchAllFlag );
+    my @webs =
+      Foswiki::Plugins::MongoDBPlugin::_getListOfWebs( $webNames, $recurse,
+        $searchAllFlag );
 
     my @resultCacheList;
     foreach my $web (@webs) {
@@ -127,7 +130,7 @@ sub query {
             && $web ne $session->{webName} );
 
         my $infoCache =
-              _webQuery( $query, $web, $inputTopicSet, $session, $options );
+          _webQuery( $query, $web, $inputTopicSet, $session, $options );
         $infoCache->sortResults($options);
         push( @resultCacheList, $infoCache );
     }
@@ -164,31 +167,32 @@ sub _webQuery {
 
 #use IxHash to keep the hash order - _some_ parts of queries are order sensitive
     my %mongoQuery = ();
-    my $ixhQuery            = tie( %mongoQuery, 'Tie::IxHash' );
-    #    $ixhQuery->Push( $scope => $elem );
+    my $ixhQuery = tie( %mongoQuery, 'Tie::IxHash' );
 
+    #    $ixhQuery->Push( $scope => $elem );
 
 #TODO: Mongo advanced query docco indicates that /^a/ is faster than /^a.*/ and /^a.*$/ so should refactor to that.
     my $includeTopicsRegex =
       Foswiki::Search::MongoDBInfoCache::convertTopicPatternToRegex(
         $options->{topic} );
+
 #print STDERR "-------------------- _topic => $includeTopicsRegex (".$options->{topic}.")\n";
-    if (( $includeTopicsRegex ne '' ) and 
-        ($includeTopicsRegex ne '.*')){
+    if (    ( $includeTopicsRegex ne '' )
+        and ( $includeTopicsRegex ne '.*' ) )
+    {
         $includeTopicsRegex = qr/$includeTopicsRegex/;
         $ixhQuery->Push( '_topic' => $includeTopicsRegex );
     }
 
-
     my $excludeTopicsRegex =
       Foswiki::Search::MongoDBInfoCache::convertTopicPatternToRegex(
         $options->{excludetopic} );
-#print STDERR "--------------------2 _topic => $includeTopicsRegex\n";
+#BUGGGGGG - can't add topic= and excludetopic= - same key, it go boom
+#WORSE - there is no actual way to do A and not B in mongodb?
+    #print STDERR "--------------------2 _topic => $includeTopicsRegex\n";
     if ( $excludeTopicsRegex ne '' ) {
         $excludeTopicsRegex = qr/$excludeTopicsRegex/;
-        $ixhQuery->Push( '_topic' => 
-            { '$not' => $excludeTopicsRegex }
-        );
+        $ixhQuery->Push( '_topic' => { '$not' => $excludeTopicsRegex } );
     }
 
     $ixhQuery->Push( '_web' => $web );
@@ -196,7 +200,7 @@ sub _webQuery {
     my $casesensitive =
       defined( $options->{casesensitive} ) ? $options->{casesensitive} : 0;
 
-    my $counter = 0;
+    my $counter             = 0;
     my $mongoJavascriptFunc = '';
     foreach my $raw_token ( @{ $query->{tokens} } ) {
         my $token = $raw_token;
@@ -206,24 +210,25 @@ sub _webQuery {
         # flag for AND NOT search
         my $invertSearch = 0;
         $invertSearch = ( $token =~ s/^\!//o );
-        
+
         #TODO: work out why mongo hates ^%META
         #TODO: make a few more unit tests with ^ in them
         #(adding 'm' to the options isn't it
         $token =~ s/\^%META/%META/g;
-        
+
         # scope can be 'topic' (default), 'text' or "all"
         # scope='topic', e.g. Perl search on topic name:
         if ( $options->{'scope'} ne 'text' ) {
             $topic_searchString = $token;
+
             # FIXME I18N
             if ( $options->{'type'} ne 'regex' ) {
                 $topic_searchString = quotemeta($topic_searchString);
             }
         }
 
-        # scope='text', e.g. grep search on topic text:
-        #TODO: this is actually incorrect for scope="both", as we need to OR the _topic and _topic_raw results SOOO, we fake it further up
+# scope='text', e.g. grep search on topic text:
+#TODO: this is actually incorrect for scope="both", as we need to OR the _topic and _topic_raw results SOOO, we fake it further up
         if ( $options->{'scope'} ne 'topic' ) {
             $raw_searchString = $token;
             if ( $options->{type} && $options->{type} eq 'regex' ) {
@@ -244,39 +249,74 @@ sub _webQuery {
               if $options->{'wordboundaries'};
         }
 
-    #remove pointless regex..
-    #TODO: need to work out wtf '\.*'
-    $raw_searchString = undef if (defined($raw_searchString) and $raw_searchString eq '.*');
-    $topic_searchString = undef if (defined($topic_searchString) and $topic_searchString eq '.*');
-        
-        if ($counter == 0) {
-            my $raw_text_regex = convertQueryToMongoRegex ($raw_searchString, $casesensitive, $invertSearch);
-            my $topic_regex = convertQueryToMongoRegex ($topic_searchString, $casesensitive, $invertSearch);
+        #remove pointless regex..
+        #TODO: need to work out wtf '\.*'
+        $raw_searchString = undef
+          if ( defined($raw_searchString) and $raw_searchString eq '.*' );
+        $topic_searchString = undef
+          if ( defined($topic_searchString) and $topic_searchString eq '.*' );
 
-            if ((defined($topic_regex) and defined($raw_text_regex)) and (not $invertSearch)) {
-                $ixhQuery->Push( '$or' => [{'_topic' => $topic_regex}, {_raw_text => $raw_text_regex}] );
-            } else {
-                $ixhQuery->Push( '_topic' => $topic_regex ) if defined($topic_regex);
-                $ixhQuery->Push( '_raw_text' => $raw_text_regex ) if defined($raw_text_regex);
+        if ( $counter == 0 ) {
+            my $raw_text_regex =
+              convertQueryToMongoRegex( $raw_searchString, $casesensitive,
+                $invertSearch );
+            my $topic_regex =
+              convertQueryToMongoRegex( $topic_searchString, $casesensitive,
+                $invertSearch );
+
+            if (    ( defined($topic_regex) and defined($raw_text_regex) )
+                and ( not $invertSearch ) )
+            {
+                $ixhQuery->Push(
+                    '$or' => [
+                        { '_topic'  => $topic_regex },
+                        { _raw_text => $raw_text_regex }
+                    ]
+                );
             }
-        } else {
-        #need to write the additional tokens as js. can't do _topic: {/qwe/, /asdf/}
-            if ((defined($topic_searchString) and defined($raw_searchString)) and (not $invertSearch)) {
-                #$ixhQuery->Push( '$or' => [{'_topic' => $topic_regex}, {_raw_text => $raw_text_regex}] );
-                #need to OR and NOT the regexStrings....... 
-                    $mongoJavascriptFunc .=
-                      convertQueryToJavascript( 'query' . $counter, 'HASH',
-                        {'_raw_text' => $raw_searchString, '_topic' => $topic_searchString}, ($casesensitive?'':'i'), $invertSearch );
-            } else {
-                if (defined($raw_searchString)) {
-                    $mongoJavascriptFunc .=
-                      convertQueryToJavascript( 'query' . $counter,
-                        '_raw_text', $raw_searchString, ($casesensitive?'':'i'), $invertSearch );
+            else {
+                $ixhQuery->Push( '_topic' => $topic_regex )
+                  if defined($topic_regex);
+                $ixhQuery->Push( '_raw_text' => $raw_text_regex )
+                  if defined($raw_text_regex);
+            }
+        }
+        else {
+
+    #need to write the additional tokens as js. can't do _topic: {/qwe/, /asdf/}
+            if ( ( defined($topic_searchString) and defined($raw_searchString) )
+                and ( not $invertSearch ) )
+            {
+
+#$ixhQuery->Push( '$or' => [{'_topic' => $topic_regex}, {_raw_text => $raw_text_regex}] );
+#need to OR and NOT the regexStrings.......
+                $mongoJavascriptFunc .= convertQueryToJavascript(
+                    'query' . $counter,
+                    'HASH',
+                    {
+                        '_raw_text' => $raw_searchString,
+                        '_topic'    => $topic_searchString
+                    },
+                    ( $casesensitive ? '' : 'i' ),
+                    $invertSearch
+                );
+            }
+            else {
+                if ( defined($raw_searchString) ) {
+                    $mongoJavascriptFunc .= convertQueryToJavascript(
+                        'query' . $counter,
+                        '_raw_text', $raw_searchString,
+                        ( $casesensitive ? '' : 'i' ),
+                        $invertSearch
+                    );
                 }
-                if (defined($topic_searchString)) {
-                    $mongoJavascriptFunc .=
-                      convertQueryToJavascript( 'query' . $counter,
-                        '_topic', $topic_searchString, ($casesensitive?'':'i'), $invertSearch );
+                if ( defined($topic_searchString) ) {
+                    $mongoJavascriptFunc .= convertQueryToJavascript(
+                        'query' . $counter,
+                        '_topic', $topic_searchString,
+                        ( $casesensitive ? '' : 'i' ),
+                        $invertSearch
+                    );
                 }
             }
         }
@@ -286,63 +326,64 @@ sub _webQuery {
         $mongoJavascriptFunc =
           'function() {' . $mongoJavascriptFunc . 'return true;}';
         $ixhQuery->Push( '$where' => $mongoJavascriptFunc );
-        print STDERR "------$mongoJavascriptFunc\n"  if MONITOR;
+        print STDERR "------$mongoJavascriptFunc\n" if MONITOR;
     }
 
-
-    
     #limit, skip, sort_by
-    my $SortDirection   = Foswiki::isTrue( $options->{reverse} )? -1 : 1;
-#ME bets casesensitive Sorting has no unit tests..
-#order="topic"
-#order="created"
-#order="modified"
-#order="editby"
-#order="formfield(name)"    
-#reverse="on"
+    my $SortDirection = Foswiki::isTrue( $options->{reverse} ) ? -1 : 1;
+
+    #ME bets casesensitive Sorting has no unit tests..
+    #order="topic"
+    #order="created"
+    #order="modified"
+    #order="editby"
+    #order="formfield(name)"
+    #reverse="on"
     my %sortKeys = (
         topic => '_topic',
+
         #created => ,   #TODO: don't yet have topic histories in mongo
         modified => 'TOPICINFO.date',
+
 #TODO: foswiki's sort by TOPICINFO.author sorts by WikiName, not CUID - so need to make an internal version of this
-        editby => 'TOPICINFO._authorWikiName', 
+        editby => 'TOPICINFO._authorWikiName',
     );
 
     my $queryAttrs = {};
-    my $orderBy = $sortKeys{$options->{order}||'topic'}; 
-    if (defined($orderBy)) {
-        $queryAttrs = { sort_by => {$orderBy => $SortDirection } };
-    } else {
-        if ($options->{order} =~ /formfield\((.*)\)/) {
-            $orderBy = 'FIELD.'.$1;
-            $queryAttrs = { sort_by => {$orderBy => $SortDirection } };
+    my $orderBy = $sortKeys{ $options->{order} || 'topic' };
+    if ( defined($orderBy) ) {
+        $queryAttrs = { sort_by => { $orderBy => $SortDirection } };
+    }
+    else {
+        if ( $options->{order} =~ /formfield\((.*)\)/ ) {
+            $orderBy = 'FIELD.' . $1;
+            $queryAttrs = { sort_by => { $orderBy => $SortDirection } };
         }
     }
 
-    my $cursor =
-      Foswiki::Plugins::MongoDBPlugin::getMongoDB()->query('current', $ixhQuery, $queryAttrs);
+    my $cursor = Foswiki::Plugins::MongoDBPlugin::getMongoDB()
+      ->query( 'current', $ixhQuery, $queryAttrs );
 
     return new Foswiki::Search::MongoDBInfoCache( $Foswiki::Plugins::SESSION,
         $web, $options, $cursor );
 }
 
-
 sub convertQueryToMongoRegex {
-    my ($searchString, $casesensitive, $invertSearch) = @_;
+    my ( $searchString, $casesensitive, $invertSearch ) = @_;
     my $mongoRegexHash;
-    
-    if (defined($searchString)) {
+
+    if ( defined($searchString) ) {
         my $theRe = ( $casesensitive ? qr/$searchString/ : qr/$searchString/i );
 
         if ($invertSearch) {
-            $mongoRegexHash = {'$not' => $theRe };
-        } else {
+            $mongoRegexHash = { '$not' => $theRe };
+        }
+        else {
             $mongoRegexHash = $theRe;
         }
     }
     return $mongoRegexHash;
 }
-
 
 sub convertQueryToJavascript {
     my $name         = shift;
@@ -350,14 +391,14 @@ sub convertQueryToJavascript {
     my $regex        = shift;
     my $regexoptions = shift || '';
     my $not          = shift || '';
-    
 
-    if (($scope eq 'HASH') and (ref($regex) eq 'HASH')) {
-        my $not = $not  ? '!' : '';
+    if ( ( $scope eq 'HASH' ) and ( ref($regex) eq 'HASH' ) ) {
+        my $not = $not ? '!' : '';
+
         #return (A OR B OR C)
-        my $js = "\t\t{\n\t\t\tvar ret = false;\n";
+        my $js    = "\t\t{\n\t\t\tvar ret = false;\n";
         my $count = 1;
-        foreach my $scope (keys(%$regex)) {
+        foreach my $scope ( keys(%$regex) ) {
             my $regex = $regex->{$scope};
             $js .= <<"HERE";
                 { 
@@ -370,10 +411,11 @@ HERE
         }
         $js .= "\t\t\tif (!ret) {return false;}\t\t}\n";
         return $js;
-    } else {
+    }
+    else {
         return '' if ( $regex eq '' );
-        
-        my $invertedNot  = $not  ? '' : '!';
+
+        my $invertedNot = $not ? '' : '!';
         return <<"HERE";
                 { 
                     $name = /$regex/$regexoptions ; 
@@ -384,7 +426,7 @@ HERE
                  }
 HERE
     }
-    die "ERROR: unexpected regex param type".ref($regex)."\n";
+    die "ERROR: unexpected regex param type" . ref($regex) . "\n";
 }
 
 1;

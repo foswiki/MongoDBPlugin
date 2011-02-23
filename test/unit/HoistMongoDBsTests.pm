@@ -449,7 +449,7 @@ sub test_hoistNOT_EQ {
     my $mongoDBQuery =
       Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
     $this->do_Assert( $query, $mongoDBQuery,
-        { '$not' => { 'FIELD.number.value' => '12' } } );
+        { 'FIELD.number.value' => { '$not' => '12' } } );
 }
 
 sub test_hoistCompound {
@@ -856,6 +856,21 @@ sub test_hoist_Item10323_2 {
         );
 }
 
+sub test_hoist_Item10323_2_not {
+    my $this        = shift;
+    my $s           = "not(lc(TermGroup)=~lc('bio'))";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert( $query, $mongoDBQuery,
+        {
+          '$where' => '! (Regex(\'bio\'.toLowerCase(), \'\').test(this.FIELD.TermGroup.value.toLowerCase())) '
+        }
+        );
+}
+
 sub test_hoist_Item10323 {
     my $this        = shift;
     my $s           = "form.name~'*TermForm' AND lc(Namespace)=~lc('ant') AND lc(TermGroup)=~lc('bio')";
@@ -930,5 +945,6 @@ sub test_hoist_concat3 {
         }
         );
 }
+
 
 1;

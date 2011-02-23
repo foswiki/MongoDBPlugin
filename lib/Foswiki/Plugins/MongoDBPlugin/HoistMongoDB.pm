@@ -22,8 +22,8 @@ use Assert;
 
 use Foswiki::Query::HoistREs ();
 
-use constant MONITOR => 0;
-use constant WATCH   => 0;
+use constant MONITOR => 1;
+use constant WATCH   => 1;
 
 =begin TML
 
@@ -35,9 +35,11 @@ use constant WATCH   => 0;
 sub hoist {
     my ( $node, $indent ) = @_;
 
-    return undef unless ref( $node->{op} );
+    print STDERR "HoistMongoDB::hoist from: ", $node->stringify(), "\n"
+      if MONITOR
+          or WATCH;
 
-    print STDERR "hoist from: ", $node->stringify(), "\n" if MONITOR or WATCH;
+    return undef unless ref( $node->{op} );
 
 #TODO: use IxHash to keep the hash order - _some_ parts of queries are order sensitive
 #    my %mongoQuery = ();
@@ -142,53 +144,57 @@ sub _hoist {
         return Foswiki::Query::OP_dot::hoistMongoDB( $node->{op}, $node );
     }
 
-
     my $containsQueryFunctions = 0;
 
     #TODO: if 2 constants(NUMBER,STRING) ASSERT
     #TODO: if the first is a constant, swap
     if ( $node->{op}->{arity} > 0 ) {
-            $node->{lhs} = _hoist( $node->{params}[0] );
-            if ( ref( $node->{lhs} ) ne '' ) {
+        $node->{lhs} = _hoist( $node->{params}[0] );
+        if ( ref( $node->{lhs} ) ne '' ) {
 
-                #print STDERR "ref($node->{lhs}) == ".ref($node->{lhs})."\n";
-                $node->{ERROR} = $node->{lhs}->{ERROR}
-                  if ( defined( $node->{lhs}->{ERROR} ) );
-                $containsQueryFunctions |=
-                  defined( $node->{lhs}->{'####need_function'} );
-                $node->{'####delay_function'} = 1 if (defined($node->{lhs}->{'####delay_function'}));
+            #print STDERR "ref($node->{lhs}) == ".ref($node->{lhs})."\n";
+            $node->{ERROR} = $node->{lhs}->{ERROR}
+              if ( defined( $node->{lhs}->{ERROR} ) );
+            $containsQueryFunctions |=
+              defined( $node->{lhs}->{'####need_function'} );
+            $node->{'####delay_function'} = 1
+              if ( defined( $node->{lhs}->{'####delay_function'} ) );
         }
     }
 
     if ( $node->{op}->{arity} > 1 ) {
-            $node->{rhs} = _hoist( $node->{params}[1] );
-            if ( ref( $node->{rhs} ) ne '' ) {
-                $node->{ERROR} = $node->{rhs}->{ERROR}
-                  if ( defined( $node->{rhs}->{ERROR} ) );
-                $containsQueryFunctions |=
-                  defined( $node->{rhs}->{'####need_function'} );
-                $node->{'####delay_function'} = 1 if (defined($node->{rhs}->{'####delay_function'}));
-            }
+        $node->{rhs} = _hoist( $node->{params}[1] );
+        if ( ref( $node->{rhs} ) ne '' ) {
+            $node->{ERROR} = $node->{rhs}->{ERROR}
+              if ( defined( $node->{rhs}->{ERROR} ) );
+            $containsQueryFunctions |=
+              defined( $node->{rhs}->{'####need_function'} );
+            $node->{'####delay_function'} = 1
+              if ( defined( $node->{rhs}->{'####delay_function'} ) );
+        }
     }
-    
-    monitor($node) if MONITOR;
-    
-    if (defined($node->{'####delay_function'})) {
-        #if we're maths, or a brace, return $node, and go for a further delay_function
-        if ( 
-            ( ref( $node->{op} ) eq 'Foswiki::Query::OP_ob' )  or
-            ( ref( $node->{op} ) eq 'Foswiki::Query::OP_minus' )  or
-            ( ref( $node->{op} ) eq 'Foswiki::Query::OP_plus' )  or
-            ( ref( $node->{op} ) eq 'Foswiki::Query::OP_times' )  or
-            ( ref( $node->{op} ) eq 'Foswiki::Query::OP_div' )  or
-            ( ref( $node->{op} ) eq 'Foswiki::Query::OP_pos' )  or
-            ( ref( $node->{op} ) eq 'Foswiki::Query::OP_neg' )  
-            ) {
-            #print STDERR "POPOPOPOPOPOPOPOPOPOPOPOPOPOPOPOPOPOPOPOPOPOPOP\n";
-                return $node->{op}->hoistMongoDB($node);
 
-        } else {
-        #else, set $containsQueryFunctions
+    monitor($node) if MONITOR;
+
+    if ( defined( $node->{'####delay_function'} ) ) {
+
+  #if we're maths, or a brace, return $node, and go for a further delay_function
+        if (   ( ref( $node->{op} ) eq 'Foswiki::Query::OP_ob' )
+            or ( ref( $node->{op} ) eq 'Foswiki::Query::OP_minus' )
+            or ( ref( $node->{op} ) eq 'Foswiki::Query::OP_plus' )
+            or ( ref( $node->{op} ) eq 'Foswiki::Query::OP_times' )
+            or ( ref( $node->{op} ) eq 'Foswiki::Query::OP_div' )
+            or ( ref( $node->{op} ) eq 'Foswiki::Query::OP_pos' )
+            or ( ref( $node->{op} ) eq 'Foswiki::Query::OP_neg' ) )
+        {
+
+            #print STDERR "POPOPOPOPOPOPOPOPOPOPOPOPOPOPOPOPOPOPOPOPOPOPOP\n";
+            return $node->{op}->hoistMongoDB($node);
+
+        }
+        else {
+
+            #else, set $containsQueryFunctions
             $containsQueryFunctions = 1;
         }
     }
@@ -210,17 +216,17 @@ sub _hoist {
     if ($containsQueryFunctions) {
         $node->{lhs} = convertToJavascript( $node->{lhs} )
           if ( ref( $node->{lhs} ) eq 'HASH' );
-          
+
         my $hoistedNode = $node->{op}->hoistMongoDB($node);
-        if (ref($hoistedNode) eq '') {
+        if ( ref($hoistedNode) eq '' ) {
+
             #could be a maths op - in which case, eeek?
             #shite - or maths inside braces
             #die 'here: '.$node->{op};
             return $hoistedNode;
-        } else {
-            return {
-                '$where' => convertToJavascript( $hoistedNode )
-            };
+        }
+        else {
+            return { '$where' => convertToJavascript($hoistedNode) };
         }
     }
 
@@ -229,7 +235,7 @@ sub _hoist {
 
 sub monitor {
     my $node = shift;
-    
+
     print STDERR "MONITOR Hoist node->op="
       . Dumper( $node->{op} )
       . " ref(node->op)="
@@ -251,7 +257,6 @@ sub monitor {
     print STDERR " \n";
 
 #print STDERR "HoistS ",$query->stringify()," -> /",Dumper($mongoDBQuery),"/\n";
-
 
 }
 
@@ -279,9 +284,9 @@ my %js_func_map = (
     '#match'  => 'MATCHBANG',
     '#like'   => 'LIKEBANG',
     '#div'    => '/',
-    '#mult'    => '*',
-    '#plus'    => '+',
-    '#minus'    => '-',
+    '#mult'   => '*',
+    '#plus'   => '+',
+    '#minus'  => '-',
     '#pos'    => '+',
     '#neg'    => '-',
 );
@@ -295,29 +300,34 @@ sub convertFunction {
         return $js_func_map{$key} . '(' . convertStringToJS($value) . ')';
     }
     if ( $key eq '#match' ) {
-        my $regex = convertStringToJS($value);
+        my $regex        = convertStringToJS($value);
         my $regexoptions = '\'\'';
-        return "Regex($regex, $regexoptions).test";#(this.\$scope);";
+        return "Regex($regex, $regexoptions).test";    #(this.\$scope);";
     }
     if ( $key eq '#like' ) {
-        my $regex = convertStringToJS($value);
+        my $regex        = convertStringToJS($value);
         my $regexoptions = '\'\'';
-        return "Regex('^'+$regex+'$', $regexoptions).test";#(this.\$scope);";
+        return "Regex('^'+$regex+'$', $regexoptions).test";   #(this.\$scope);";
     }
-    if (
-        ( $key eq '#div') or 
-        ( $key eq '#mult') or 
-        ( $key eq '#plus') or 
-        ( $key eq '#minus') or 
-        ( $key eq '#pos') or 
-        ( $key eq '#neg') 
-        ) {
-            #die 'asd';
-        return  '(' . convertStringToJS($$value[0]) . ')'.$js_func_map{$key} . '(' . convertStringToJS($$value[1]) . ')';
+    if (   ( $key eq '#div' )
+        or ( $key eq '#mult' )
+        or ( $key eq '#plus' )
+        or ( $key eq '#minus' )
+        or ( $key eq '#pos' )
+        or ( $key eq '#neg' ) )
+    {
+
+        #die 'asd';
+        return
+            '('
+          . convertStringToJS( $$value[0] ) . ')'
+          . $js_func_map{$key} . '('
+          . convertStringToJS( $$value[1] ) . ')';
     }
-    die "$key and $value is not a string? " if (ref($value) ne '');
-    die "$key is not in the js_func_map" if (not defined($js_func_map{$key}));
-print STDERR "\t\tconvertfunction($value, $key) => \n" if MONITOR;
+    die "$key and $value is not a string? " if ( ref($value) ne '' );
+    die "$key is not in the js_func_map"
+      if ( not defined( $js_func_map{$key} ) );
+    print STDERR "\t\tconvertfunction($value, $key) => \n" if MONITOR;
     return convertStringToJS($value) . $js_func_map{$key};
 }
 
@@ -327,13 +337,16 @@ my $ops    = '(' . join( '|', values(%js_op_map) ) . ')';
 sub convertStringToJS {
     my $string = shift;
     print STDERR "  convertStringToJS($string)\n" if MONITOR;
-    
-    return $string if ($string =~ /^\(.*\)$/);  #if we're doing braces, and they're not quoted leave things be
+
+    return $string
+      if ( $string =~ /^\(.*\)$/ )
+      ;    #if we're doing braces, and they're not quoted leave things be
 
     return convertToJavascript($string) if ( ref($string) eq 'HASH' );
 
     return $string if ( $string =~ /^'.*'^/ );
-    #TODO: i _think_ the line below is ok, its needed to make ::test_hoistLengthLHSString work
+
+#TODO: i _think_ the line below is ok, its needed to make ::test_hoistLengthLHSString work
     return $string if ( $string =~ /^\'.*/ );
 
     return $string if ( $string =~ /^this\./ );
@@ -349,15 +362,13 @@ sub convertStringToJS {
     return $string if ( $string =~ /^foswiki_d2n\(.*/ );
     return $string if ( $string eq '<' );
 
-
-
     return 'this.' . $string if ( $string eq '_web' );
     return 'this.' . $string if ( $string eq '_topic' );
     return 'this.' . $string if ( $string eq '_text' );
-    
-    #if it looks like a number, lets try treating it like a number, and see what happens
-    #i _think_ this will result in js doing magic just like perl does, as the main diff seems to be that Perl('1'+'1'=2) and JS('1'+'1'='11')
-    return $string if ($string =~ /^[+-]?\d+(\.\d*)?$/);
+
+#if it looks like a number, lets try treating it like a number, and see what happens
+#i _think_ this will result in js doing magic just like perl does, as the main diff seems to be that Perl('1'+'1'=2) and JS('1'+'1'='11')
+    return $string if ( $string =~ /^[+-]?\d+(\.\d*)?$/ );
 
     return '\'' . $string . '\'';
 }
@@ -372,8 +383,7 @@ sub convertToJavascript {
 #TODO: for some reason the Dumper call makes the HoistMongoDBsTests::test_hoistLcRHSName test succeed - have to work out what i've broken.
     my $dump = Dumper($node);
 
-    print STDERR "\n..............convertToJavascript "
-      . Dumper($node) . "\n"
+    print STDERR "\n..............convertToJavascript " . Dumper($node) . "\n"
       if MONITOR;
 
     while ( my ( $key, $value ) = each(%$node) ) {
@@ -404,7 +414,7 @@ sub convertToJavascript {
                 $statement .= ' ( ' . join(
                     ' || ',
                     map {
-                        convertStringToJS($js_key) . ' == '
+                            convertStringToJS($js_key) . ' == '
                           . convertStringToJS($_)
                       } @$v
                 ) . ' ) ';
@@ -415,29 +425,35 @@ sub convertToJavascript {
 
                 $statement .= convertFunction( $value, $key );
             }
-            elsif ($k eq '#match') {
+            elsif ( $k eq '#match' ) {
+
                 #this is essentially an operator lookahead
-print STDERR ">>>>>>>>>>>>>>>>>>>> lookahead $key -> $k\n" if MONITOR;
+                print STDERR ">>>>>>>>>>>>>>>>>>>> lookahead $key -> $k\n"
+                  if MONITOR;
                 $statement .=
-                  convertToJavascript($value).'('.convertStringToJS($js_key).')';
+                    convertToJavascript($value) . '('
+                  . convertStringToJS($js_key) . ')';
             }
-            elsif (
-                ($k eq '#like') or
-                ( $k eq '#div') or 
-                ( $k eq '#mult') or 
-                ( $k eq '#plus') or 
-                ( $k eq '#minus') or 
-                ( $k eq '#pos') or 
-                ( $k eq '#neg') 
-                ) {
+            elsif (( $k eq '#like' )
+                or ( $k eq '#div' )
+                or ( $k eq '#mult' )
+                or ( $k eq '#plus' )
+                or ( $k eq '#minus' )
+                or ( $k eq '#pos' )
+                or ( $k eq '#neg' ) )
+            {
+
                 #this is essentially an operator lookahead
-print STDERR ">>>>>>>>>>>>>>>>>>>> lookahead $key -> $k\n" if MONITOR;
+                print STDERR ">>>>>>>>>>>>>>>>>>>> lookahead $key -> $k\n"
+                  if MONITOR;
                 $statement .= ($js_key) . ' ' . convertStringToJS($value);
-                #$statement .= convertFunction( convertToJavascript($value), $key );
+
+#$statement .= convertFunction( convertToJavascript($value), $key );
 #                $statement .=
 #                  convertToJavascript($value).'('.convertStringToJS($js_key).')';
             }
-            elsif ( ($k =~ /^\$/)) {
+            elsif ( ( $k =~ /^\$/ ) ) {
+
                 #this is essentially an operator lookahead
                 $statement .=
                     convertStringToJS($js_key) . ' '
@@ -469,6 +485,7 @@ print STDERR ">>>>>>>>>>>>>>>>>>>> lookahead $key -> $k\n" if MONITOR;
                 #$statement = " ($statement) ";
             }
             elsif ( $key =~ /^#/ ) {
+
                 #maths ops
                 $statement .= convertFunction( $value, $key );
             }
@@ -498,7 +515,8 @@ print STDERR ">>>>>>>>>>>>>>>>>>>> lookahead $key -> $k\n" if MONITOR;
 
                 }
                 elsif ( $key =~ /^\#/ ) {
-print STDERR ">>>>>>>>>>>>>>>>>>>> #hash - $key \n" if MONITOR;
+                    print STDERR ">>>>>>>>>>>>>>>>>>>> #hash - $key \n"
+                      if MONITOR;
 
                     $statement .= convertFunction( $value, $key );
                 }
@@ -813,7 +831,7 @@ sub hoistMongoDB {
                         $andHash{$key} );
 
                     if ( ( $rNum == 0 ) and ( $lNum == 0 ) ) {
-                        print STDERR 'I have no solution for this query';
+                        die 'I have no solution for this query';
                     }
                     else {
                         if ( ( $rNum > 0 ) and ( $lNum > 0 ) ) {
@@ -846,8 +864,9 @@ sub hoistMongoDB {
 
                 }
                 else {
-                    #i think it should be ok, but i've not seen it happen, so die
-                    die  'not here yet ' . $key if ($key ne '$where');
+
+                   #i think it should be ok, but i've not seen it happen, so die
+                    die '---not here yet ' . $key if ( $key ne '$where' );
                 }
             }
             else {
@@ -857,57 +876,97 @@ sub hoistMongoDB {
 
          #TODO: how about minimising 2 identical non-simple queries ANDed?
          #this eq test below doesn't do identical regex, nor identical $ne etc..
-         #                print STDERR "----+++++++++++++++++ ||"
-         #                  . $andHash{$key} . "||"
-         #                  . $node->{rhs}->{$key} . "||"
-         #                  . ref( $andHash{$key} ) . "||"
-         #                  . ref( $node->{rhs}->{$key} ) . "||\n";
+                    use Data::Dumper;
+                         print STDERR "----+++++++++++++++++ $key ||"
+                           . Dumper($andHash{$key}) . "||"
+                           . Dumper($node->{rhs}->{$key}) . "||"
+                           . ref( $andHash{$key} ) . "||"
+                           . ref( $node->{rhs}->{$key} ) . "||\n";
 
                 if (    ( ref( $andHash{$key} ) eq '' )
-                    and ( ref( $node->{rhs}->{$key} ) eq '' )
-                    and ( $andHash{$key} eq $node->{rhs}->{$key} ) )
+                    and ( ref( $node->{rhs}->{$key} ) eq '' ) )
                 {
+                    #simplest case - both are implicit 'eq'
+                    
+                    if ( $andHash{$key} eq $node->{rhs}->{$key} ) {
+                        #they're the same, ignore the second..
+                        $conflictResolved = 1;
 
-                    #they're the same, ignore the second..
-                    $conflictResolved = 1;
-
-                    #print STDERR "bump - de-duplicate\n";
+                    } else {
+#this is able to presume there is no $in, as andHas{key} isa scalar
+                        #replace with a $in
+                         $andHash{$key} = {
+                            '$in' => [
+                                $andHash{$key},
+                                $node->{rhs}->{$key}
+                            ]
+                        };
+                        $conflictResolved = 1;
+                    }
                 }
-                elsif ( ( ref( $andHash{$key} ) eq 'HASH' )
-                    and ( ref( $node->{rhs}->{$key} ) eq 'HASH' )
-                    and ( defined( $andHash{$key}->{'$ne'} ) )
-                    and ( defined( ( $node->{rhs}->{$key}->{'$ne'} ) ) ) )
+                elsif ( ( ref( $andHash{$key} ) eq 'HASH' ) #if we're already in a non-trivial compare.
+                    and ( ref( $node->{rhs}->{$key} ) eq 'HASH' ) )
                 {
-                    ###(A != 'qe') AND (A != 'zx') transforms to {A: {$nin: ['qe', 'zx']}} (and regex $ne too?)
-                    $andHash{$key} = {
-                        '$nin' => [
-                            $andHash{$key}->{'$ne'},
-                            $node->{rhs}->{$key}->{'$ne'}
-                        ]
-                    };
-                    $conflictResolved = 1;
+                    if (    ( defined( $andHash{$key}->{'$ne'} ) )
+                        and ( defined( ( $node->{rhs}->{$key}->{'$ne'} ) ) ) )
+                    {
+#TODO: ERROR: this presumes that there isn't already a $nin. 
+                        ###(A != 'qe') AND (A != 'zx') transforms to {A: {$nin: ['qe', 'zx']}} (and regex $ne too?)
+                        if (not defined($andHash{$key}->{'$nin'})) {
+                            $andHash{$key}->{'$nin'} = ();
+                        }
+                        push(@{$andHash{$key}->{'$nin'}}, $andHash{$key}->{'$ne'});
+                        delete $andHash{$key}->{'$ne'};
+                        push(@{$andHash{$key}->{'$nin'}}, $node->{rhs}->{$key}->{'$ne'});
+
+                        $conflictResolved = 1;
+                    }
+                    else {
+                        print STDERR 'doood - not here yet ';
+die 'bonus';
+                    }
                 }
-                else {
-                    use Data::Dumper;
-                    print STDERR 'field - not here yet ' 
-                      . $key
-                      . '   ----   '
-                      . Dumper( $andHash{$key} )
-                      . '    ----    '
-                      . Dumper( $node->{rhs}->{$key} );
+                elsif ( ( ref( $andHash{$key} ) eq 'HASH' )and ( ref( $node->{rhs}->{$key} ) eq '' )) {
+                    #$andHash{$key} complex - beware.
+                    #$node->{rhs}->{$key} simple - can we toss at $in
+                    if (not defined($andHash{$key}->{'$in'})) {
+                        $andHash{$key}->{'$in'} = ();
+                    }
+                    push(@{$andHash{$key}->{'$in'}}, $node->{rhs}->{$key});
+                    $conflictResolved = 1;
+                } elsif ( ( ref( $andHash{$key} ) eq '' )and ( ref( $node->{rhs}->{$key} ) eq 'HASH' )) {
+                         $andHash{$key} = {
+                            '$in' => [
+                                $andHash{$key}
+                            ]
+                        };
+                        if (defined( $andHash{$key}->{'$ne'} )) {
+                            $andHash{$key}->{'$nin'} = [$andHash{$key}->{'$ne'}];
+                            $conflictResolved = 1;
+                        }
+                } else {
+                    #db.current.find({_web: 'Sandbox',  '_topic' : {$in : [/Web.*/], $nin : [/.*e$/]}}, {_topic:1})
+{
+                    print STDERR 'what are we ?';
+die 'bonus2';
+}
                 }
             }
             if ( not $conflictResolved ) {
 
                 if ( defined( $andHash{'$where'} ) ) {
+
                     # re-write one as $where
                     $andHash{'$where'} =
                       Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::convertToJavascript(
-                        { 
-                            $key => $node->{rhs}->{$key},
+                        {
+                            $key     => $node->{rhs}->{$key},
                             '#where' => $andHash{'$where'}
-                        } );
-                } else {
+                        }
+                      );
+                }
+                else {
+
                     # re-write one as $where
                     $andHash{'$where'} =
                       Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::convertToJavascript(
@@ -957,12 +1016,27 @@ sub hoistMongoDB {
 }
 
 package Foswiki::Query::OP_not;
+use Foswiki::Plugins::MongoDBPlugin::HoistMongoDB;
 
 sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
 
-    return { '$not' => $node->{lhs} };
+    #no, $not is a dirty little thing that needs to go inside lhs :(
+    my $lhs = $node->{lhs};
+    die 'not sure' if (ref($lhs) ne 'HASH');    #i don't think I should get here.
+    my %query;
+    foreach my $key (keys(%$lhs)) {
+        #TODO: convertion $nin to $in, and vs versa
+        if ($key eq '$where') {
+            $query{$key} = '!'. $lhs->{$key};
+        } else {
+            $query{$key} = {
+                            '$not' => $lhs->{$key}
+                        };
+        }
+    }
+    return \%query;
 }
 
 package Foswiki::Query::OP_gte;
@@ -1075,6 +1149,7 @@ sub hoistMongoDB {
 }
 
 package Foswiki::Query::OP_int;
+
 sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
@@ -1084,63 +1159,93 @@ sub hoistMongoDB {
 
 #maths
 package Foswiki::Query::OP_div;
+
 sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
 
-    return { '#div' => [$node->{lhs}, $node->{rhs}], '####delay_function' => 1 };
+    return {
+        '#div'               => [ $node->{lhs}, $node->{rhs} ],
+        '####delay_function' => 1
+    };
 }
+
 package Foswiki::Query::OP_minus;
+
 sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
 
-    return { '#minus' => [$node->{lhs}, $node->{rhs}], '####delay_function' => 1 };
+    return {
+        '#minus'             => [ $node->{lhs}, $node->{rhs} ],
+        '####delay_function' => 1
+    };
 }
+
 package Foswiki::Query::OP_plus;
+
 sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
 
-    return { '#plus' => [$node->{lhs}, $node->{rhs}], '####delay_function' => 1 };
+    return {
+        '#plus'              => [ $node->{lhs}, $node->{rhs} ],
+        '####delay_function' => 1
+    };
 }
+
 package Foswiki::Query::OP_times;
+
 sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
 
-    return { '#mult' => [$node->{lhs}, $node->{rhs}], '####delay_function' => 1 };
+    return {
+        '#mult'              => [ $node->{lhs}, $node->{rhs} ],
+        '####delay_function' => 1
+    };
 }
 
 package Foswiki::Query::OP_neg;
+
 sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
 
-    return { '#neg' => [$node->{lhs}, $node->{rhs}], '####delay_function' => 1 , '####numeric' => 1};
+    return {
+        '#neg'               => [ $node->{lhs}, $node->{rhs} ],
+        '####delay_function' => 1,
+        '####numeric'        => 1
+    };
 }
+
 package Foswiki::Query::OP_pos;
+
 sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
 
-    return { '#pos' => [$node->{lhs}, $node->{rhs}], '####delay_function' => 1 , '####numeric' => 1};
+    return {
+        '#pos'               => [ $node->{lhs}, $node->{rhs} ],
+        '####delay_function' => 1,
+        '####numeric'        => 1
+    };
 }
-
 
 package Foswiki::Query::OP_empty;
+
 #TODO: not sure this is the right answer..
 sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
 
-    return { };
+    return {};
 }
 
 #array ops from versions.. (m3 work)
 package Foswiki::Query::OP_comma;
-package Foswiki::Query::OP_in;
 
+package Foswiki::Query::OP_in;
 
 ######################################
 package Foswiki::Query::OP_ref;
@@ -1148,6 +1253,36 @@ package Foswiki::Query::OP_ref;
 #oh what a disaster.
 # this has to be implemented as a compound query, so that we're querying against constants
 ######################################
+
+=pod
+
+mmm, cannot $not a $where
+
+> db.current.find({_web: 'Sandbox',  '_topic' : 'AjaxComment'}, {_topic:1})    
+{ "_id" : ObjectId("4d54110940f61a09b1a33186"), "_topic" : "AjaxComment" }
+> 
+> 
+> db.current.find({_web: 'Sandbox',  $where: "this._topic == 'AjaxComment'"}, {_topic:1})
+{ "_id" : ObjectId("4d54110940f61a09b1a33186"), "_topic" : "AjaxComment" }
+> 
+> db.current.find({_web: 'Sandbox',  $where: {$not : "this._topic == 'AjaxComment'"}}, {_topic:1})
+error: { "$err" : "invalid use of $not", "code" : 13031 }
+> 
+> db.current.find({_web: 'Sandbox',  $not: {$where : "this._topic == 'AjaxComment'"}}, {_topic:1})  
+error: { "$err" : "invalid operator: $where", "code" : 10068 }
+
+-------------
+mmm, can't $not a simple eq (have to unwind to work out to use $ne
+
+> db.current.find({_web: 'Sandbox',  '_topic' : 'AjaxComment'}, {_topic:1})                       
+{ "_id" : ObjectId("4d54110940f61a09b1a33186"), "_topic" : "AjaxComment" }
+> db.current.find({_web: 'Sandbox',  '_topic' : {'$not':'AjaxComment'}}, {_topic:1})
+error: { "$err" : "invalid use of $not", "code" : 13041 }
+
+-------------------
+but we can do very fun things with $in and $nin - including regexs
+
+=cut
 
 1;
 __DATA__
