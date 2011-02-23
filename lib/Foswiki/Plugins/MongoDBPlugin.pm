@@ -235,7 +235,8 @@ sub _updateTopic {
         next if ( $key eq '_session' );
 
         #not totally sure if there's a benefit to using / not the _indices
-        #next if ( $key eq '_indices' );
+	#TODO: but if I don't use it here, I need to re-create it when loading Meta (and I'm not yet doing that)
+        next if ( $key eq '_indices' );
 
 #TODO: as of Oct 2010, mongodb can't sort on an element in an array, so we de-array the ARRAYs.
 #TODO: use the registered list of META elements, and the type that is registered.
