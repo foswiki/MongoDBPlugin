@@ -152,44 +152,55 @@ sub _hoist {
         #print STDERR "not an op (".Dumper($node).")\n" if MONITOR;
         return Foswiki::Query::OP_dot::hoistMongoDB( $node->{op}, $node );
     }
+    my $unreality_arity = $node->{op}->{arity};
     if ( ref( $node->{op} ) eq 'Foswiki::Query::OP_dot' ) {
-        #print STDERR "OP_dot (". $node->{op}->{arity}.")\n" if MONITOR;
+
+        #print STDERR "OP_dot (". $unreality_arity.")\n" if MONITOR;
         if ( ref( $node->{params}[0]->{op} ) eq 'Foswiki::Query::OP_where' ) {
+
             #print STDERR "erkle ".Dumper($node->{params}[0])."\n";
-    print STDERR "pre erkle::hoist from: ", $node->stringify(), "\n"
-      if MONITOR
-          or WATCH;
+            print STDERR "pre erkle::hoist from: ", $node->stringify(), "\n"
+              if MONITOR
+                  or WATCH;
 
-my $rhs_Id = $node->{params}[1]->{params}[0];
-if (    #TODO: this is why you can't do this - if the post . portion is an attr name, its not a where selector
-    ($rhs_Id ne 'name') and
-    ($rhs_Id ne 'val')
-                    ) {
-            #this is some pretty horrid mucking with reality
-            #the rhs of this OP_dot needs to go inside the OP_Where stuff
-            #as a name='$rhsval'
-            $node->{op}->{arity}--;
-            
-            
-            #TODO: Note - you can't do this - as it won't work if the $name is a registered attr
-            my $eq = new Foswiki::Query::OP_eq();
-            my $name_node = Foswiki::Query::Node->newLeaf( 'name', Foswiki::Infix::Node::NAME );
-            my $eq_node = Foswiki::Query::Node->newNode( $eq, ($name_node, $node->{params}[1]) );
-            my $and = new Foswiki::Query::OP_and();
-            my @params = $node->{params}[0]->{params}[1];
-            push(@params, $eq_node);
-            my $and_node = Foswiki::Query::Node->newNode( $and, $node->{params}[0]->{params}[1], $eq_node );
+            my $rhs_Id = $node->{params}[1]->{params}[0];
+            if
+              ( #TODO: this is why you can't do this - if the post . portion is an attr name, its not a where selector
+                ( $rhs_Id ne 'name' ) and ( $rhs_Id ne 'val' )
+              )
+            {
 
-            
-            $node->{params}[0]->{params} = [$node->{params}[0]->{params}[0], $and_node];
+  #this is some pretty horrid mucking with reality
+  #the rhs of this OP_dot needs to go inside the OP_Where stuff
+  #as a name='$rhsval'
+  #$node->{op}->{arity}--; - OK - so if you do this you are breaking everything.
+                $unreality_arity--;
 
-           
-    print STDERR "POST erkle::hoist from: ", $node->stringify(), "\n"
-      if MONITOR
-          or WATCH;
-}
+#TODO: Note - you can't do this - as it won't work if the $name is a registered attr
+                my $eq = new Foswiki::Query::OP_eq();
+                my $name_node =
+                  Foswiki::Query::Node->newLeaf( 'name',
+                    Foswiki::Infix::Node::NAME );
+                my $eq_node =
+                  Foswiki::Query::Node->newNode( $eq,
+                    ( $name_node, $node->{params}[1] ) );
+                my $and    = new Foswiki::Query::OP_and();
+                my @params = $node->{params}[0]->{params}[1];
+                push( @params, $eq_node );
+                my $and_node =
+                  Foswiki::Query::Node->newNode( $and,
+                    $node->{params}[0]->{params}[1], $eq_node );
 
-            my $query = _hoist( $node->{params}[0] , $level.' ');
+                $node->{params}[0]->{params} =
+                  [ $node->{params}[0]->{params}[0], $and_node ];
+
+                print STDERR "POST erkle::hoist from: ", $node->stringify(),
+                  "\n"
+                  if MONITOR
+                      or WATCH;
+            }
+
+            my $query = _hoist( $node->{params}[0], $level . ' ' );
             return $query;
         } else {
             #TODO: really should test for 'simple case' and barf elsewise
@@ -201,12 +212,13 @@ if (    #TODO: this is why you can't do this - if the post . portion is an attr 
 
     #TODO: if 2 constants(NUMBER,STRING) ASSERT
     #TODO: if the first is a constant, swap
-    if ( $node->{op}->{arity} > 0 ) {
+    if ( $unreality_arity > 0 ) {
         print STDERR "arity 1 \n" if MONITOR;
-        $node->{lhs} = _hoist( $node->{params}[0] , $level.' ');
+        $node->{lhs} = _hoist( $node->{params}[0], $level . ' ' );
         if ( ref( $node->{lhs} ) ne '' ) {
 
-            print STDERR "ref($node->{lhs}) == ".ref($node->{lhs})."\n" if MONITOR;
+            print STDERR "ref($node->{lhs}) == " . ref( $node->{lhs} ) . "\n"
+              if MONITOR;
             $node->{ERROR} = $node->{lhs}->{ERROR}
               if ( defined( $node->{lhs}->{ERROR} ) );
             $containsQueryFunctions |=
@@ -216,9 +228,9 @@ if (    #TODO: this is why you can't do this - if the post . portion is an attr 
         }
     }
 
-    if (( $node->{op}->{arity} > 1 ) and (defined($node->{params}[1]))) {
+    if ( ( $unreality_arity > 1 ) and ( defined( $node->{params}[1] ) ) ) {
         print STDERR "arity 2 \n" if MONITOR;
-        $node->{rhs} = _hoist( $node->{params}[1] , $level.' ');
+        $node->{rhs} = _hoist( $node->{params}[1], $level . ' ' );
         if ( ref( $node->{rhs} ) ne '' ) {
             $node->{ERROR} = $node->{rhs}->{ERROR}
               if ( defined( $node->{rhs}->{ERROR} ) );
@@ -228,6 +240,7 @@ if (    #TODO: this is why you can't do this - if the post . portion is an attr 
               if ( defined( $node->{rhs}->{'####delay_function'} ) );
         }
     }
+    die 'totally unimplemented' if ( $unreality_arity > 2 );
 
     #monitor($node) if MONITOR;
 
@@ -265,22 +278,37 @@ if (    #TODO: this is why you can't do this - if the post . portion is an attr 
         die "HOIST ERROR: " . $node->{ERROR};
         return $node;
     }
-
+#print STDERR "GIBBER".$node->stringify()."\n";
     #need to convert to js for lc/uc/length  etc :(
     # '####need_function'
     if ($containsQueryFunctions) {
-        $node->{lhs} = convertToJavascript( $node->{lhs} )
-          if ( ref( $node->{lhs} ) eq 'HASH' );
+#print STDERR "......1.........(".Dumper($node).")\n";
+         if ( ref( $node->{lhs} ) eq 'HASH' ){
+#            if (defined($node->{lhs}->{'####need_function'})) {
+#print STDERR "......2.........\n";
+#                $node->{lhs} = {'$where'=>convertToJavascript( $node->{lhs} )}
+#            
+#            } else {
+#print STDERR "......3.........\n";
+                $node->{lhs} = convertToJavascript( $node->{lhs} )
+            
+#            }
+         }
+
+#print STDERR "......4.........(".Dumper($node).")\n";
 
         my $hoistedNode = $node->{op}->hoistMongoDB($node);
         if ( ref($hoistedNode) eq '' ) {
+#print STDERR "......5.........\n";
 
             #could be a maths op - in which case, eeek?
             #shite - or maths inside braces
             #die 'here: '.$node->{op};
             return $hoistedNode;
-        }
-        else {
+#        } elsif (defined($node->{rhs}->{'####need_function'})) {
+#print STDERR "......6.........\n";
+        } else {
+#print STDERR "......7.........\n";
             return { '$where' => convertToJavascript($hoistedNode) };
         }
     }
@@ -410,6 +438,8 @@ sub convertStringToJS {
       if ( $string =~ /^$ops$/ );    #for ops, we only want the entirety
 
     return $js_op_map{$string} if ( defined( $js_op_map{$string} ) );
+    return $string if ( $string =~ /^\s?\(?Regex.*/ );
+
 
     #TODO: generalise - we should not clobber over js_func_map values
     return $string if ( $string =~ /^foswiki_d2n\(.*/ );
@@ -1076,18 +1106,45 @@ sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
 
+    my %query;
+
     #no, $not is a dirty little thing that needs to go inside lhs :(
     my $lhs = $node->{lhs};
-    die 'not sure' if (ref($lhs) ne 'HASH');    #i don't think I should get here.
-    my %query;
-    foreach my $key (keys(%$lhs)) {
-        #TODO: convertion $nin to $in, and vs versa
-        if ($key eq '$where') {
-            $query{$key} = '!'. $lhs->{$key};
-        } else {
-            $query{$key} = {
-                            '$not' => $lhs->{$key}
-                        };
+
+    if ( ( ref($lhs) eq '' ) or ( ref($lhs) eq 'Regexp' ) ) {
+
+#TODO: this needs much more consideration :/
+#need to activate the magic perl-er-isation of boolean - which I think means don't convert until the parent'
+        $query{'$where'} =
+          Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::convertToJavascript(
+            { '$not' => $lhs } );
+    }
+    else {
+        foreach my $key ( keys(%$lhs) ) {
+
+#use Data::Dumper;
+#print STDERR "###### OP_not ".Dumper($lhs->{$key})." - ".ref($lhs->{$key})."\n";
+#TODO: convert $nin to $in, and vs versa
+            if (   ( ref( $lhs->{$key} ) eq '' )
+                or ( ref( $lhs->{$key} ) eq 'Regexp' ) )
+            {
+
+                #if this is a name / string etc - use $ne :(
+                if ( $key eq '$where' ) {
+                    $query{$key} = '!' . $lhs->{$key};
+                }
+                else {
+                    $query{$key} = { '$ne' => $lhs->{$key} };
+                }
+            }
+            else {
+                if ( $key eq '$where' ) {
+                    $query{$key} = '!' . $lhs->{$key};
+                }
+                else {
+                    $query{$key} = { '$not' => $lhs->{$key} };
+                }
+            }
         }
     }
     return \%query;

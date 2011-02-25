@@ -449,7 +449,7 @@ sub test_hoistNOT_EQ {
     my $mongoDBQuery =
       Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
     $this->do_Assert( $query, $mongoDBQuery,
-        { 'FIELD.number.value' => { '$not' => '12' } } );
+        { 'FIELD.number.value' => { '$ne' => '12' } } );
 }
 
 sub test_hoistCompound {
@@ -833,6 +833,37 @@ sub test_hoistLengthLHSNameGT {
         );
 }
 
+sub test_hoist_d2n_value {
+    my $this        = shift;
+    my $s           = "d2n noatime";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert( $query, $mongoDBQuery,
+        {
+          '$where' => 'foswiki_d2n(this.FIELD.noatime.value)'
+        }
+        );
+}
+
+sub test_hoist_d2n_valueAND {
+    my $this        = shift;
+    my $s           = "d2n(noatime) and topic='WebHome'";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert( $query, $mongoDBQuery,
+        {
+          '$where' => 'foswiki_d2n(this.FIELD.noatime.value)',
+          'FIELD.topic.value' => 'WebHome'
+        }
+        );
+}
+
 sub test_hoist_d2n {
     my $this        = shift;
     my $s           = "d2n(name) < d2n('1998-11-23')";
@@ -843,10 +874,11 @@ sub test_hoist_d2n {
 
     $this->do_Assert( $query, $mongoDBQuery,
         {
-            '$where' => "foswiki_d2n(this._topic) < foswiki_d2n('1998-11-23')"
+           '$where' => "foswiki_d2n(this._topic) < foswiki_d2n('1998-11-23')"
         }
         );
 }
+
 
 sub test_hoist_Item10323_1 {
     my $this        = shift;
@@ -872,7 +904,7 @@ sub test_hoist_Item10323_2 {
 
     $this->do_Assert( $query, $mongoDBQuery,
         {
-          '$where' => ' (Regex(\'bio\'.toLowerCase(), \'\').test(this.FIELD.TermGroup.value.toLowerCase())) '
+           '$where' => " (Regex('bio'.toLowerCase(), '').test(this.FIELD.TermGroup.value.toLowerCase())) "
         }
         );
 }
@@ -887,7 +919,7 @@ sub test_hoist_Item10323_2_not {
 
     $this->do_Assert( $query, $mongoDBQuery,
         {
-          '$where' => '! (Regex(\'bio\'.toLowerCase(), \'\').test(this.FIELD.TermGroup.value.toLowerCase())) '
+          '$where' => "! (Regex('bio'.toLowerCase(), '').test(this.FIELD.TermGroup.value.toLowerCase())) "
         }
         );
 }
@@ -1047,6 +1079,93 @@ sub BROKENtest_hoist_PrefPlusAccessor {
 
 
 #this is basically a SEARCH with both the topic= and excludetopic= set
+sub test_hoistTopicNameIncludeANDNOExclude {
+    my $this = shift;
+    my $s =
+      "name='Item' AND (something=12 or something=999 or something=123)";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert(
+        $query,
+        $mongoDBQuery,
+        {
+          '$or' => [
+                     {
+                       'FIELD.something.value' => '12'
+                     },
+                     {
+                       'FIELD.something.value' => '999'
+                     },
+                     {
+                       'FIELD.something.value' => '123'
+                     }
+                   ],
+          '_topic' => 'Item'
+            }
+    );
+}
+
+sub test_hoistTopicNameNOIncludeANDExclude {
+    my $this = shift;
+    my $s =
+      "(NOT(name='Item')) AND (something=12 or something=999 or something=123)";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert(
+        $query,
+        $mongoDBQuery,
+        {
+          '$or' => [
+                     {
+                       'FIELD.something.value' => '12'
+                     },
+                     {
+                       'FIELD.something.value' => '999'
+                     },
+                     {
+                       'FIELD.something.value' => '123'
+                     }
+                   ],
+          '_topic' => { '$ne'=>'Item' }
+            }
+    );
+}
+
+sub test_hoistTopicNameNOIncludeANDExclude2 {
+    my $this = shift;
+    my $s =
+      "((name!='Item')) AND (something=12 or something=999 or something=123)";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert(
+        $query,
+        $mongoDBQuery,
+        {
+          '$or' => [
+                     {
+                       'FIELD.something.value' => '12'
+                     },
+                     {
+                       'FIELD.something.value' => '999'
+                     },
+                     {
+                       'FIELD.something.value' => '123'
+                     }
+                   ],
+          '_topic' => { '$ne'=>'Item' }
+            }
+    );
+}
+
 sub test_hoistTopicNameIncludeANDExclude {
     my $this = shift;
     my $s =

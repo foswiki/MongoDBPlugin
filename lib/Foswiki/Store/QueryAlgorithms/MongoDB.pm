@@ -120,8 +120,9 @@ sub _webQuery {
         }
         my $queryStr = join(' AND ', @option_query);
         
-        require Foswiki::Query::Parser;
-        my $theParser = new Foswiki::Query::Parser();
+        #print STDERR "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN($queryStr)\n";
+        
+        my $theParser = $session->search->{queryParser};
         $extra_query = $theParser->parse( $queryStr, $options );
     }
 
@@ -150,6 +151,8 @@ sub _webQuery {
         my $and = new Foswiki::Query::OP_and();
         $query = Foswiki::Query::Node->newNode( $and, ($extra_query, $query) );
     }
+    
+    print STDERR "modified parsetree: ".$query->stringify()."\n" if MONITOR;
 
     #try HoistMongoDB first
     my $mongoQuery =
