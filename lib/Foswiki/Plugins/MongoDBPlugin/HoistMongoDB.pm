@@ -174,7 +174,7 @@ sub _hoist {
             my $rhs_Id = $node->{params}[1]->{params}[0];
             if
               ( #TODO: this is why you can't do this - if the post . portion is an attr name, its not a where selector
-                ( $rhs_Id ne 'name' ) and ( $rhs_Id ne 'val' )
+                ( $rhs_Id ne 'name' ) and ( $rhs_Id ne 'value' )
               )
             {
 
@@ -1287,17 +1287,17 @@ sub hoistMongoDB {
 #and thus, need to re-do the mongodb schema so that meta 'arrays' are arrays again.
 #and that means the FIELD: name based shorcuts need to be re-written :/ de-indexing the queries :(
 
-if (ref($node->{lhs}) ne '') {
-    #some darned bugger thought field[name="white"][value="black"] was worth parsing to
-    
-    #add $node->{rhs} to the lhs' $elemMatch
-    my @k = keys(%{$node->{lhs}});
-    my @v = each(%{$node->{rhs}});
+    if (ref($node->{lhs}) ne '') {
+        #some darned bugger thought field[name="white"][value="black"] was worth parsing to
+        
+        #add $node->{rhs} to the lhs' $elemMatch
+        my @k = keys(%{$node->{lhs}});
+        my @v = each(%{$node->{rhs}});
 
-    $node->{lhs}->{$k[0]}->{'$elemMatch'}->{$v[0]} = $v[1];
+        $node->{lhs}->{$k[0]}->{'$elemMatch'}->{$v[0]} = $v[1];
 
-    return $node->{lhs};
-}
+        return $node->{lhs};
+    }
 
     return {
         $node->{lhs} . '.__RAW_ARRAY' => { '$elemMatch' => $node->{rhs} } };

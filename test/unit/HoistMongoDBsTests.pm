@@ -1039,6 +1039,27 @@ sub test_hoist_longhandPref {
         }
         );
 }
+sub test_hoist_longhandField_value {
+    my $this        = shift;
+#see QueryTests::verify_meta_squabs_MongoDBQuery
+    my $s           = "fields[name='number'].value";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert( $query, $mongoDBQuery,
+        {
+                     'FIELD.__RAW_ARRAY' => {
+                                        '$elemMatch' => {
+                                                          'name' => 'number'
+                                                        }
+                                      }
+        }
+        );
+}
+
+
 sub test_hoist_longhand2Pref {
     my $this        = shift;
     my $s           = "preferences[value=12 AND name='Red']";
