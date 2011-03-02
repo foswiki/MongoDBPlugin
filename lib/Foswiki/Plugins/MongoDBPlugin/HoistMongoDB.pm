@@ -928,6 +928,7 @@ sub hoistMongoDB {
             {
                 '#where' => $node->{lhs}
             });
+    }
     foreach my $key ( keys( %{ $node->{rhs} } ) ) {
         if ( defined( $andHash{$key} ) ) {
             my $conflictResolved = 0;
@@ -1012,7 +1013,7 @@ sub hoistMongoDB {
 
                     } else {
                         #same field being tested in AND - have no choice but to goto $where
-                        print STDERR "sameosameo ($key) is a hash on both sides - not here yet \n";
+                        #print STDERR "sameosameo ($key) is a hash on both sides - not here yet \n";
                     }
                 }
                 elsif ( ( ref( $andHash{$key} ) eq 'HASH' ) #if we're already in a non-trivial compare.
