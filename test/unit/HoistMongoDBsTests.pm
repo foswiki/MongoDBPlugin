@@ -858,8 +858,10 @@ sub test_hoist_d2n_valueAND {
 
     $this->do_Assert( $query, $mongoDBQuery,
         {
-          '$where' => 'foswiki_d2n(this.FIELD.noatime.value)',
-          'FIELD.topic.value' => 'WebHome'
+#TODO: need to figure out how to not make both into js
+          '$where' => ' ( (foswiki_d2n(this.FIELD.noatime.value)) )  && this.FIELD.topic.value == \'WebHome\''
+#          '$where' => 'foswiki_d2n(this.FIELD.noatime.value)',
+#          'FIELD.topic.value' => 'WebHome'
         }
         );
 }
@@ -919,7 +921,7 @@ sub test_hoist_Item10323_2_not {
 
     $this->do_Assert( $query, $mongoDBQuery,
         {
-          '$where' => "! (Regex('bio'.toLowerCase(), '').test(this.FIELD.TermGroup.value.toLowerCase())) "
+          '$where' => "! (  ( (Regex('bio'.toLowerCase(), '').test(this.FIELD.TermGroup.value.toLowerCase())) )  ) "
         }
         );
 }
@@ -1190,6 +1192,7 @@ sub test_hoistTopicNameIncludeANDExclude {
                        'FIELD.something.value' => '123'
                      }
                    ],
+#          '$where' => '! ( this._topic == \'ItemTemplate\' ) ',
           '_topic' => {
                         '$nin' => [
                                     'ItemTemplate'
@@ -1226,6 +1229,7 @@ sub test_hoistTopicNameIncludeRegANDExclude {
                        'FIELD.something.value' => '123'
                      }
                    ],
+#          '$where' => '! ( this._topic == \'ItemTemplate\' ) ',
           '_topic' => {
                         '$nin' => [
                                     'ItemTemplate'
@@ -1261,6 +1265,7 @@ sub test_hoistTopicNameIncludeRegANDExcludeReg {
                        'FIELD.something.value' => '123'
                      }
                    ],
+#          '$where' => '! ( ( /^.*Template$/.test(this._topic) ) ) ',
           '_topic' => {
                         '$nin' => [
                                     qr/(?-xism:^.*Template$)/
@@ -1273,5 +1278,113 @@ sub test_hoistTopicNameIncludeRegANDExcludeReg {
     );
 }
 
+sub test_hoist_dateAndRelationship {
+    my $this = shift;
+    my $s = "form.name~'*RelationshipForm' AND ( (NOW - info.date) < (60*60*24*7))";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
 
+    $this->do_Assert(
+        $query,
+        $mongoDBQuery,
+        {
+          'FORM.name' => qr/(?-xism:^.*RelationshipForm$)/,
+          '$where' => '(this.FIELD.NOW.value)-(this.TOPICINFO.date) < (((60)*(60))*(24))*(7)'
+        }
+    );
+}
+
+sub test_hoist_MultiAnd {
+    my $this = shift;
+#ignore that this could be optimised out - we're testing that the hoister manages to get the logic reasonalbe'
+    my $s = "(name = 'fest' AND name = 'test' AND name = 'pest')";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert(
+        $query,
+        $mongoDBQuery,
+        {
+          '$where' => ' (this._topic == \'test\')  && this._topic == \'pest\'',
+          '_topic' => 'fest'
+        }
+    );
+   $this->assert_equals(
+            " ( (this._topic == 'test')  && this._topic == 'pest')  && this._topic == 'fest'", 
+            Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::convertToJavascript($mongoDBQuery)
+            );
+}
+
+sub test_hoist_not_in {
+#this tests a number of things, including that the 'not' actually goes around all the inner logic
+    my $this = shift;
+    my $s = "not(name = 'fest' AND name = 'test' AND name = 'pest')";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert(
+        $query,
+        $mongoDBQuery,
+        {
+          '$where' => '! (  ( (this._topic == \'test\')  && this._topic == \'pest\')  && this._topic == \'fest\' ) '
+#            '$where' => {
+#                '$ne' => " ( (this._topic == 'test')  && this._topic == 'pest')  && this._topic == 'fest'"
+#            }
+        }
+    );
+   $this->assert_equals(
+            ' (! (  ( (this._topic == \'test\')  && this._topic == \'pest\')  && this._topic == \'fest\' ) ) ',
+            Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::convertToJavascript($mongoDBQuery)
+            );
+}
+
+sub test_hoist_not_in2 {
+    my $this = shift;
+    my $s = "not(name = 'fest') AND not(name = 'test') AND not(name = 'pest')";
+#    my $s = "name != 'fest' AND name != 'test' AND name != 'pest'";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert(
+        $query,
+        $mongoDBQuery,
+        {
+#          '$where' => ' ( (! ( this._topic == \'fest\' ) )  &&  (! ( this._topic == \'test\' ) ) )  &&  (! ( this._topic == \'pest\' ) ) '
+#OR
+#          '_topic' => {
+#                        '$not' => {
+#                                    '$in' => [
+#                                               'fest',
+#                                               'test',
+#                                               'pest'
+#                                             ]
+#                                  }
+#                      }
+#OR
+#TODO: the OP_and gets confused sometimes
+          '$where' => 'this._topic != \'pest\'',
+          '_topic' => {
+                        '$nin' => [
+                                    'fest',
+                                    'test'
+                                  ]
+                      }
+
+        }
+    );
+   $this->assert_equals(
+#            " ( (this._topic ! == 'fest' || this._topic ! == 'test' || this._topic ! == 'pest' ) ) ", 
+#            " ( ( (! ( this._topic == \'fest\' ) )  &&  (! ( this._topic == \'test\' ) ) )  &&  (! ( this._topic == \'pest\' ) ) ) ",
+            " (this._topic != 'pest')  && ! ( this._topic == 'fest' || this._topic == 'test' ) ",
+            Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::convertToJavascript($mongoDBQuery)
+            );
+}
 1;

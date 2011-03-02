@@ -49,6 +49,14 @@ sub hoist {
 
     $mongoDBQuery =
       Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::_hoist($node);
+      
+    if ((ref($mongoDBQuery) ne '') and defined( $mongoDBQuery->{'####need_function'} )) {
+        #this can happen if the entire query is something like "d2n(banana)"
+        #ideally, the parser should be converting that into a logical tree - 
+        #but for now, our parser is dumb, forcing hoisting code to suck
+            print STDERR "\n......final convert..........\n" if MONITOR;
+            $mongoDBQuery = { '$where' => convertToJavascript($mongoDBQuery) };
+    }
 
     die $mongoDBQuery if (ref($mongoDBQuery) eq '');
 
@@ -92,7 +100,7 @@ sub kludge {
 
             #nested OR detected, replace with $where and hope
             #try converting to $in first.
-            use Foswiki::Query::OP_and;
+
             my ( $lfield, $lhsIn, $lNum ) = convertOrToIn($value);
             if ( ( $lNum > 0 ) and !defined( $node->{$lfield} ) ) {
                 $node->{$lfield} = $lhsIn;
@@ -125,7 +133,7 @@ sub _hoist {
 
     die 'node eq undef' unless defined($node);
 
-    print STDERR "HoistMongoDB::hoist from: ", $node->stringify(), "\n"
+    print STDERR "HoistMongoDB::hoist from: ", $node->stringify(), " (ref() == ".ref($node).")\n"
       if MONITOR
           or WATCH;
 
@@ -149,7 +157,7 @@ sub _hoist {
     #name, or constants.
     if ( not ref( $node->{op} ) ) {
         #use Data::Dumper;
-        #print STDERR "not an op (".Dumper($node).")\n" if MONITOR;
+        print STDERR "not an op (".Dumper($node).")\n" if MONITOR;
         return Foswiki::Query::OP_dot::hoistMongoDB( $node->{op}, $node );
     }
     my $unreality_arity = $node->{op}->{arity};
@@ -201,9 +209,11 @@ sub _hoist {
             }
 
             my $query = _hoist( $node->{params}[0], $level . ' ' );
+            print STDERR "return 1\n" if MONITOR;
             return $query;
         } else {
             #TODO: really should test for 'simple case' and barf elsewise
+            print STDERR "return 2\n" if MONITOR;
             return Foswiki::Query::OP_dot::hoistMongoDB( $node->{op}, $node );
         }
     }
@@ -256,7 +266,8 @@ sub _hoist {
             or ( ref( $node->{op} ) eq 'Foswiki::Query::OP_neg' ) )
         {
 
-            #print STDERR "POPOPOPOPOPOPOPOPOPOPOPOPOPOPOPOPOPOPOPOPOPOPOP\n";
+            print STDERR "return 3\n" if MONITOR;
+
             return $node->{op}->hoistMongoDB($node);
 
         }
@@ -270,6 +281,7 @@ sub _hoist {
 #DAMMIT, I presume we have oddly nested eval/try catch so throwing isn't working
 #throw Error::Simple( 'failed to Hoist ' . ref( $node->{op} ) . "\n" )
 # unless ( $node->{op}->can('hoistMongoDB') );
+
     unless ( $node->{op}->can('hoistMongoDB') ) {
         $node->{ERROR} = 'can\'t Hoist ' . ref( $node->{op} );
     }
@@ -278,41 +290,38 @@ sub _hoist {
         die "HOIST ERROR: " . $node->{ERROR};
         return $node;
     }
-#print STDERR "GIBBER".$node->stringify()."\n";
+    
+
+    
+print STDERR "GIBBER".$node->stringify()."\n" if MONITOR;
+print STDERR "..............(".Dumper($node).")\n" if MONITOR;
     #need to convert to js for lc/uc/length  etc :(
     # '####need_function'
     if ($containsQueryFunctions) {
-#print STDERR "......1.........(".Dumper($node).")\n";
+
          if ( ref( $node->{lhs} ) eq 'HASH' ){
-#            if (defined($node->{lhs}->{'####need_function'})) {
-#print STDERR "......2.........\n";
-#                $node->{lhs} = {'$where'=>convertToJavascript( $node->{lhs} )}
-#            
-#            } else {
-#print STDERR "......3.........\n";
                 $node->{lhs} = convertToJavascript( $node->{lhs} )
-            
-#            }
          }
 
-#print STDERR "......4.........(".Dumper($node).")\n";
-
-        my $hoistedNode = $node->{op}->hoistMongoDB($node);
+        my $hoistedNode;
+        if (ref($node) eq 'Foswiki::Query::Node') {
+            $hoistedNode = $node->{op}->hoistMongoDB($node);
+        } else {
+            #generally only happens if there is no rhs really (eg, a query that lookd like "d2n(SomeField)")
+            $hoistedNode = $node;
+            return $hoistedNode;
+        }
         if ( ref($hoistedNode) eq '' ) {
-#print STDERR "......5.........\n";
 
             #could be a maths op - in which case, eeek?
             #shite - or maths inside braces
             #die 'here: '.$node->{op};
             return $hoistedNode;
-#        } elsif (defined($node->{rhs}->{'####need_function'})) {
-#print STDERR "......6.........\n";
         } else {
-#print STDERR "......7.........\n";
+            #this is used to convert something like "lc(Subject)='webhome'"
             return { '$where' => convertToJavascript($hoistedNode) };
         }
     }
-
     return $node->{op}->hoistMongoDB($node);
 }
 
@@ -462,6 +471,8 @@ sub convertStringToJS {
 sub convertToJavascript {
     my $node      = shift;
     my $statement = '';
+    
+    ASSERT(ref($node) eq 'HASH') if DEBUG;
 
 #TODO: for some reason the Dumper call makes the HoistMongoDBsTests::test_hoistLcRHSName test succeed - have to work out what i've broken.
     my $dump = Dumper($node);
@@ -494,15 +505,14 @@ sub convertToJavascript {
             if ( ( $k eq '$in' ) or ( $k eq '$nin' ) ) {
 
 #TODO: look up to see if javascript thas an value.in(list) or ARRAY.contains(value)
-                $statement .= ' ( ' . join(
+                $statement .= ( ( $k eq '$nin' ) ? '!' : ' ijij ' ) .
+                    ' ( ' . join(
                     ' || ',
                     map {
                             convertStringToJS($js_key) . ' == '
                           . convertStringToJS($_)
                       } @$v
                 ) . ' ) ';
-                $statement =
-                  ( ( $key eq '$nin' ) ? '!' : '' ) . " ($statement) ";
             }
             elsif ( $key =~ /^\#/ ) {
 
@@ -535,8 +545,14 @@ sub convertToJavascript {
 #                $statement .=
 #                  convertToJavascript($value).'('.convertStringToJS($js_key).')';
             }
-            elsif ( ( $k =~ /^\$/ ) ) {
+            elsif ( ( $key eq '$not' ) ) {
 
+                #this is essentially an operator lookahead
+                $statement .=
+                    convertStringToJS($js_key) . ' ( '
+                  . convertToJavascript($value).' ) ';
+            }
+            elsif ( ( $k =~ /^\$/ ) ) {
                 #this is essentially an operator lookahead
                 $statement .=
                     convertStringToJS($js_key) . ' '
@@ -579,9 +595,11 @@ sub convertToJavascript {
         }
         else {
             if ( $key eq '$where' ) {
+
                 $statement .= " ($value) ";
             }
             elsif ( $key eq '#where' ) {
+
                 $statement .= " ($value) ";
             }
             else {
@@ -712,18 +730,22 @@ use Assert;
 sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
+    ASSERT(ref($node) eq 'Foswiki::Query::Node');
 
     ASSERT( $node->{op}->{name} eq '=' ) if DEBUG;
     return { $node->{lhs} => $node->{rhs} };
 }
 
 package Foswiki::Query::OP_like;
+use Assert;
 
 #hoist ~ into a mongoDB ixHash query
 
 sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
+    ASSERT(ref($node) eq 'Foswiki::Query::Node');
+
 
     unless ( ref( $node->{rhs} ) eq '' ) {
 
@@ -746,12 +768,14 @@ sub hoistMongoDB {
 }
 
 package Foswiki::Query::OP_match;
+use Assert;
 
 #hoist =~ into a mongoDB ixHash query
 
 sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
+    ASSERT(ref($node) eq 'Foswiki::Query::Node');
 
     unless ( ref( $node->{rhs} ) eq '' ) {
 
@@ -786,6 +810,7 @@ sub hoistMongoDB {
 
 package Foswiki::Query::OP_dot;
 use Foswiki::Meta;
+use Assert;
 
 #mongo specific aliases
 our %aliases = (
@@ -811,6 +836,7 @@ sub mapAlias {
 sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
+    ASSERT(ref($node) eq 'Foswiki::Query::Node');
 
     if ( not defined( $node->{op} ) ) {
         print STDERR 'CONFUSED: ' . Data::Dumper::Dumper($node) . "\n";
@@ -888,11 +914,20 @@ use Assert;
 sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
+    ASSERT(ref($node) eq 'Foswiki::Query::Node');
 
 #beware, can't have the same key in both lhs and rhs, as the hash collapses them into one
 #this is more a limitation of the mongodb drivers - internally, mongodb (i'm told) can doit.
 
-    my %andHash = %{ $node->{lhs} };
+    my %andHash;
+    if (ref($node->{lhs}) eq 'HASH') {
+        %andHash = %{ $node->{lhs} };
+    } else {
+        $andHash{'$where'} =
+          Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::convertToJavascript(
+            {
+                '#where' => $node->{lhs}
+            });
     foreach my $key ( keys( %{ $node->{rhs} } ) ) {
         if ( defined( $andHash{$key} ) ) {
             my $conflictResolved = 0;
@@ -976,15 +1011,8 @@ sub hoistMongoDB {
                         $conflictResolved = 1;
 
                     } else {
-#this is able to presume there is no $in, as andHas{key} isa scalar
-                        #replace with a $in
-                         $andHash{$key} = {
-                            '$in' => [
-                                $andHash{$key},
-                                $node->{rhs}->{$key}
-                            ]
-                        };
-                        $conflictResolved = 1;
+                        #same field being tested in AND - have no choice but to goto $where
+                        print STDERR "sameosameo ($key) is a hash on both sides - not here yet \n";
                     }
                 }
                 elsif ( ( ref( $andHash{$key} ) eq 'HASH' ) #if we're already in a non-trivial compare.
@@ -1005,8 +1033,7 @@ sub hoistMongoDB {
                         $conflictResolved = 1;
                     }
                     else {
-                        print STDERR 'doood - not here yet ';
-die 'bonus';
+                        print STDERR "($key) is a hash on both sides - convert to js \n";
                     }
                 }
                 elsif ( ( ref( $andHash{$key} ) eq 'HASH' )and ( ref( $node->{rhs}->{$key} ) ne 'HASH' )) {
@@ -1070,10 +1097,12 @@ die 'bonus';
 }
 
 package Foswiki::Query::OP_or;
+use Assert;
 
 sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
+    ASSERT(ref($node) eq 'Foswiki::Query::Node');
 
     my $mongoQuery;
 
@@ -1101,14 +1130,18 @@ sub hoistMongoDB {
 
 package Foswiki::Query::OP_not;
 use Foswiki::Plugins::MongoDBPlugin::HoistMongoDB;
+use Assert;
 
 sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
+    ASSERT(ref($node) eq 'Foswiki::Query::Node') if DEBUG;
+    ASSERT(not defined($node->{rhs})) if DEBUG;
 
     my %query;
 
     #no, $not is a dirty little thing that needs to go inside lhs :(
+    #EXCEPT when we're doing AND
     my $lhs = $node->{lhs};
 
     if ( ( ref($lhs) eq '' ) or ( ref($lhs) eq 'Regexp' ) ) {
@@ -1119,7 +1152,7 @@ sub hoistMongoDB {
           Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::convertToJavascript(
             { '$not' => $lhs } );
     }
-    else {
+    elsif (1==2) {
         foreach my $key ( keys(%$lhs) ) {
 
 #use Data::Dumper;
@@ -1146,70 +1179,104 @@ sub hoistMongoDB {
                 }
             }
         }
+    } else {
+        my @keys = keys(%$lhs);
+        if ($#keys == 0) {
+            if ( ( ref($lhs->{$keys[0]}) eq '' ) or ( ref($lhs->{$keys[0]}) eq 'Regexp' ) ) {
+                if ($keys[0] eq '$where') {
+                    $query{'$where'} =
+                      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::convertToJavascript(
+                        { '$not' => $lhs } );
+                } else {
+                    return {$keys[0] => {'$ne' => $lhs->{$keys[0]}}};
+                }
+            } elsif ( $keys[0] eq '$or' ) {
+                #TODO: avoid using $nor, and convert to $in and $nin
+                return {'$nor' => $lhs->{$keys[0]}};
+            } else {
+                return {$keys[0] => {'$not' => $lhs->{$keys[0]}}};
+            }
+        }
+        #esplode - need to convert to js :(
+        return {'$where' => Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::convertToJavascript({ '$not' => $lhs })};
     }
     return \%query;
 }
 
 package Foswiki::Query::OP_gte;
+use Assert;
 
 sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
+    ASSERT(ref($node) eq 'Foswiki::Query::Node');
 
     return { $node->{lhs} => { '$gte' => $node->{rhs} } };
 }
 
 package Foswiki::Query::OP_gt;
+use Assert;
 
 sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
+    ASSERT(ref($node) eq 'Foswiki::Query::Node');
 
     return { $node->{lhs} => { '$gt' => $node->{rhs} } };
 }
 
 package Foswiki::Query::OP_lte;
+use Assert;
 
 sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
+    ASSERT(ref($node) eq 'Foswiki::Query::Node');
 
     return { $node->{lhs} => { '$lte' => $node->{rhs} } };
 }
 
 package Foswiki::Query::OP_lt;
+use Assert;
 
 sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
+    ASSERT(ref($node) eq 'Foswiki::Query::Node');
 
     return { $node->{lhs} => { '$lt' => $node->{rhs} } };
 }
 
 package Foswiki::Query::OP_ne;
+use Assert;
 
 sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
+    ASSERT(ref($node) eq 'Foswiki::Query::Node');
 
     return { $node->{lhs} => { '$ne' => $node->{rhs} } };
 }
 
 package Foswiki::Query::OP_ob;
+use Assert;
 
 # ( )
 sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
+    ASSERT(ref($node) eq 'Foswiki::Query::Node');
 
     return $node->{lhs};
 }
 
 package Foswiki::Query::OP_where;
+use Assert;
 
 sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
+    ASSERT(ref($node) eq 'Foswiki::Query::Node');
 
 #AHA. this needs to use $elemMatch
 #> t.find( { x : { $elemMatch : { a : 1, b : { $gt : 1 } } } } )
@@ -1236,56 +1303,68 @@ if (ref($node->{lhs}) ne '') {
 }
 
 package Foswiki::Query::OP_d2n;
+use Assert;
 
 sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
+    ASSERT(ref($node) eq 'Foswiki::Query::Node');
 
     return { '#d2n' => $node->{lhs}, '####need_function' => 1 };
 }
 
 package Foswiki::Query::OP_lc;
+use Assert;
 
 sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
+    ASSERT(ref($node) eq 'Foswiki::Query::Node');
 
     return { '#lc' => $node->{lhs}, '####need_function' => 1 };
 }
 
 package Foswiki::Query::OP_length;
+use Assert;
 
 sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
+    ASSERT(ref($node) eq 'Foswiki::Query::Node');
 
     return { '#length' => $node->{lhs}, '####need_function' => 1 };
 }
 
 package Foswiki::Query::OP_uc;
+use Assert;
 
 sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
+    ASSERT(ref($node) eq 'Foswiki::Query::Node');
 
     return { '#uc' => $node->{lhs}, '####need_function' => 1 };
 }
 
 package Foswiki::Query::OP_int;
+use Assert;
 
 sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
+    ASSERT(ref($node) eq 'Foswiki::Query::Node');
 
     return { '#int' => $node->{lhs}, '####need_function' => 1 };
 }
 
 #maths
 package Foswiki::Query::OP_div;
+use Assert;
 
 sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
+    ASSERT(ref($node) eq 'Foswiki::Query::Node');
 
     return {
         '#div'               => [ $node->{lhs}, $node->{rhs} ],
@@ -1294,10 +1373,12 @@ sub hoistMongoDB {
 }
 
 package Foswiki::Query::OP_minus;
+use Assert;
 
 sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
+    ASSERT(ref($node) eq 'Foswiki::Query::Node');
 
     return {
         '#minus'             => [ $node->{lhs}, $node->{rhs} ],
@@ -1306,10 +1387,12 @@ sub hoistMongoDB {
 }
 
 package Foswiki::Query::OP_plus;
+use Assert;
 
 sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
+    ASSERT(ref($node) eq 'Foswiki::Query::Node');
 
     return {
         '#plus'              => [ $node->{lhs}, $node->{rhs} ],
@@ -1318,10 +1401,12 @@ sub hoistMongoDB {
 }
 
 package Foswiki::Query::OP_times;
+use Assert;
 
 sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
+    ASSERT(ref($node) eq 'Foswiki::Query::Node');
 
     return {
         '#mult'              => [ $node->{lhs}, $node->{rhs} ],
@@ -1330,10 +1415,12 @@ sub hoistMongoDB {
 }
 
 package Foswiki::Query::OP_neg;
+use Assert;
 
 sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
+    ASSERT(ref($node) eq 'Foswiki::Query::Node');
 
     return {
         '#neg'               => [ $node->{lhs}, $node->{rhs} ],
@@ -1343,10 +1430,12 @@ sub hoistMongoDB {
 }
 
 package Foswiki::Query::OP_pos;
+use Assert;
 
 sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
+    ASSERT(ref($node) eq 'Foswiki::Query::Node');
 
     return {
         '#pos'               => [ $node->{lhs}, $node->{rhs} ],
@@ -1356,11 +1445,12 @@ sub hoistMongoDB {
 }
 
 package Foswiki::Query::OP_empty;
+use Assert;
 
 #TODO: not sure this is the right answer..
 sub hoistMongoDB {
     my $op   = shift;
-    my $node = shift;
+    my $node = shift;ASSERT(ref($node) eq 'Foswiki::Query::Node');
 
     return {};
 }

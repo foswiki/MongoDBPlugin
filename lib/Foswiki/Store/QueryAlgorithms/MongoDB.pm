@@ -338,7 +338,7 @@ sub convertTopicPatternToLonghandQuery {
 
     # ( 'Web.*', 'FooBar' ) ==> "^(Web.*|FooBar)$"
     #return '^(' . join( '|', @arr ) . ')$';
-    return join(' AND ', map {
+    return join(' OR ', map {
                             if (/\.\*/) {
                                 "name =~ '".$_."'"
                             } else {
