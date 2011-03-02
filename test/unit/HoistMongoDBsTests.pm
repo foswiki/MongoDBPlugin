@@ -906,7 +906,9 @@ sub test_hoist_Item10323_2 {
 
     $this->do_Assert( $query, $mongoDBQuery,
         {
-           '$where' => " (Regex('bio'.toLowerCase(), '').test(this.FIELD.TermGroup.value.toLowerCase())) "
+#           '$where' => " (Regex('bio'.toLowerCase(), '').test(this.FIELD.TermGroup.value.toLowerCase())) "
+#find a special case
+            'FIELD.TermGroup.value' => qr/(?i-xsm:.*bio.*)/i
         }
         );
 }
@@ -921,7 +923,11 @@ sub test_hoist_Item10323_2_not {
 
     $this->do_Assert( $query, $mongoDBQuery,
         {
-          '$where' => "! (  ( (Regex('bio'.toLowerCase(), '').test(this.FIELD.TermGroup.value.toLowerCase())) )  ) "
+#          '$where' => "! (  ( (Regex('bio'.toLowerCase(), '').test(this.FIELD.TermGroup.value.toLowerCase())) )  ) "
+          'FIELD.TermGroup.value' => {
+                                       '$ne' => qr/(?i-xsm:bio)/
+                                     }
+
         }
         );
 }
@@ -937,7 +943,9 @@ sub test_hoist_Item10323 {
     $this->do_Assert( $query, $mongoDBQuery,
         {
           'FORM.name' => qr/(?-xism:^.*TermForm$)/,
-          '$where' => ' ( (Regex(\'ant\'.toLowerCase(), \'\').test(this.FIELD.Namespace.value.toLowerCase())) )  &&  ( (Regex(\'bio\'.toLowerCase(), \'\').test(this.FIELD.TermGroup.value.toLowerCase())) ) '
+#          '$where' => ' ( (Regex(\'ant\'.toLowerCase(), \'\').test(this.FIELD.Namespace.value.toLowerCase())) )  &&  ( (Regex(\'bio\'.toLowerCase(), \'\').test(this.FIELD.TermGroup.value.toLowerCase())) ) '
+          'FIELD.TermGroup.value' => qr/(?i-xsm:bio)/,
+          'FIELD.Namespace.value' => qr/(?i-xsm:ant)/
         }
         );
 }

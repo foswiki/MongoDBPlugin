@@ -153,6 +153,24 @@ sub _hoist {
     }
     print STDERR $level."???????" . ref( $node->{op} ) . " ".($node->{inWhere}?'inWhere':'')."\n" if MONITOR or WATCH;
 
+    #optimise lc(rhs) = lc(lhs) so that we don't have to goto javascript
+    #imo we should put this kind of optimisation into the parser
+    if (
+        (
+#TODO:        ( ref( $node->{op} ) eq 'Foswiki::Query::OP_eq' ) or
+        ( ref( $node->{op} ) eq 'Foswiki::Query::OP_match' ) or
+        ( ref( $node->{op} ) eq 'Foswiki::Query::OP_like' ) 
+        #others?
+        ) and
+        ( #TODO: uc()
+            ( ref( $node->{params}[0]->{op} ) eq 'Foswiki::Query::OP_lc' ) and 
+            ( ref( $node->{params}[1]->{op} ) eq 'Foswiki::Query::OP_lc' )
+        )) {
+        #redo it as a case insensitive regex.
+        $node->{params}[0] = $node->{params}[0]->{params}[0];
+        $node->{params}[1] = $node->{params}[1]->{params}[0];
+        $node->{insensitive} = 1;
+    }
 
     #name, or constants.
     if ( not ref( $node->{op} ) ) {
@@ -747,7 +765,9 @@ sub hoistMongoDB {
     ASSERT(ref($node) eq 'Foswiki::Query::Node');
 
 
-    unless ( ref( $node->{rhs} ) eq '' ) {
+    if ( ref( $node->{rhs} ) ne '' ) {
+
+        die 'not implemented yet' if (defined($node->{insensitive}));
 
         #            die 'er, no, can\'t regex on a function';
         # re-write one as $where
@@ -762,7 +782,12 @@ sub hoistMongoDB {
     my $rhs = quotemeta( $node->{rhs} );
     $rhs =~ s/\\\?/./g;
     $rhs =~ s/\\\*/.*/g;
-    $rhs = qr/^$rhs$/;
+
+    if (defined($node->{insensitive})) {
+        $rhs = qr/^$rhs$/i;
+    } else {
+        $rhs = qr/^$rhs$/;
+    }
 
     return { $node->{lhs} => $rhs };
 }
@@ -777,10 +802,12 @@ sub hoistMongoDB {
     my $node = shift;
     ASSERT(ref($node) eq 'Foswiki::Query::Node');
 
-    unless ( ref( $node->{rhs} ) eq '' ) {
-
+    if ( ref( $node->{rhs} ) ne '' ) {
         #            die 'er, no, can\'t regex on a function';
         # re-write one as $where
+        
+        die 'not implemented yet' if (defined($node->{insensitive}));
+        
         return {
             '$where' =>
               Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::convertToJavascript(
@@ -796,7 +823,11 @@ sub hoistMongoDB {
     #marginal speedup, but still every straw
     return {} if ( $rhs eq '.*' );
 
-    $rhs = qr/$rhs/;
+    if (defined($node->{insensitive})) {
+        $rhs = qr/$rhs/i;
+    } else {
+        $rhs = qr/$rhs/;
+    }
 
     return { $node->{lhs} => $rhs };
 }
@@ -1034,7 +1065,7 @@ sub hoistMongoDB {
                         $conflictResolved = 1;
                     }
                     else {
-                        print STDERR "($key) is a hash on both sides - convert to js \n";
+                        #print STDERR "($key) is a hash on both sides - convert to js \n";
                     }
                 }
                 elsif ( ( ref( $andHash{$key} ) eq 'HASH' )and ( ref( $node->{rhs}->{$key} ) ne 'HASH' )) {
