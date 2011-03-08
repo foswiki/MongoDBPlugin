@@ -1,3 +1,9 @@
+%TMPL:DEF{foswiki_getRef_js}%function(host, collection, web, topic) {
+    conn = new Mongo(host);
+    current = conn.getCollection(collection);
+
+    return current.findOne({_web:web, _topic: topic});
+}%TMPL:END%
 %TMPL:DEF{foswiki_d2n_js}%function(dateString) {
     var parseTime = function(date, defaultLocal) {
 

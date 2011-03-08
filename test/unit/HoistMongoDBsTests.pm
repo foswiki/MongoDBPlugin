@@ -1416,4 +1416,22 @@ sub test_hoist_not_in2 {
             Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::convertToJavascript($mongoDBQuery)
             );
 }
+
+sub test_hoist_ref {
+    my $this = shift;
+    my $s = "'AnotherTopic'/number = 12";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert(
+        $query,
+        $mongoDBQuery,
+        {
+          '$where' => "(foswiki_getRef('AnotherTopic').FIELD.number.value) == 12",
+        }
+    );
+}
+
 1;

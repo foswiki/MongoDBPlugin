@@ -91,6 +91,7 @@ sub reload {
 sub loadFromBSONData {
     my $this = shift;
     my $data = shift;
+#print STDERR "======== loadFromBSONData (".$data->{_web}.")(".$data->{_topic}.")\n";
 
     my @validKeys = keys(%Foswiki::Meta::VALIDATE);
     #push( @validKeys, '_text' );
@@ -99,18 +100,21 @@ sub loadFromBSONData {
     foreach my $key (@validKeys) {
         next unless (defined($data->{$key}));
         if ( $Foswiki::Meta::isArrayType{$key} ) {
-            #print STDERR "---- $key == many\n";
-            $this->{$key} = $data->{$key}->{'__RAW_ARRAY'};
+            #print STDERR "---- $key == many (".scalar(@{$data->{$key}->{'__RAW_ARRAY'}}).")\n";
+            ##$this->{$key} = $data->{$key}->{'__RAW_ARRAY'};
+            if (defined($data->{$key}->{'__RAW_ARRAY'}) && scalar(@{$data->{$key}->{'__RAW_ARRAY'}})>0) {
+                $this->putAll($key, @{$data->{$key}->{'__RAW_ARRAY'}});
+            }
         } else {
-            #$meta->{$key} = $savedMeta->{$key}[0];
-            $this->{$key} = [];
-            push(@{$this->{$key}}, $data->{$key});
+#            $this->{$key} = [];
+#            push(@{$this->{$key}}, $data->{$key});
+            $this->putAll($key, $data->{$key});
         }
     }
 #use Data::Dumper;
 #print STDERR "--- FIELD: ".Dumper($this->{TOPICINFO})."\n";
     $this->{_text} = $data->{_text};
-    $this->{_indices} = $data->{_indices};
+    #$this->{_indices} = $data->{_indices};
 
     $this->{_loadedRev} = 
       Foswiki::Store::cleanUpRevID( $this->{TOPICINFO}[0]->{version} );

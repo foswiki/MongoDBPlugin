@@ -397,6 +397,7 @@ my %js_func_map = (
     '#minus'  => '-',
     '#pos'    => '+',
     '#neg'    => '-',
+    '#ref'    => 'REF'
 );
 
 sub convertFunction {
@@ -417,6 +418,15 @@ sub convertFunction {
         my $regexoptions = '\'\'';
         return "Regex('^'+$regex+'$', $regexoptions).test";   #(this.\$scope);";
     }
+    if ($key eq '#ref') {
+        #TODO: like all accessses, this needs alot of undef protection.
+        my $addr = convertStringToJS( $$value[1] );
+        $addr =~ s/^this//;
+        return
+            '(foswiki_getRef('
+          . convertStringToJS( $$value[0] ) . ')'
+          . $addr . ')';
+    }
     if (   ( $key eq '#div' )
         or ( $key eq '#mult' )
         or ( $key eq '#plus' )
@@ -425,7 +435,6 @@ sub convertFunction {
         or ( $key eq '#neg' ) )
     {
 
-        #die 'asd';
         return
             '('
           . convertStringToJS( $$value[0] ) . ')'
@@ -628,7 +637,7 @@ sub convertToJavascript {
                   . ref($value) . "\n"
                   if MONITOR;
                 if ( ref($value) eq 'Regexp' ) {
-                    $value =~ /\(\?-xism:(.*)\)/;    #TODO: er, regex options?
+                    $value =~ /\(\?[xism]*-[xism]*:(.*)\)/;    #TODO: er, regex options?
                     $statement .=
                       "( /$1/.test(" . convertStringToJS($js_key) . ") )";
 
@@ -1494,9 +1503,20 @@ package Foswiki::Query::OP_in;
 
 ######################################
 package Foswiki::Query::OP_ref;
+use Assert;
+#use Data::Dumper;
 
-#oh what a disaster.
-# this has to be implemented as a compound query, so that we're querying against constants
+sub hoistMongoDB {
+    my $op   = shift;
+    my $node = shift;ASSERT(ref($node) eq 'Foswiki::Query::Node');
+
+#print STDERR "---OP_ref(".Dumper($node).")\n";
+
+    return { 
+            '####delay_function' => 1,
+            '#ref' => [ $node->{lhs}, $node->{rhs} ]
+        };
+}
 ######################################
 
 =pod

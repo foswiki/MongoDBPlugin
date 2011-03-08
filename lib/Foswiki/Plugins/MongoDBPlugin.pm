@@ -315,10 +315,10 @@ sub _updateDatabase {
     
     Foswiki::Func::loadTemplate('mongodb_js');
     my $foswiki_d2n_js = Foswiki::Func::expandTemplate('foswiki_d2n_js');
-    
-print STDERR "_updateDatabase\n".$foswiki_d2n_js."\n";
-
     getMongoDB()->updateSystemJS('foswiki_d2n', $foswiki_d2n_js);
+    
+    my $foswiki_getRef_js = Foswiki::Func::expandTemplate('foswiki_getRef_js');
+    getMongoDB()->updateSystemJS('foswiki_getRef', $foswiki_getRef_js);
 }
 
 
