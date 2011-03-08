@@ -599,16 +599,18 @@ sub convertToJavascript {
                 die 'unpleasently'
                   ; #should never get here - it needs to be handled while we knoe the field it refers to
             }
-            elsif ( $key eq '$or' ) {
-
+            elsif (( $key eq '$or' ) or ( $key eq '$nor' )) {
+                
+                $js_key = '$or' if ( $key eq '$nor' );
                 #er, assuming $key == $or - $in and $nin will kick me
-                $statement .= ' ( '
+                my $new = ' ( '
                   . join(
                     ' ' . convertStringToJS($js_key) . ' ',
                     map { convertToJavascript($_) } @$value
                   ) . ' ) ';
+                $new = '(!'.$new.')' if ( $key eq '$nor' );
 
-                #$statement = " ($statement) ";
+                $statement .= $new;
             }
             elsif ( $key =~ /^#/ ) {
 
