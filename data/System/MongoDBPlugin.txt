@@ -17,6 +17,10 @@ This is an experimental attempt to utilise [[http://mongodb.org][MongoDB]] for a
 At this point the Plugin is used to populate the MongoDB. All user topic Saves are automatically copied into the MongoDB, and you can batch load using the restHandler:
    * %SCRIPTURL{rest}%/MongoDBPlugin/update?updateweb=Main
 
+To update the javascript stored in MongoDB
+   * %SCRIPTURL{rest}%/MongoDBPlugin/updateDatabase
+
+
 ---++ Technical details
 This initial version serialises the internal Meta object directly into _one_ collection, using web.name as a unique index.
 

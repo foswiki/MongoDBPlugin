@@ -1,3 +1,39 @@
+%{ foswiki_getField attempts to avoid dereferenceing an undefined element. }%
+%TMPL:DEF{foswiki_getField_js}%function(this, address) {
+    var ptr = this;
+//address is of the form 'this.TOPICINFO.version' and needs to be separated into individual return undefined if this['TOPICINFO'] == undefined etc
+
+    var addrs = address.split('.');
+    for (var name in addrs) {
+        if (ptr == undefined) {
+            return ptr;
+        }
+        ptr = ptr[name];
+    }
+    return ptr;
+}%TMPL:END%
+%TMPL:DEF{foswiki_toLowerCase_js}%function(value) {
+    if (value == undefined) {
+        return value;
+    }
+    return value.toLowerCase();
+}%TMPL:END%
+
+%TMPL:DEF{foswiki_toUpperCase_js}%function(value) {
+    if (value == undefined) {
+        return value;
+    }
+    return value.toUpperCase();
+}%TMPL:END%
+%TMPL:DEF{foswiki_length_js}%function(value) {
+    if (value == undefined) {
+        return value;
+    }
+    return value.length;
+}%TMPL:END%
+
+
+
 %TMPL:DEF{foswiki_getRef_js}%function(host, collection, web, topic) {
     conn = new Mongo(host);
     current = conn.getCollection(collection);
@@ -5,6 +41,10 @@
     return current.findOne({_web:web, _topic: topic});
 }%TMPL:END%
 %TMPL:DEF{foswiki_d2n_js}%function(dateString) {
+    if (dateString == undefined) {
+        return dateString;
+    }
+
     var parseTime = function(date, defaultLocal) {
 
         // ala Time::Local::timegm()

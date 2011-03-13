@@ -724,7 +724,7 @@ sub test_hoistLcRHSName {
 
     $this->do_Assert( $query, $mongoDBQuery,
         {
-            '$where' => 'this._topic == \'WebHome\'.toLowerCase()'
+            '$where' => "this._topic == foswiki_toLowerCase('WebHome')"
         }
         );
 }
@@ -740,7 +740,7 @@ sub test_hoistLcLHSField {
 
     $this->do_Assert( $query, $mongoDBQuery,
         {
-            '$where' => 'this.FIELD.Subject.value.toLowerCase() == \'WebHome\''
+            '$where' => "foswiki_toLowerCase(foswiki_getField(this, 'FIELD.Subject.value')) == 'WebHome'"
         }
         );
 }
@@ -755,7 +755,7 @@ sub test_hoistLcLHSName {
 
     $this->do_Assert( $query, $mongoDBQuery,
         {
-            '$where' => 'this._topic.toLowerCase() == \'WebHome\''
+            '$where' => "foswiki_toLowerCase(this._topic) == 'WebHome'"
         }
         );
 }
@@ -784,7 +784,7 @@ sub test_hoistLcLHSLikeName {
 
     $this->do_Assert( $query, $mongoDBQuery,
         {
-            '$where' => '( /^Web.*$/.test(this._topic.toLowerCase()) )'
+            '$where' => "( /^Web.*\$/.test(foswiki_toLowerCase(this._topic)) )"
         }
         );
 }
@@ -799,7 +799,7 @@ sub test_hoistLengthLHSName {
 
     $this->do_Assert( $query, $mongoDBQuery,
         {
-            '$where' => 'this._topic.length == 12'
+            '$where' => "foswiki_length(this._topic) == 12"
         }
         );
 }
@@ -813,7 +813,7 @@ sub test_hoistLengthLHSString {
 
     $this->do_Assert( $query, $mongoDBQuery,
         {
-            '$where' => '\'something\'.length == 9'
+            '$where' => "foswiki_length('something') == 9"
         }
         );
 }
@@ -828,7 +828,7 @@ sub test_hoistLengthLHSNameGT {
 
     $this->do_Assert( $query, $mongoDBQuery,
         {
-            '$where' => 'this._topic.length < 12'
+            '$where' => "foswiki_length(this._topic) < 12"
         }
         );
 }
@@ -843,7 +843,7 @@ sub test_hoist_d2n_value {
 
     $this->do_Assert( $query, $mongoDBQuery,
         {
-          '$where' => 'foswiki_d2n(this.FIELD.noatime.value)'
+          '$where' => "foswiki_d2n(foswiki_getField(this, 'FIELD.noatime.value'))"
         }
         );
 }
@@ -859,7 +859,7 @@ sub test_hoist_d2n_valueAND {
     $this->do_Assert( $query, $mongoDBQuery,
         {
 #TODO: need to figure out how to not make both into js
-          '$where' => ' ( (foswiki_d2n(this.FIELD.noatime.value)) )  && this.FIELD.topic.value == \'WebHome\''
+          '$where' => " ( (foswiki_d2n(foswiki_getField(this, 'FIELD.noatime.value'))) )  && foswiki_getField(this, 'FIELD.topic.value') == 'WebHome'"
 #          '$where' => 'foswiki_d2n(this.FIELD.noatime.value)',
 #          'FIELD.topic.value' => 'WebHome'
         }
@@ -892,7 +892,7 @@ sub test_hoist_Item10323_1 {
 
     $this->do_Assert( $query, $mongoDBQuery,
         {
-               '$where' => '( /bio/.test(this.FIELD.TermGroup.value.toLowerCase()) )'
+               '$where' => "( /bio/.test(foswiki_toLowerCase(foswiki_getField(this, 'FIELD.TermGroup.value'))) )"
         }
         );
 }
@@ -960,7 +960,7 @@ sub test_hoist_maths {
 
     $this->do_Assert( $query, $mongoDBQuery,
         {
-           '$where' => ' ((12)-(this.FIELD.Namespace.value) < (((24)*(60))*(60))-(5))  &&  ((this.FIELD.TermGroup.value)/(12) > (this.FIELD.WebScale.value)*(42.8)) '
+           '$where' =>  " ((12)-(foswiki_getField(this, 'FIELD.Namespace.value')) < (((24)*(60))*(60))-(5))  &&  ((foswiki_getField(this, 'FIELD.TermGroup.value'))/(12) > (foswiki_getField(this, 'FIELD.WebScale.value'))*(42.8)) "
         }
         );
 }
@@ -1320,7 +1320,8 @@ sub test_hoist_dateAndRelationship {
         $mongoDBQuery,
         {
           'FORM.name' => qr/(?-xism:^.*RelationshipForm$)/,
-          '$where' => '(this.FIELD.NOW.value)-(this.TOPICINFO.date) < (((60)*(60))*(24))*(7)'
+          '$where' => "(foswiki_getField(this, 'FIELD.NOW.value'))-(foswiki_getField(this, 'TOPICINFO.date')) < (((60)*(60))*(24))*(7)"
+        }
         }
     );
 }
@@ -1429,7 +1430,8 @@ sub test_hoist_ref {
         $query,
         $mongoDBQuery,
         {
-          '$where' => "(foswiki_getRef('AnotherTopic').FIELD.number.value) == 12",
+          '$where' => "(foswiki_getField(foswiki_getRef('AnotherTopic'), 'FIELD.number.value')) == 12"
+          #"(foswiki_getRef('AnotherTopic').FIELD.number.value) == 12",
         }
     );
 }

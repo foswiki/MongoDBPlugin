@@ -319,6 +319,19 @@ sub _updateDatabase {
     
     my $foswiki_getRef_js = Foswiki::Func::expandTemplate('foswiki_getRef_js');
     getMongoDB()->updateSystemJS('foswiki_getRef', $foswiki_getRef_js);
+
+    my $foswiki_getField_js = Foswiki::Func::expandTemplate('foswiki_getField_js');
+    getMongoDB()->updateSystemJS('foswiki_getField', $foswiki_getField_js);
+    
+    my $foswiki_toLowerCase_js = Foswiki::Func::expandTemplate('foswiki_toLowerCase_js');
+    getMongoDB()->updateSystemJS('foswiki_toLowerCase', $foswiki_toLowerCase_js);
+    
+    my $foswiki_toUpperCase_js = Foswiki::Func::expandTemplate('foswiki_toUpperCase_js');
+    getMongoDB()->updateSystemJS('foswiki_toUpperCase', $foswiki_toUpperCase_js);
+    
+    my $foswiki_length_js = Foswiki::Func::expandTemplate('foswiki_length_js');
+    getMongoDB()->updateSystemJS('foswiki_length', $foswiki_length_js);
+
 }
 
 

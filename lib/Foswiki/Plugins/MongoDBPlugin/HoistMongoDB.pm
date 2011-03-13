@@ -384,9 +384,9 @@ my %js_op_map = (
 );
 
 my %js_func_map = (
-    '#lc'     => '.toLowerCase()',
-    '#uc'     => '.toUpperCase()',
-    '#length' => '.length',
+    '#lc'     => 'foswiki_toLowerCase',
+    '#uc'     => 'foswiki_toUpperCase',
+    '#length' => 'foswiki_length',
     '#d2n'    => 'foswiki_d2n',
     '#int'    => 'parseInt',
     '#match'  => 'MATCHBANG',
@@ -402,10 +402,13 @@ my %js_func_map = (
 
 sub convertFunction {
     my ( $value, $key ) = @_;
-    if ( $key eq '#d2n' ) {
-        return $js_func_map{$key} . '(' . convertStringToJS($value) . ')';
-    }
-    if ( $key eq '#int' ) {
+    if (
+        ( $key eq '#lc' ) or 
+        ( $key eq '#uc' ) or 
+        ( $key eq '#length' ) or 
+        ( $key eq '#d2n' ) or 
+        ( $key eq '#int' ) 
+            ) {
         return $js_func_map{$key} . '(' . convertStringToJS($value) . ')';
     }
     if ( $key eq '#match' ) {
@@ -420,12 +423,10 @@ sub convertFunction {
     }
     if ($key eq '#ref') {
         #TODO: like all accessses, this needs alot of undef protection.
-        my $addr = convertStringToJS( $$value[1] );
-        $addr =~ s/^this//;
-        return
-            '(foswiki_getRef('
-          . convertStringToJS( $$value[0] ) . ')'
-          . $addr . ')';
+        my $addr = '('.convertStringToJS( $$value[1] ).')';
+        my $ref = 'foswiki_getRef(' . convertStringToJS( $$value[0] ) . ')';
+        $addr =~ s/this/$ref/;
+        return $addr;
     }
     if (   ( $key eq '#div' )
         or ( $key eq '#mult' )
@@ -466,10 +467,10 @@ sub convertStringToJS {
 #TODO: i _think_ the line below is ok, its needed to make ::test_hoistLengthLHSString work
     return $string if ( $string =~ /^\'.*/ );
 
-    return $string if ( $string =~ /^this\./ );
-
     # all registered meta type prefixes use a this. in js
-    return 'this.' . $string if ( $string =~ /^$fields/ );
+    return $string if ( $string =~ /^foswiki_/ );
+    return 'foswiki_getField(this, \''.$string.'\')' if ( $string =~ /^$fields/ );
+
     return $string
       if ( $string =~ /^$ops$/ );    #for ops, we only want the entirety
 
