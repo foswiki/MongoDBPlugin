@@ -23,7 +23,7 @@ use Assert;
 use Foswiki::Query::HoistREs ();
 
 use constant MONITOR => 0;
-use constant WATCH   => 0;
+use constant MONITOR_DETAIL => 0;
 
 =begin TML
 
@@ -37,7 +37,7 @@ sub hoist {
 
     print STDERR "HoistMongoDB::hoist from: ", $node->stringify(), "\n"
       if MONITOR
-          or WATCH;
+          or MONITOR_DETAIL;
 
     return undef unless ref( $node->{op} );
 
@@ -50,7 +50,7 @@ sub hoist {
     $mongoDBQuery =
       Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::_hoist($node);
       
-    if ((ref($mongoDBQuery) ne '') and defined( $mongoDBQuery->{'####need_function'} )) {
+    if ((ref($mongoDBQuery) ne '') and (defined( $mongoDBQuery->{'####need_function'}) or defined( $mongoDBQuery->{'####delay_function'} ))) {
         #this can happen if the entire query is something like "d2n(banana)"
         #ideally, the parser should be converting that into a logical tree - 
         #but for now, our parser is dumb, forcing hoisting code to suck
@@ -68,7 +68,7 @@ sub hoist {
 
     print STDERR "Hoisted to:  ",    #$node->stringify(), " -> /",
       Dumper($mongoDBQuery), "/\n"
-      if MONITOR or WATCH;
+      if MONITOR or MONITOR_DETAIL;
 
     if ( defined( $Foswiki::cfg{Plugins}{MongoDBPlugin}{UseJavascriptQuery} )
         and $Foswiki::cfg{Plugins}{MongoDBPlugin}{UseJavascriptQuery} )
@@ -135,13 +135,14 @@ sub _hoist {
 
     print STDERR "HoistMongoDB::hoist from: ", $node->stringify(), " (ref() == ".ref($node).")\n"
       if MONITOR
-          or WATCH;
+          or MONITOR_DETAIL;
 
 
     #forward propogate that we're inside a 'where' - eg lhs[rhs]
     #sadly, also need to treat a dot case : preferences[value=12].Red
     #   which is the same as preferences[value=12 AND name='Red']
-    if ( ( ref( $node->{op} ) eq 'Foswiki::Query::OP_where' )
+    if ( 
+        ( ref( $node->{op} ) eq 'Foswiki::Query::OP_where' )
         or defined( $node->{inWhere} ) )
     {
         $node->{params}[0]->{inWhere} = $node->{inWhere}
@@ -151,7 +152,7 @@ sub _hoist {
           if ( defined( $node->{params}[1] )
             and ( ref( $node->{params}[1] ) ne '' ) );
     }
-    print STDERR $level."???????" . ref( $node->{op} ) . " ".($node->{inWhere}?'inWhere':'')."\n" if MONITOR or WATCH;
+    print STDERR $level."???????" . ref( $node->{op} ) . " ".($node->{inWhere}?'inWhere':'')."\n" if MONITOR or MONITOR_DETAIL;
 
     #optimise lc(rhs) = lc(lhs) so that we don't have to goto javascript
     #imo we should put this kind of optimisation into the parser
@@ -187,7 +188,7 @@ sub _hoist {
             #print STDERR "erkle ".Dumper($node->{params}[0])."\n";
             print STDERR "pre erkle::hoist from: ", $node->stringify(), "\n"
               if MONITOR
-                  or WATCH;
+                  or MONITOR_DETAIL;
 
             my $rhs_Id = $node->{params}[1]->{params}[0];
             if
@@ -223,16 +224,21 @@ sub _hoist {
                 print STDERR "POST erkle::hoist from: ", $node->stringify(),
                   "\n"
                   if MONITOR
-                      or WATCH;
+                      or MONITOR_DETAIL;
             }
 
             my $query = _hoist( $node->{params}[0], $level . ' ' );
             print STDERR "return 1\n" if MONITOR;
             return $query;
-        } else {
+        } elsif (
+                    ( ref( $node->{params}[0]->{op} ) eq '' ) and 
+                    ( ref( $node->{params}[1]->{op} ) eq '' ) 
+                    ) {
             #TODO: really should test for 'simple case' and barf elsewise
             print STDERR "return 2\n" if MONITOR;
             return Foswiki::Query::OP_dot::hoistMongoDB( $node->{op}, $node );
+        } else {
+            #die 'rogered';
         }
     }
 
@@ -251,7 +257,7 @@ sub _hoist {
               if ( defined( $node->{lhs}->{ERROR} ) );
             $containsQueryFunctions |=
               defined( $node->{lhs}->{'####need_function'} );
-            $node->{'####delay_function'} = 1
+            $node->{'####delay_function'} = 'l'.$node->{lhs}->{'####delay_function'}
               if ( defined( $node->{lhs}->{'####delay_function'} ) );
         }
     }
@@ -264,7 +270,7 @@ sub _hoist {
               if ( defined( $node->{rhs}->{ERROR} ) );
             $containsQueryFunctions |=
               defined( $node->{rhs}->{'####need_function'} );
-            $node->{'####delay_function'} = 1
+            $node->{'####delay_function'} = 'r'.$node->{rhs}->{'####delay_function'}
               if ( defined( $node->{rhs}->{'####delay_function'} ) );
         }
     }
@@ -281,7 +287,9 @@ sub _hoist {
             or ( ref( $node->{op} ) eq 'Foswiki::Query::OP_times' )
             or ( ref( $node->{op} ) eq 'Foswiki::Query::OP_div' )
             or ( ref( $node->{op} ) eq 'Foswiki::Query::OP_pos' )
-            or ( ref( $node->{op} ) eq 'Foswiki::Query::OP_neg' ) )
+            or ( ref( $node->{op} ) eq 'Foswiki::Query::OP_neg' )
+            #or ( ref( $node->{op} ) eq 'Foswiki::Query::OP_ref' )
+             )
         {
 
             print STDERR "return 3\n" if MONITOR;
@@ -316,28 +324,40 @@ print STDERR "..............(".Dumper($node).")\n" if MONITOR;
     #need to convert to js for lc/uc/length  etc :(
     # '####need_function'
     if ($containsQueryFunctions) {
+        if ( ref( $node->{lhs} ) eq 'HASH' ) {
+            if (defined($node->{lhs}->{'####delay_function'})) {
+                print STDERR "--- qwe \n" if Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::MONITOR;
 
-         if ( ref( $node->{lhs} ) eq 'HASH' ){
-                $node->{lhs} = convertToJavascript( $node->{lhs} )
-         }
+                $node->{'####delay_function'} = 'k'.$node->{lhs}->{'####delay_function'};
+            }
+            print STDERR "--- asd \n" if Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::MONITOR;
+             $node->{lhs} = convertToJavascript( $node->{lhs} );
+        }
 
         my $hoistedNode;
         if (ref($node) eq 'Foswiki::Query::Node') {
+            print STDERR 'who '.Dumper($node) if Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::MONITOR;
             $hoistedNode = $node->{op}->hoistMongoDB($node);
         } else {
             #generally only happens if there is no rhs really (eg, a query that lookd like "d2n(SomeField)")
             $hoistedNode = $node;
+            print STDERR 'norhs '.Dumper($hoistedNode) if Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::MONITOR;
             return $hoistedNode;
         }
         if ( ref($hoistedNode) eq '' ) {
 
             #could be a maths op - in which case, eeek?
             #shite - or maths inside braces
-            #die 'here: '.$node->{op};
+            print STDERR 'notahash '.Dumper($hoistedNode) if Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::MONITOR;
             return $hoistedNode;
         } else {
             #this is used to convert something like "lc(Subject)='webhome'"
-            return { '$where' => convertToJavascript($hoistedNode) };
+            print STDERR 'why '.Dumper($hoistedNode) if Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::MONITOR;
+            #TODO: need to minimise the #delay_function setting - atm its a little over-enthusiastic
+            return { 
+                    '$where' => convertToJavascript($hoistedNode), 
+                    '####delay_function' => 'p'.(defined($hoistedNode->{'####delay_function'})?$hoistedNode->{'####delay_function'}:99) 
+                    };
         }
     }
     return $node->{op}->hoistMongoDB($node);
@@ -501,6 +521,13 @@ sub convertToJavascript {
     my $statement = '';
     
     ASSERT(ref($node) eq 'HASH') if DEBUG;
+    
+    #do nothing, if there is only a $where and #need_function and/or #delay_function
+    my @keys = keys(%$node);
+    my $keycount = $#keys;
+    $keycount-- if (defined($node->{'####need_function'}));
+    $keycount-- if (defined($node->{'####delay_function'}));
+    return $node->{'$where'} if (($keycount == 0) and (defined($node->{'$where'})));
 
 #TODO: for some reason the Dumper call makes the HoistMongoDBsTests::test_hoistLcRHSName test succeed - have to work out what i've broken.
     my $dump = Dumper($node);
@@ -761,6 +788,8 @@ sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
     ASSERT(ref($node) eq 'Foswiki::Query::Node');
+    ASSERT(ref($node->{lhs}) eq '');
+    #ASSERT(ref($node->{rhs}) eq '');
 
     ASSERT( $node->{op}->{name} eq '=' ) if DEBUG;
     return { $node->{lhs} => $node->{rhs} };
@@ -864,7 +893,8 @@ our %aliases = (
 
 sub mapAlias {
     my $name = shift;
-
+    ASSERT((ref($name) eq ''));
+    
     #TODO: map to the MongoDB field names (name, web, text, fieldname)
     if ( defined( $aliases{$name} ) ) {
         $name = $aliases{$name};
@@ -882,7 +912,7 @@ sub hoistMongoDB {
     ASSERT(ref($node) eq 'Foswiki::Query::Node');
 
     if ( not defined( $node->{op} ) ) {
-        print STDERR 'CONFUSED: ' . Data::Dumper::Dumper($node) . "\n";
+        print STDERR 'CONFUSED: ' . Data::Dumper::Dumper($node) . "\n" if Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::MONITOR;
         die 'here';
 
         #return;
@@ -891,18 +921,50 @@ sub hoistMongoDB {
 #TODO: both the next 2 should only work form registered META - including what params are allowed. (except we don't do that for FIELDS :(
     if ( ref( $node->{op} ) ) {
 
+        my $dont_know_why;
         #an actual OP_dot
-        my $lhs = $node->{params}[0]->{params}[0];
-        my $rhs = $node->{params}[1]->{params}[0];
+        my $lhs = $node->{params}[0];
+        my $rhs = $node->{params}[1];
+        if (ref($rhs->{op}) ne '') {
+            print STDERR "------------rhs =="
+              . Data::Dumper::Dumper($rhs)
+              . "\n" if Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::MONITOR;
+              $rhs = $node->{rhs};
+        } else {
+            $rhs = $node->{params}[1]->{params}[0];        
+        }
+        if (ref($lhs->{op}) ne '') {
+            print STDERR "------------lhs =="
+              . Data::Dumper::Dumper($lhs)
+              . "\nOOO "
+              . ref($lhs->{op})
+              . " OOO \n" if Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::MONITOR_DETAIL;
+              #return $node->{op}->hoistMongoDB($node);
+              if (ref($lhs) ne '' and ref($lhs->{op}) eq 'Foswiki::Query::OP_ref') { # and defined($node->{lhs}->{'#ref'})) {
+print STDERR "+_+_+_+_+_+_+_+_+_+_+_+_+_+_GIMPLE($rhs)\n" if Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::MONITOR;
+                $lhs->{rhs} .= '.'.$node->{rhs};
+                return {'#ref' => [$lhs->{lhs}, $lhs->{rhs}], '####delay_function' => 13};
+                return $lhs->{op}->hoistMongoDB($lhs);
+              }
+              $lhs = $node->{lhs};
+        } else {
+            $lhs = $node->{params}[0]->{params}[0];
+        }
+
+        print STDERR "-------------------------------- hoist OP_dot("
+          . ref( $node->{op} ) . ", "
+          . Data::Dumper::Dumper($node)
+          . ")\n" if Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::MONITOR;
+        
+        #an actual OP_dot
+        ASSERT(ref($lhs) eq '');
+        ASSERT(ref($rhs) eq '');
 
         my $mappedName = mapAlias($lhs);
 
-        #print STDERR "-------------------------------- hoist OP_dot("
-        #  . ref( $node->{op} ) . ", "
-        #  . Data::Dumper::Dumper($node)
-        #  . ")\n  INTO "
-        #  . $mappedName . '.'
-        #  . $rhs . "\n";
+        print STDERR "-INTO "
+          . $mappedName . '.'
+          . $rhs . "\n" if Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::MONITOR;
 
         if ( $mappedName ne $lhs ) {
             return $mappedName . '.' . $rhs;
@@ -916,10 +978,10 @@ sub hoistMongoDB {
     elsif ( $node->{op} == Foswiki::Infix::Node::NAME ) {
 
         #if we're in a where, this is a bit transmissive
-        #print STDERR "============================= hoist OP_dot("
-        #  . $node->{op} . ", "
-        #  . $node->{params}[0] . ', '
-        #  . (defined($node->{inWhere})?'inwhere':'notinwhere'). ")\n";
+        print STDERR "============================= hoist OP_dot("
+          . $node->{op} . ", "
+          . $node->{params}[0] . ', '
+          . (defined($node->{inWhere})?'inwhere':'notinwhere'). ")\n" if Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::MONITOR;
 
       #if we're in a 'where' eg preferences[name = 'Summary'] then don't aliases
         return $node->{params}[0] if ( defined( $node->{inWhere} ) );
@@ -1254,6 +1316,9 @@ sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
     ASSERT(ref($node) eq 'Foswiki::Query::Node');
+   ASSERT(ref($node->{lhs}) eq '');
+    ASSERT(ref($node->{rhs}) eq '');
+
 
     return { $node->{lhs} => { '$gte' => $node->{rhs} } };
 }
@@ -1276,6 +1341,9 @@ sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
     ASSERT(ref($node) eq 'Foswiki::Query::Node');
+   ASSERT(ref($node->{lhs}) eq '');
+    ASSERT(ref($node->{rhs}) eq '');
+
 
     return { $node->{lhs} => { '$lte' => $node->{rhs} } };
 }
@@ -1287,6 +1355,8 @@ sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
     ASSERT(ref($node) eq 'Foswiki::Query::Node');
+   ASSERT(ref($node->{lhs}) eq '');
+#    ASSERT(ref($node->{rhs}) eq '');
 
     return { $node->{lhs} => { '$lt' => $node->{rhs} } };
 }
@@ -1298,6 +1368,8 @@ sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
     ASSERT(ref($node) eq 'Foswiki::Query::Node');
+    #ASSERT(ref($node->{lhs}) eq '');
+    ASSERT(ref($node->{rhs}) eq '');
 
     return { $node->{lhs} => { '$ne' => $node->{rhs} } };
 }
@@ -1412,7 +1484,7 @@ sub hoistMongoDB {
 
     return {
         '#div'               => [ $node->{lhs}, $node->{rhs} ],
-        '####delay_function' => 1
+        '####delay_function' => 15
     };
 }
 
@@ -1426,7 +1498,7 @@ sub hoistMongoDB {
 
     return {
         '#minus'             => [ $node->{lhs}, $node->{rhs} ],
-        '####delay_function' => 1
+        '####delay_function' => 16
     };
 }
 
@@ -1440,7 +1512,7 @@ sub hoistMongoDB {
 
     return {
         '#plus'              => [ $node->{lhs}, $node->{rhs} ],
-        '####delay_function' => 1
+        '####delay_function' => 17
     };
 }
 
@@ -1454,7 +1526,7 @@ sub hoistMongoDB {
 
     return {
         '#mult'              => [ $node->{lhs}, $node->{rhs} ],
-        '####delay_function' => 1
+        '####delay_function' => 18
     };
 }
 
@@ -1468,7 +1540,7 @@ sub hoistMongoDB {
 
     return {
         '#neg'               => [ $node->{lhs}, $node->{rhs} ],
-        '####delay_function' => 1,
+        '####delay_function' => 19,
         '####numeric'        => 1
     };
 }
@@ -1483,7 +1555,7 @@ sub hoistMongoDB {
 
     return {
         '#pos'               => [ $node->{lhs}, $node->{rhs} ],
-        '####delay_function' => 1,
+        '####delay_function' => 21,
         '####numeric'        => 1
     };
 }
@@ -1516,7 +1588,7 @@ sub hoistMongoDB {
 #print STDERR "---OP_ref(".Dumper($node).")\n";
 
     return { 
-            '####delay_function' => 1,
+            '####delay_function' => 22,
             '#ref' => [ $node->{lhs}, $node->{rhs} ]
         };
 }

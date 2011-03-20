@@ -960,7 +960,7 @@ sub test_hoist_maths {
 
     $this->do_Assert( $query, $mongoDBQuery,
         {
-           '$where' =>  " ((12)-(foswiki_getField(this, 'FIELD.Namespace.value')) < (((24)*(60))*(60))-(5))  &&  ((foswiki_getField(this, 'FIELD.TermGroup.value'))/(12) > (foswiki_getField(this, 'FIELD.WebScale.value'))*(42.8)) "
+           '$where' =>  " ( ((12)-(foswiki_getField(this, 'FIELD.Namespace.value')) < (((24)*(60))*(60))-(5)) )  &&  ((foswiki_getField(this, 'FIELD.TermGroup.value'))/(12) > (foswiki_getField(this, 'FIELD.WebScale.value'))*(42.8)) "
         }
         );
 }
@@ -1319,9 +1319,10 @@ sub test_hoist_dateAndRelationship {
         $query,
         $mongoDBQuery,
         {
-          'FORM.name' => qr/(?-xism:^.*RelationshipForm$)/,
-          '$where' => "(foswiki_getField(this, 'FIELD.NOW.value'))-(foswiki_getField(this, 'TOPICINFO.date')) < (((60)*(60))*(24))*(7)"
-        }
+#TODO: this is caused by the delay_function at line 360 of the hoister ('why')
+#          'FORM.name' => qr/(?-xism:^.*RelationshipForm$)/,
+#          '$where' => "(foswiki_getField(this, 'FIELD.NOW.value'))-(foswiki_getField(this, 'TOPICINFO.date')) < (((60)*(60))*(24))*(7)"
+            '$where' => ' ( (( /^.*RelationshipForm$/.test(foswiki_getField(this, \'FORM.name\')) )) )  &&  ((foswiki_getField(this, \'FIELD.NOW.value\'))-(foswiki_getField(this, \'TOPICINFO.date\')) < (((60)*(60))*(24))*(7)) '
         }
     );
 }
@@ -1369,7 +1370,7 @@ sub test_hoist_not_in {
         }
     );
    $this->assert_equals(
-            ' (! (  ( (this._topic == \'test\')  && this._topic == \'pest\')  && this._topic == \'fest\' ) ) ',
+            '! (  ( (this._topic == \'test\')  && this._topic == \'pest\')  && this._topic == \'fest\' ) ',
             Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::convertToJavascript($mongoDBQuery)
             );
 }
@@ -1432,6 +1433,42 @@ sub test_hoist_ref {
         {
           '$where' => "(foswiki_getField(foswiki_getRef('AnotherTopic'), 'FIELD.number.value')) == 12"
           #"(foswiki_getRef('AnotherTopic').FIELD.number.value) == 12",
+        }
+    );
+}
+
+sub test_hoist_ref2 {
+    my $this = shift;
+    my $s = "Source/info.rev!=SourceRev";
+#    my $s = "form.name='TaxonProfile.Relationships.RelationshipForm' AND Source/info.rev!=SourceRev";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert(
+        $query,
+        $mongoDBQuery,
+        {
+          '$where' => '(foswiki_getField(foswiki_getRef(foswiki_getField(this, \'FIELD.Source.value\')), \'TOPICINFO.FIELD.rev.value\')) != foswiki_getField(this, \'FIELD.SourceRev.value\')'
+
+        }
+    );
+}
+sub test_hoist_ref3 {
+    my $this = shift;
+    my $s = "SourceRev>Source/info.rev";
+#    my $s = "form.name='TaxonProfile.Relationships.RelationshipForm' AND Source/info.rev!=SourceRev";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert(
+        $query,
+        $mongoDBQuery,
+        {
+          '$where' => 'foswiki_getField(this, \'FIELD.SourceRev.value\') > (foswiki_getField(foswiki_getRef(foswiki_getField(this, \'FIELD.Source.value\')), \'TOPICINFO.FIELD.rev.value\'))'
         }
     );
 }
