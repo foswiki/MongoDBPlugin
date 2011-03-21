@@ -444,7 +444,8 @@ sub convertFunction {
     if ($key eq '#ref') {
         #TODO: like all accessses, this needs alot of undef protection.
         my $addr = '('.convertStringToJS( $$value[1] ).')';
-        my $ref = 'foswiki_getRef(' . convertStringToJS( $$value[0] ) . ')';
+##%TMPL:DEF{foswiki_getRef_js}%function(host, collection, currentqueryweb, topic) {
+        my $ref = 'foswiki_getRef(\'localhost\', \'foswiki.current\', this._web, ' . convertStringToJS( $$value[0] ) . ')';
         $addr =~ s/this/$ref/;
         return $addr;
     }
@@ -941,10 +942,10 @@ sub hoistMongoDB {
               . " OOO \n" if Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::MONITOR_DETAIL;
               #return $node->{op}->hoistMongoDB($node);
               if (ref($lhs) ne '' and ref($lhs->{op}) eq 'Foswiki::Query::OP_ref') { # and defined($node->{lhs}->{'#ref'})) {
-print STDERR "+_+_+_+_+_+_+_+_+_+_+_+_+_+_GIMPLE($rhs)\n" if Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::MONITOR;
+print STDERR "+_+_+_+_+_+_+_+_+_+_+_+_+_+_GIMPLE($rhs)(".Data::Dumper::Dumper($lhs).") => ".$lhs->{rhs}.'.'.$node->{params}[1]->{params}[0]."\n" if Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::MONITOR;
+                return {'#ref' => [$lhs->{lhs}, $lhs->{rhs}.'.'.$node->{params}[1]->{params}[0]], '####delay_function' => 13};
                 $lhs->{rhs} .= '.'.$node->{rhs};
                 return {'#ref' => [$lhs->{lhs}, $lhs->{rhs}], '####delay_function' => 13};
-                return $lhs->{op}->hoistMongoDB($lhs);
               }
               $lhs = $node->{lhs};
         } else {
@@ -970,7 +971,6 @@ print STDERR "+_+_+_+_+_+_+_+_+_+_+_+_+_+_GIMPLE($rhs)\n" if Foswiki::Plugins::M
             return $mappedName . '.' . $rhs;
         }
         else {
-
             # TODO: assumes the term before the dot is the form name??? gads
             return 'FIELD.' . $rhs . '.value';
         }

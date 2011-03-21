@@ -1431,7 +1431,7 @@ sub test_hoist_ref {
         $query,
         $mongoDBQuery,
         {
-          '$where' => "(foswiki_getField(foswiki_getRef('AnotherTopic'), 'FIELD.number.value')) == 12"
+          '$where' => "(foswiki_getField(foswiki_getRef(\'localhost\', \'foswiki.current\', this._web, 'AnotherTopic'), 'FIELD.number.value')) == 12"
           #"(foswiki_getRef('AnotherTopic').FIELD.number.value) == 12",
         }
     );
@@ -1450,7 +1450,7 @@ sub test_hoist_ref2 {
         $query,
         $mongoDBQuery,
         {
-          '$where' => '(foswiki_getField(foswiki_getRef(foswiki_getField(this, \'FIELD.Source.value\')), \'TOPICINFO.FIELD.rev.value\')) != foswiki_getField(this, \'FIELD.SourceRev.value\')'
+          '$where' => '(foswiki_getField(foswiki_getRef(\'localhost\', \'foswiki.current\', this._web, foswiki_getField(this, \'FIELD.Source.value\')), \'TOPICINFO.rev\')) != foswiki_getField(this, \'FIELD.SourceRev.value\')'
 
         }
     );
@@ -1468,7 +1468,7 @@ sub test_hoist_ref3 {
         $query,
         $mongoDBQuery,
         {
-          '$where' => 'foswiki_getField(this, \'FIELD.SourceRev.value\') > (foswiki_getField(foswiki_getRef(foswiki_getField(this, \'FIELD.Source.value\')), \'TOPICINFO.FIELD.rev.value\'))'
+          '$where' => 'foswiki_getField(this, \'FIELD.SourceRev.value\') > (foswiki_getField(foswiki_getRef(\'localhost\', \'foswiki.current\', this._web, foswiki_getField(this, \'FIELD.Source.value\')), \'TOPICINFO.rev\'))'
         }
     );
 }

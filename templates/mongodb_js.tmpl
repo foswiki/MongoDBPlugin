@@ -1,10 +1,11 @@
 %{ foswiki_getField attempts to avoid dereferenceing an undefined element. }%
-%TMPL:DEF{foswiki_getField_js}%function(this, address) {
-    var ptr = this;
+%TMPL:DEF{foswiki_getField_js}%function(obj, address) {
+    var ptr = obj;
 //address is of the form 'this.TOPICINFO.version' and needs to be separated into individual return undefined if this['TOPICINFO'] == undefined etc
 
     var addrs = address.split('.');
-    for (var name in addrs) {
+    for (var i in addrs) {
+        var name = addrs[i];
         if (ptr == undefined) {
             return ptr;
         }
@@ -31,12 +32,29 @@
     }
     return value.length;
 }%TMPL:END%
+%TMPL:DEF{foswiki_normaliseTopic_js}%function(web, topic) {
+    //if there's a dot or slash, look for last one, and chop off there
 
+    var m = /(.*)[/.](.*)/.exec(topic);
+    if (m != undefined) {
+        web = m[1];
+        topic=m[2];
+    }
+
+    return [web, topic];
+}%TMPL:END%
 
 
 %TMPL:DEF{foswiki_getRef_js}%function(host, collection, web, topic) {
     conn = new Mongo(host);
     current = conn.getCollection(collection);
+    
+    if (topic ==undefined) {
+        return topic;
+    }
+    var arr = foswiki_normaliseTopic(web, topic);
+    web = arr[0];
+    topic = arr[1];
 
     return current.findOne({_web:web, _topic: topic});
 }%TMPL:END%

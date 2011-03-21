@@ -332,6 +332,8 @@ sub _updateDatabase {
     my $foswiki_length_js = Foswiki::Func::expandTemplate('foswiki_length_js');
     getMongoDB()->updateSystemJS('foswiki_length', $foswiki_length_js);
 
+    my $foswiki_normaliseTopic_js = Foswiki::Func::expandTemplate('foswiki_normaliseTopic_js');
+    getMongoDB()->updateSystemJS('foswiki_normaliseTopic', $foswiki_normaliseTopic_js);
 }
 
 
