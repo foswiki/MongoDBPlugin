@@ -13,6 +13,7 @@ lib/Foswiki/Plugins/MongoDBPlugin/Listener.pm 0644 Store Listener
 lib/Foswiki/Plugins/MongoDBPlugin/HoistMongoDB.pm 0644 Hoist Queries into MongoDB queries
 
 test/unit/HoistMongoDBsTests.pm 0644 Unit tests
+tools/mongoload.pm 0644 tool to load all webs from CLI
 
 lib/Foswiki/Store/QueryAlgorithms/MongoDB.pm 0644 Perl module
 lib/Foswiki/Store/SearchAlgorithms/MongoDB.pm 0644 Perl module
