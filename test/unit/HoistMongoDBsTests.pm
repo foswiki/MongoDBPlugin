@@ -1472,5 +1472,40 @@ sub test_hoist_ref3 {
         }
     );
 }
+sub test_hoist_ref4 {
+    my $this = shift;
+    my $s = "form.name='TaxonProfile.Relationships.RelationshipForm' AND Source/info.rev!=SourceRev";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert(
+        $query,
+        $mongoDBQuery,
+        {
+          '$where' => ' ( (foswiki_getField(this, \'FORM.name\') == \'TaxonProfile.Relationships.RelationshipForm\') )  &&  ((foswiki_getField(foswiki_getRef(\'localhost\', \'foswiki.current\', this._web, foswiki_getField(this, \'FIELD.Source.value\')), \'TOPICINFO.rev\')) != foswiki_getField(this, \'FIELD.SourceRev.value\')) '
+        }
+    );
+}
+
+#test written to match Fn_SEARCH::verify_formQuery2
+#Item10520: in Sven's reading of System.QuerySearch, this should return no results, as there is no field of the name 'TestForm'
+sub DISABLEtest_hoist_ImplicitFormNameBUG {
+    my $this = shift;
+    my $s = "FormName";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert(
+        $query,
+        $mongoDBQuery,
+        {
+          '$where' => '(foswiki_getField(this, \'FIELD.FormName.name\') )'
+        }
+    );
+}
 
 1;

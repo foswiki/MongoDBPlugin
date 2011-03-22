@@ -1034,6 +1034,11 @@ sub hoistMongoDB {
                 '#where' => $node->{lhs}
             });
     }
+    if (ref($node->{rhs}) eq '') {
+        $node->{rhs} =             {
+                '$where' => Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::convertStringToJS($node->{rhs})
+            };
+    }
     foreach my $key ( keys( %{ $node->{rhs} } ) ) {
         if ( defined( $andHash{$key} ) ) {
             my $conflictResolved = 0;
