@@ -152,54 +152,71 @@ sub getMongoDB {
 sub _update {
     my $session = shift;
     my $query   = Foswiki::Func::getCgiQuery();
-    my $web     = $query->param('updateweb') || 'Sandbox';
-    
-    #we need to deactivate any listeners :/ () at least stop the loadTopic one from triggering
-    $Foswiki::cfg{Store}{Listeners}{'Foswiki::Plugins::MongoDBPlugin::Listener'} = 0; 
 
-    
     #lets make sure we have the javascript we'll rely on later
     _updateDatabase($session, $query);
 
-    my @topicList = Foswiki::Func::getTopicList($web);
 
-    my $count = 0;
-    foreach my $topic (@topicList) {
-        my ( $meta, $text, $raw_text )
-          ;    # = Foswiki::Func::readTopic( $web, $topic );
-        my $filename =
-          join( '/', ( $Foswiki::cfg{PubDir}, $web, $topic . '.txt' ) );
-        if (
-            ( 1 == 2 )
-            and (
-                (
-                    $Foswiki::cfg{Store}{Implementation} eq
-                    'Foswiki::Store::RcsWrap'
-                )
-                or ( $Foswiki::cfg{Store}{Implementation} eq
-                    'Foswiki::Store::RcsLite' )
-            )
-            and ( -e $filename )
-          )
-        {
-
-#if this happens to be a normal file based store, then we can speed things up a bit by breaking the Store abstraction
-            $raw_text = Foswiki::Func::readFile($filename);
-            $raw_text =~ s/\r//g;    # Remove carriage returns
-            $meta->setEmbeddedStoreForm($raw_text);
-            $text = $meta->text();
+    my $webParam     = $query->param('updateweb') || 'Sandbox';
+    my $recurse   = Foswiki::Func::isTrue($query->param('recurse'), ($webParam eq 'all'));
+    
+    my @webNames;
+    if ($recurse) {
+           
+        if ($webParam eq 'all') {
+            $webParam = undef;
         }
-        else {
-            ( $meta, $text ) = Foswiki::Func::readTopic( $web, $topic );
-        }
-
-        #TODO: listener called for webs too.. (delete, move etc)
-        _updateTopic( $web, $topic, $meta, $raw_text );
-
-        $count++;
+        @webNames = Foswiki::Func::getListOfWebs( '' , $webParam );
     }
+    unshift(@webNames, $webParam);
 
-    return $count;
+    #we need to deactivate any listeners :/ () at least stop the loadTopic one from triggering
+    $Foswiki::cfg{Store}{Listeners}{'Foswiki::Plugins::MongoDBPlugin::Listener'} = 0; 
+
+    my $result = "\n importing: \n";
+    foreach my $web (@webNames) {
+        print STDERR "start web: $web\n";
+        my @topicList = Foswiki::Func::getTopicList($web);
+
+        my $count = 0;
+        foreach my $topic (@topicList) {
+            my ( $meta, $text, $raw_text )
+              ;    # = Foswiki::Func::readTopic( $web, $topic );
+            my $filename =
+              join( '/', ( $Foswiki::cfg{PubDir}, $web, $topic . '.txt' ) );
+            if (
+                ( 1 == 2 )
+                and (
+                    (
+                        $Foswiki::cfg{Store}{Implementation} eq
+                        'Foswiki::Store::RcsWrap'
+                    )
+                    or ( $Foswiki::cfg{Store}{Implementation} eq
+                        'Foswiki::Store::RcsLite' )
+                )
+                and ( -e $filename )
+              )
+            {
+
+    #if this happens to be a normal file based store, then we can speed things up a bit by breaking the Store abstraction
+                $raw_text = Foswiki::Func::readFile($filename);
+                $raw_text =~ s/\r//g;    # Remove carriage returns
+                $meta->setEmbeddedStoreForm($raw_text);
+                $text = $meta->text();
+            }
+            else {
+                ( $meta, $text ) = Foswiki::Func::readTopic( $web, $topic );
+            }
+
+            #TODO: listener called for webs too.. (delete, move etc)
+            _updateTopic( $web, $topic, $meta, $raw_text );
+
+            $count++;
+            print STDERR "imported $count\n" if (($count %1000) == 0);
+        }
+        $result .= $web.': '.$count."\n";
+    }
+    return $result."\n\n";
 }
 
 sub _removeTopic {

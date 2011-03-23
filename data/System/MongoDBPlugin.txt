@@ -14,8 +14,11 @@ prefer.
 ---++ Usage
 This is an experimental attempt to utilise [[http://mongodb.org][MongoDB]] for all aspects of serialisation in foswiki.
 
-At this point the Plugin is used to populate the MongoDB. All user topic Saves are automatically copied into the MongoDB, and you can batch load using the restHandler:
-   * %SCRIPTURL{rest}%/MongoDBPlugin/update?updateweb=Main
+At this point the Plugin is used to populate the MongoDB. All user topic Saves are automatically copied into the MongoDB, 
+and you can batch load using the restHandler:
+   * %SCRIPTURL{rest}%/MongoDBPlugin/update?updateweb=Main (just the Main web)
+   * %SCRIPTURL{rest}%/MongoDBPlugin/update?updateweb=all (all webs recursivly)
+   * %SCRIPTURL{rest}%/MongoDBPlugin/update?updateweb=Lauries;recurse=true (Lauries web and its subwebs recursivly)
 
 To update the javascript stored in MongoDB
    * %SCRIPTURL{rest}%/MongoDBPlugin/updateDatabase
