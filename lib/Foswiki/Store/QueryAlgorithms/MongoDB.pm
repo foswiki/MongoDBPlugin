@@ -320,8 +320,6 @@ sub doMongoSearch {
     my $cursor = Foswiki::Plugins::MongoDBPlugin::getMongoDB()
       ->query( 'current', $ixhQuery, $queryAttrs );
 
-    print STDERR "found " . $cursor->count . "\n";
-
     return $cursor;
 }
 
