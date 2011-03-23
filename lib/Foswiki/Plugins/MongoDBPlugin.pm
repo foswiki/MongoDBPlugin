@@ -168,15 +168,15 @@ sub _update {
         }
         @webNames = Foswiki::Func::getListOfWebs( '' , $webParam );
     }
-    unshift(@webNames, $webParam);
+    unshift(@webNames, $webParam) if (defined($webParam));
 
     #we need to deactivate any listeners :/ () at least stop the loadTopic one from triggering
     $Foswiki::cfg{Store}{Listeners}{'Foswiki::Plugins::MongoDBPlugin::Listener'} = 0; 
 
     my $result = "\n importing: \n";
     foreach my $web (@webNames) {
-        print STDERR "start web: $web\n";
         my @topicList = Foswiki::Func::getTopicList($web);
+        print STDERR "start web: $web ($#topicList)\n";
 
         my $count = 0;
         foreach my $topic (@topicList) {
