@@ -57,22 +57,38 @@ sub query {
       if MONITOR;
 
 #debugging for upstream
-#print STDERR "----------------------------------------------------------------------------------\n";
-#my $connection = $self->_connect();
-#my $database   = $connection->get_database( $self->{database} );
+print STDERR "----------------------------------------------------------------------------------\n";
+my $connection = $self->_connect();
+my $database   = $connection->get_database( $self->{database} );
 #$database->run_command({"profile" => 2});
 
+#use Devel::Peek;
+#Dump($database->run_command({"count" => 'current', "query" => $ixhQuery}));
+#print STDERR "----------------------------------------------------------------------------------\n";
     my $cursor = $collection->query( $ixhQuery, $queryAttrs );
+    my $long_count = $database->run_command({"count" => 'current', "query" => $ixhQuery});
+    my $real_count = $cursor->count;
+
+
+
+
+if (($cursor->count == 0) and $cursor->has_next()) {
+	#fake it
+	$real_count = $long_count->{n};
+	$cursor->{real_count} = $real_count;
+}
+
+use Data::Dumper;
     print STDERR "found "
       . $cursor->count
+      . " (long_count = ".Dumper($long_count).") "
       . " _BUT_ has_next is "
-      . ( $cursor->has_next() ? 'true' : 'false' ) . "\n"
-      if MONITOR;
+      . ( $cursor->has_next() ? 'true' : 'false' ) . "\n";
 
 #more debugging
 #print STDERR "get_collection(system.profile)".Dumper($database->get_collection("system.profile")->find->all)."\n";
-#$database->run_command({"profile" => 0});
-#print STDERR "----------------------------------------------------------------------------------\n";
+#p$database->run_command({"profile" => 0});
+print STDERR "----------------------------------------------------------------------------------\n";
 
     #end timer
     my $endTime = [Time::HiRes::gettimeofday];
