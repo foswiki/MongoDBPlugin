@@ -9,7 +9,7 @@ use Foswiki::Plugins::MongoDBPlugin::DB;
 use Foswiki::Search::MongoDBInfoCache;
 use Data::Dumper;
 
-use constant MONITOR => 1;
+use constant MONITOR => 0;
 
 BEGIN {
 
