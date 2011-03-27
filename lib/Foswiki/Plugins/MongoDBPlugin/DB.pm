@@ -57,7 +57,7 @@ sub query {
       if MONITOR;
 
 #debugging for upstream
-print STDERR "----------------------------------------------------------------------------------\n";
+print STDERR "----------------------------------------------------------------------------------\n" if DEBUG;
 my $connection = $self->_connect();
 my $database   = $connection->get_database( $self->{database} );
 #$database->run_command({"profile" => 2});
@@ -83,12 +83,12 @@ use Data::Dumper;
       . $cursor->count
       . " (long_count = ".Dumper($long_count).") "
       . " _BUT_ has_next is "
-      . ( $cursor->has_next() ? 'true' : 'false' ) . "\n";
+      . ( $cursor->has_next() ? 'true' : 'false' ) . "\n" if DEBUG;
 
 #more debugging
 #print STDERR "get_collection(system.profile)".Dumper($database->get_collection("system.profile")->find->all)."\n";
 #p$database->run_command({"profile" => 0});
-print STDERR "----------------------------------------------------------------------------------\n";
+print STDERR "----------------------------------------------------------------------------------\n" if DEBUG;
 
     #end timer
     my $endTime = [Time::HiRes::gettimeofday];
