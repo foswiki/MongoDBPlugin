@@ -1269,8 +1269,7 @@ sub hoistMongoDB {
 #use Data::Dumper;
 #print STDERR "###### OP_not ".Dumper($lhs->{$key})." - ".ref($lhs->{$key})."\n";
 #TODO: convert $nin to $in, and vs versa
-            if (   ( ref( $lhs->{$key} ) eq '' )
-                or ( ref( $lhs->{$key} ) eq 'Regexp' ) )
+            if ( ref( $lhs->{$key} ) eq '' )
             {
 
                 #if this is a name / string etc - use $ne :(
@@ -1299,7 +1298,11 @@ sub hoistMongoDB {
                       Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::convertToJavascript(
                         { '$not' => $lhs } );
                 } else {
-                    return {$keys[0] => {'$ne' => $lhs->{$keys[0]}}};
+                    if ( ref( $lhs->{$keys[0]} ) eq '' ) {
+                        return {$keys[0] => {'$ne' => $lhs->{$keys[0]}}};
+                    } else {
+                        return {$keys[0] => {'$not' => $lhs->{$keys[0]}}};
+                    }
                 }
             } elsif ( $keys[0] eq '$or' ) {
                 #TODO: avoid using $nor, and convert to $in and $nin

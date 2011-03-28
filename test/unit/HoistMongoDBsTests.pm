@@ -925,7 +925,7 @@ sub test_hoist_Item10323_2_not {
         {
 #          '$where' => "! (  ( (Regex('bio'.toLowerCase(), '').test(this.FIELD.TermGroup.value.toLowerCase())) )  ) "
           'FIELD.TermGroup.value' => {
-                                       '$ne' => qr/(?i-xsm:bio)/
+                                       '$not' => qr/(?i-xsm:bio)/
                                      }
 
         }
