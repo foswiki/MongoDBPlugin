@@ -1489,6 +1489,25 @@ sub test_hoist_ref4 {
     );
 }
 
+sub test_hoist_Item10515 {
+    my $this = shift;
+    my $s = "lc(Firstname)=lc('JOHN')";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert(
+        $query,
+        $mongoDBQuery,
+        {
+          '$where' => 'foswiki_toLowerCase(foswiki_getField(this, \'FIELD.Firstname.value\')) == foswiki_toLowerCase(\'JOHN\')'
+        }
+    );
+}
+
+
+
 #test written to match Fn_SEARCH::verify_formQuery2
 #Item10520: in Sven's reading of System.QuerySearch, this should return no results, as there is no field of the name 'TestForm'
 sub DISABLEtest_hoist_ImplicitFormNameBUG {
