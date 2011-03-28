@@ -23,9 +23,14 @@ package Foswiki::Plugins::MongoDBPlugin::DB;
 # Always use strict to enforce variable scoping
 use strict;
 use MongoDB;
+use MongoDB::Cursor;
 use Assert;
 use Data::Dumper;
 use Time::HiRes ();
+
+#lets declare it ok to run queries on slaves.
+#http://search.cpan.org/~kristina/MongoDB-0.42/lib/MongoDB/Cursor.pm#slave_okay
+$MongoDB::Cursor::slave_okay = 1;
 
 #I wish
 #use constant MONITOR => $Foswiki::cfg{MONITOR}{'Foswiki::Plugins::MongoDBPlugin'} || 0;
