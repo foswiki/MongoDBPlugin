@@ -70,12 +70,16 @@ my $database   = $connection->get_database( $self->{database} );
 #use Devel::Peek;
 #Dump($database->run_command({"count" => 'current', "query" => $ixhQuery}));
 #print STDERR "----------------------------------------------------------------------------------\n";
-    my $cursor = $collection->query( $ixhQuery, $queryAttrs );
     my $long_count = $database->run_command({"count" => 'current', "query" => $ixhQuery});
+    my $cursor = $collection->query( $ixhQuery, $queryAttrs );
+    #TODO: this is to make sure we're getting the cursor->count before anyone uses the cursor.
+    my $count = $long_count;
+    if ($count > 100) {
+        $cursor->{noCache} = 1;
+        $cursor = $cursor->fields({_web=>1, _topic=>1});
+    }
+
     my $real_count = $cursor->count;
-
-
-
 
 if (($cursor->count == 0) and $cursor->has_next()) {
 	#fake it

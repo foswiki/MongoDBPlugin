@@ -35,9 +35,6 @@ sub new {
     $this->{_SEARCHoptions} = $options;
     $this->{_cursor}        = $cursor;
     
-    #TODO: this is to make sure we're getting the cursor->count before anyone uses the cursor.
-    $this->numberOfTopics();
-
     return $this;
 }
 
@@ -57,7 +54,7 @@ sub numberOfTopics {
         #    $count++;
         #}
         #$this->{_cursor}->reset();
-	$count = $this->{_cursor}->{real_count};
+        $count = $this->{_cursor}->{real_count};
     }
     $this->{cachedCount} = $count;
     return $count;
@@ -73,12 +70,13 @@ sub next {
     my $obj  = $this->{_cursor}->next;
     my $session = $this->{_session};
     
-    if (not $session->search->metacache->hasCached( $obj->{_web}, $obj->{_topic})) {
-        my $meta = new Foswiki::Plugins::MongoDBPlugin::Meta($session, $obj->{_web}, $obj->{_topic}, $obj);
-#print STDERR "===== MongoDBInfoCache store in metacache (".$meta->web." , ".$meta->topic.", version)\n";
-        $session->search->metacache->addMeta( $meta->web, $meta->topic, $meta );
+    if (not ($this->{_cursor}->{noCache})) {
+        if (not $session->search->metacache->hasCached( $obj->{_web}, $obj->{_topic})) {
+            my $meta = new Foswiki::Plugins::MongoDBPlugin::Meta($session, $obj->{_web}, $obj->{_topic}, $obj);
+    #print STDERR "===== MongoDBInfoCache store in metacache (".$meta->web." , ".$meta->topic.", version)\n";
+            $session->search->metacache->addMeta( $meta->web, $meta->topic, $meta );
+        }
     }
-
     return $obj->{_web}.'.'.$obj->{_topic};
 }
 sub reset { return 0; }
