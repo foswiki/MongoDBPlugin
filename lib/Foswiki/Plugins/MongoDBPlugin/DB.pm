@@ -79,20 +79,20 @@ my $db   = $self->_getDatabase( $database );
         $cursor = $cursor->fields({_web=>1, _topic=>1});
     }
 
-    my $real_count = $cursor->count;
+##    my $real_count = $cursor->count;
 
-if (($cursor->count == 0) and $cursor->has_next()) {
+##if (($cursor->count == 0) and $cursor->has_next()) {
 	#fake it
-	$real_count = $long_count->{n};
-	$cursor->{real_count} = $real_count;
-}
+##	$real_count = $long_count->{n};
+	$cursor->{real_count} = $long_count->{n};
+##}
 
-use Data::Dumper;
-    print STDERR "found "
-      . $cursor->count
-      . " (long_count = ".Dumper($long_count).") "
-      . " _BUT_ has_next is "
-      . ( $cursor->has_next() ? 'true' : 'false' ) . "\n" if DEBUG;
+##use Data::Dumper;
+##    print STDERR "found "
+##      . $cursor->count
+##      . " (long_count = ".Dumper($long_count).") "
+##      . " _BUT_ has_next is "
+##      . ( $cursor->has_next() ? 'true' : 'false' ) . "\n" if DEBUG;
 
 #more debugging
 #print STDERR "get_collection(system.profile)".Dumper($db->get_collection("system.profile")->find->all)."\n";
