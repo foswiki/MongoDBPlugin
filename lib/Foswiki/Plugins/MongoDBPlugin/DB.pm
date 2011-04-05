@@ -49,13 +49,14 @@ sub new {
 
 sub query {
     my $self           = shift;
+    my $database       = shift;
     my $collectionName = shift;
     my $ixhQuery       = shift;
     my $queryAttrs     = shift || {};
 
     my $startTime = [Time::HiRes::gettimeofday];
 
-    my $collection = $self->_getCollection('current');
+    my $collection = $self->_getCollection($database, 'current');
     print STDERR "searching mongo : "
       . Dumper($ixhQuery) . " , "
       . Dumper($queryAttrs) . "\n"
@@ -63,14 +64,13 @@ sub query {
 
 #debugging for upstream
 print STDERR "----------------------------------------------------------------------------------\n" if DEBUG;
-my $connection = $self->_connect();
-my $database   = $connection->get_database( $self->{database} );
-#$database->run_command({"profile" => 2});
+my $db   = $self->_getDatabase( $database );
+#$db->run_command({"profile" => 2});
 
 #use Devel::Peek;
-#Dump($database->run_command({"count" => 'current', "query" => $ixhQuery}));
+#Dump($db->run_command({"count" => 'current', "query" => $ixhQuery}));
 #print STDERR "----------------------------------------------------------------------------------\n";
-    my $long_count = $database->run_command({"count" => 'current', "query" => $ixhQuery});
+    my $long_count = $db->run_command({"count" => 'current', "query" => $ixhQuery});
     my $cursor = $collection->query( $ixhQuery, $queryAttrs );
     #TODO: this is to make sure we're getting the cursor->count before anyone uses the cursor.
     my $count = $long_count;
@@ -95,8 +95,8 @@ use Data::Dumper;
       . ( $cursor->has_next() ? 'true' : 'false' ) . "\n" if DEBUG;
 
 #more debugging
-#print STDERR "get_collection(system.profile)".Dumper($database->get_collection("system.profile")->find->all)."\n";
-#p$database->run_command({"profile" => 0});
+#print STDERR "get_collection(system.profile)".Dumper($db->get_collection("system.profile")->find->all)."\n";
+#$db->run_command({"profile" => 0});
 print STDERR "----------------------------------------------------------------------------------\n" if DEBUG;
 
     #end timer
@@ -110,6 +110,7 @@ print STDERR "------------------------------------------------------------------
 
 sub update {
     my $self           = shift;
+    my $database       = shift;
     my $collectionName = shift;
     my $address        = shift;
     my $hash           = shift;
@@ -117,15 +118,15 @@ sub update {
     #    use Data::Dumper;
     print STDERR "+++++ mongo update $address == ".Dumper($hash)."\n" if MONITOR;
 
-    my $collection = $self->_getCollection($collectionName);
+    my $collection = $self->_getCollection($database, $collectionName);
 
 #TODO: not the most efficient place to create and index, but I want to be sure, to be sure.
     $self->ensureIndex( $collection, { _topic => 1 }, { name => '_topic' } );
-    $self->ensureIndex(
-        $collection,
-        { _topic => 1,             _web   => 1 },
-        { name   => '_topic:_web', unique => 1 }
-    );
+#    $self->ensureIndex(
+#        $collection,
+#        { _topic => 1,             _web   => 1 },
+#        { name   => '_topic:_web', unique => 1 }
+#    );
     $self->ensureIndex(
         $collection,
         { 'TOPICINFO.author' => 1 },
@@ -176,16 +177,16 @@ sub update {
 #MongoDB's ensure_index causes the server to re0index, even if that index already exists, so we need to wrap it.
 sub ensureIndex {
     my $self       = shift;
-    my $collection = shift;    #either a collection object of a name
+    my $collection = shift;#must be a collection obj
     my $indexRef   = shift;    #can be a hashref or an ixHash
     my $options    = shift;
 
     ASSERT( defined( $options->{name} ) ) if DEBUG;
 
     if ( ref($collection) eq '' ) {
-
+die 'must convert $collection param to be a collection obj';
         #convert name of collection to collection obj
-        $collection = $self->_getCollection($collection);
+        #$collection = $self->_getCollection($database, $collection);
     }
 
     #cache the indexes we know about
@@ -218,20 +219,22 @@ sub ensureIndex {
 
 sub remove {
     my $self           = shift;
+    my $database       = shift;
     my $collectionName = shift;
     my $mongoDbQuery           = shift;
 
-    my $collection = $self->_getCollection($collectionName);
+    my $collection = $self->_getCollection($database, $collectionName);
 
     $collection->remove($mongoDbQuery);
 }
 
 sub updateSystemJS {
     my $self = shift;
+    my $database       = shift;
     my $functionname = shift;
     my $sourcecode = shift;
     
-    my $collection = $self->_getCollection('system.js');
+    my $collection = $self->_getCollection($database, 'system.js');
 
 use MongoDB::Code;
     my $code = MongoDB::Code->new('code' => $sourcecode);
@@ -246,15 +249,35 @@ use MongoDB::Code;
 
 
 #######################################################
-#Webname?
-sub _getCollection {
+sub getDatabaseName {
     my $self           = shift;
-    my $collectionName = shift;
+    my $web       = shift;
+    
+    #using webname as database name, so we need to sanitise
+    #replace / with __ and pre-pend foswiki__ ?
+    $web =~ s/\//__/g;
+    return 'foswiki__'.$web;
+}
+sub _getDatabase {
+    my $self           = shift;
+    my $database       = shift;
+    
+    #using webname as database name, so we need to sanitise
+    #replace / with __ and pre-pend foswiki__ ?
+    $database =~ s/\//__/g;
+    $database = 'foswiki__'.$database;
 
     my $connection = $self->_connect();
-    my $database   = $connection->get_database( $self->{database} );
+    return $connection->get_database( $database );
+}
+sub _getCollection {
+    my $self           = shift;
+    my $database       = shift;
+    my $collectionName = shift;
+    
+    my $db   = $self->_getDatabase($database);
 
-    return $database->get_collection($collectionName);
+    return $db->get_collection($collectionName);
 }
 
 sub _connect {
@@ -276,9 +299,10 @@ sub _MONGODB {
     my $params = shift;
 
     my $web   = $params->{web};
+    my $database = $web;
     my $topic = $params->{topic};
 
-    my $collection = $self->_getCollection('current');
+    my $collection = $self->_getCollection($database, 'current');
     my $data = $collection->find_one( { _web => $web, _topic => $topic } );
 
     use Foswiki::Plugins::MongoDBPlugin::Meta;

@@ -445,7 +445,7 @@ sub convertFunction {
         #TODO: like all accessses, this needs alot of undef protection.
         my $addr = '('.convertStringToJS( $$value[1] ).')';
 ##%TMPL:DEF{foswiki_getRef_js}%function(host, collection, currentqueryweb, topic) {
-        my $ref = 'foswiki_getRef(\'localhost\', \'foswiki.current\', this._web, ' . convertStringToJS( $$value[0] ) . ')';
+        my $ref = 'foswiki_getRef(\'localhost\', foswiki_getDatabaseName(this._web)+\'.current\', this._web, ' . convertStringToJS( $$value[0] ) . ')';
         $addr =~ s/this/$ref/;
         return $addr;
     }

@@ -141,7 +141,7 @@ sub getMongoDB {
                 port => $Foswiki::cfg{MongoDBPlugin}{port} || '27017',
                 username => $Foswiki::cfg{MongoDBPlugin}{username},
                 password => $Foswiki::cfg{MongoDBPlugin}{password},
-                database => $Foswiki::cfg{MongoDBPlugin}{database} || 'foswiki',
+#                database => $Foswiki::cfg{MongoDBPlugin}{database} || 'foswiki',
             }
         );
     }
@@ -152,10 +152,6 @@ sub getMongoDB {
 sub _update {
     my $session = shift;
     my $query   = Foswiki::Func::getCgiQuery();
-
-    #lets make sure we have the javascript we'll rely on later
-    _updateDatabase($session, $query);
-
 
     my $webParam     = $query->param('updateweb') || 'Sandbox';
     my $recurse   = Foswiki::Func::isTrue($query->param('recurse'), ($webParam eq 'all'));
@@ -175,6 +171,9 @@ sub _update {
 
     my $result = "\n importing: \n";
     foreach my $web (@webNames) {
+    #lets make sure we have the javascript we'll rely on later
+    _updateDatabase($session, $web, $query);
+
         my @topicList = Foswiki::Func::getTopicList($web);
         print STDERR "start web: $web ($#topicList)\n";
 
@@ -228,7 +227,7 @@ sub _removeTopic {
 
     #    $query->{'_attachment'} = $topic if (defined($attachment));
 
-    my $ret = getMongoDB()->remove( 'current', $query );
+    my $ret = getMongoDB()->remove($web, 'current', $query );
 
 }
 
@@ -269,8 +268,8 @@ sub _updateTopic {
 #even then, we have a hard limit of 40 indexes, so we're going to have to get more creative.
 #mind you, we don't really need indexes for speed, just to cope with query() resultsets that contain more than 1Meg of documents - so maybe we can delay creation until that happens?
                     getMongoDB()->ensureIndex(
-                        'current',
-                        { $key . '.' . $elem->{name} => 1 },
+                        getMongoDB()->_getCollection($web, 'current'),
+                        { $key . '.' . $elem->{name}.'.value' => 1 },
                         { name => $key . '.' . $elem->{name} }
                     );
                 }
@@ -319,38 +318,53 @@ sub _updateTopic {
 
     $meta->{_raw_text} = $raw_text || $savedMeta->getEmbeddedStoreForm();
 
-    my $ret = getMongoDB()->update( 'current', "$web.$topic", $meta );
+    my $ret = getMongoDB()->update($web, 'current', "$web.$topic", $meta );
 }
 
 #restHandler used to update the javascript saved in MongoDB
 sub _updateDatabase {
     my $session = shift;
     my $query   = Foswiki::Func::getCgiQuery();
+    #TODO: actually, should do all webs if not specified..
+    my $web = shift;
+    if (not defined($web) or ($web eq 'MongoDBPlugin')) {
+        my $count = 0;
+        #do all webs..
+        my @webNames = Foswiki::Func::getListOfWebs( '' , undef );
+        foreach $web (@webNames) {
+            $count += _updateDatabase($session, $web);
+        }
+        return $count;
+    }
     
-    #load from topic..
-    my $meta = Foswiki::Func::readTopic('Sandbox', 'TestParseTime');
+    print STDERR "loading js into $web\n";
     
     Foswiki::Func::loadTemplate('mongodb_js');
     my $foswiki_d2n_js = Foswiki::Func::expandTemplate('foswiki_d2n_js');
-    getMongoDB()->updateSystemJS('foswiki_d2n', $foswiki_d2n_js);
+    getMongoDB()->updateSystemJS($web, 'foswiki_d2n', $foswiki_d2n_js);
     
     my $foswiki_getRef_js = Foswiki::Func::expandTemplate('foswiki_getRef_js');
-    getMongoDB()->updateSystemJS('foswiki_getRef', $foswiki_getRef_js);
+    getMongoDB()->updateSystemJS($web, 'foswiki_getRef', $foswiki_getRef_js);
 
     my $foswiki_getField_js = Foswiki::Func::expandTemplate('foswiki_getField_js');
-    getMongoDB()->updateSystemJS('foswiki_getField', $foswiki_getField_js);
+    getMongoDB()->updateSystemJS($web, 'foswiki_getField', $foswiki_getField_js);
     
     my $foswiki_toLowerCase_js = Foswiki::Func::expandTemplate('foswiki_toLowerCase_js');
-    getMongoDB()->updateSystemJS('foswiki_toLowerCase', $foswiki_toLowerCase_js);
+    getMongoDB()->updateSystemJS($web, 'foswiki_toLowerCase', $foswiki_toLowerCase_js);
     
     my $foswiki_toUpperCase_js = Foswiki::Func::expandTemplate('foswiki_toUpperCase_js');
-    getMongoDB()->updateSystemJS('foswiki_toUpperCase', $foswiki_toUpperCase_js);
+    getMongoDB()->updateSystemJS($web, 'foswiki_toUpperCase', $foswiki_toUpperCase_js);
     
     my $foswiki_length_js = Foswiki::Func::expandTemplate('foswiki_length_js');
-    getMongoDB()->updateSystemJS('foswiki_length', $foswiki_length_js);
+    getMongoDB()->updateSystemJS($web, 'foswiki_length', $foswiki_length_js);
 
     my $foswiki_normaliseTopic_js = Foswiki::Func::expandTemplate('foswiki_normaliseTopic_js');
-    getMongoDB()->updateSystemJS('foswiki_normaliseTopic', $foswiki_normaliseTopic_js);
+    getMongoDB()->updateSystemJS($web, 'foswiki_normaliseTopic', $foswiki_normaliseTopic_js);
+    
+    my $foswiki_getDatabaseName_js = Foswiki::Func::expandTemplate('foswiki_getDatabaseName_js');
+    getMongoDB()->updateSystemJS($web, 'foswiki_getDatabaseName', $foswiki_getDatabaseName_js);
+    
+    return 1;
 }
 
 

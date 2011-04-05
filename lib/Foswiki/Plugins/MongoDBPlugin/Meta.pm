@@ -81,7 +81,7 @@ sub reload {
     $this->{FILEATTACHMENT} = [];
 
     my $collection =
-      Foswiki::Plugins::MongoDBPlugin::getMongoDB->_getCollection('current');
+      Foswiki::Plugins::MongoDBPlugin::getMongoDB->_getCollection($this->{_web}, 'current');
     my $data = $collection->find_one(
         { _web => $this->{_web}, _topic => $this->{_topic} } );
     $this->loadFromBSONData($data);

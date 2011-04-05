@@ -43,6 +43,9 @@ sub insert {
     my %args = @_;
 
     return if ( defined( $args{newattachment} ) );
+    
+    #creating a new web... so we need to add the js we use to get foswiki style functionality
+    Foswiki::Plugins::MongoDBPlugin::_updateDatabase($args{newmeta}->{_session}, $args{newmeta}->web) if ($args{newmeta}->topic eq 'WebPreferences');
 
     Foswiki::Plugins::MongoDBPlugin::_updateTopic( $args{newmeta}->web,
         $args{newmeta}->topic, $args{newmeta} );
@@ -119,7 +122,7 @@ sub loadTopic {
 #    my $_[1]    = shift;
 #    my $_[2] = shift;
     
-    my $session = $_[1]->{_session};    #TODO: naughty, but we see to get called before Foswiki::Func::SESSION is set up :(
+    my $session = $_[1]->{_session};    #TODO: naughty, but we seem to get called before Foswiki::Func::SESSION is set up :(
 
 $_[0]->{count} = {} unless (defined($_[0]->{count}));
 $_[0]->{count}{$_[1]->web} = {} unless (defined($_[0]->{count}{$_[1]->web}));

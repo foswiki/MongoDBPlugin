@@ -84,7 +84,7 @@ sub search {
     }
 
     my $cursor = Foswiki::Plugins::MongoDBPlugin::getMongoDB()
-      ->query( 'current', \%elements );
+      ->query($web, 'current', \%elements );
     return new Foswiki::Search::MongoDBInfoCache( $Foswiki::Plugins::SESSION,
         $web, $options, $cursor );
 }
@@ -362,7 +362,7 @@ sub _webQuery {
     }
 
     my $cursor = Foswiki::Plugins::MongoDBPlugin::getMongoDB()
-      ->query( 'current', $ixhQuery, $queryAttrs );
+      ->query($web, 'current', $ixhQuery, $queryAttrs );
 
     return new Foswiki::Search::MongoDBInfoCache( $Foswiki::Plugins::SESSION,
         $web, $options, $cursor );

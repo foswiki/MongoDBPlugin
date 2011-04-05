@@ -315,10 +315,10 @@ sub doMongoSearch {
     #  . Dumper($queryAttrs) . "\n";
 
 #    my $collection =
-#      Foswiki::Plugins::MongoDBPlugin::getMongoDB()->_getCollection('current');
+#      Foswiki::Plugins::MongoDBPlugin::getMongoDB()->_getCollection($web, 'current');
 #    my $cursor = $collection->query($ixhQuery, $queryAttrs);
     my $cursor = Foswiki::Plugins::MongoDBPlugin::getMongoDB()
-      ->query( 'current', $ixhQuery, $queryAttrs );
+      ->query($web, 'current', $ixhQuery, $queryAttrs );
 
     return $cursor;
 }

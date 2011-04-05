@@ -43,11 +43,14 @@
 
     return [web, topic];
 }%TMPL:END%
-
+%TMPL:DEF{foswiki_getDatabaseName_js}%function(web) {
+    web = web.replace(/\//, '__');
+    return 'foswiki__'+web;
+}%TMPL:END%
 
 %TMPL:DEF{foswiki_getRef_js}%function(host, collection, web, topic) {
     conn = new Mongo(host);
-    current = conn.getCollection(collection);
+    current = conn.getCollection(collection); //collection is actually database.collection
     
     if (topic ==undefined) {
         return topic;
