@@ -47,7 +47,7 @@ sub numberOfTopics {
     my $count = 0;#$this->{_cursor}->count(1);
     #TODO: find out if th
     if (($count == 0) and $this->{_cursor}->has_next()) {
-	print STDERR "ERROR: cursor count == $count (real_count = ".$this->{_cursor}->{real_count}."), but cursor->has_next is true\n" if DEBUG;
+	#print STDERR "ERROR: cursor count == $count (real_count = ".$this->{_cursor}->{real_count}."), but cursor->has_next is true\n" if DEBUG;
         #work around a bug in MongoDB
         #while ($this->{_cursor}->has_next()) {
         #    $this->{_cursor}->next();

@@ -63,7 +63,7 @@ sub query {
       if MONITOR;
 
 #debugging for upstream
-print STDERR "----------------------------------------------------------------------------------\n" if DEBUG;
+#print STDERR "----------------------------------------------------------------------------------\n" if DEBUG;
 my $db   = $self->_getDatabase( $database );
 #$db->run_command({"profile" => 2});
 
@@ -97,7 +97,7 @@ my $db   = $self->_getDatabase( $database );
 #more debugging
 #print STDERR "get_collection(system.profile)".Dumper($db->get_collection("system.profile")->find->all)."\n";
 #$db->run_command({"profile" => 0});
-print STDERR "----------------------------------------------------------------------------------\n" if DEBUG;
+#print STDERR "----------------------------------------------------------------------------------\n" if DEBUG;
 
     #end timer
     my $endTime = [Time::HiRes::gettimeofday];
@@ -262,13 +262,8 @@ sub _getDatabase {
     my $self           = shift;
     my $database       = shift;
     
-    #using webname as database name, so we need to sanitise
-    #replace / with __ and pre-pend foswiki__ ?
-    $database =~ s/\//__/g;
-    $database = 'foswiki__'.$database;
-
     my $connection = $self->_connect();
-    return $connection->get_database( $database );
+    return $connection->get_database( $self->getDatabaseName($database) );
 }
 sub _getCollection {
     my $self           = shift;
