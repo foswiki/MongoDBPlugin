@@ -337,7 +337,7 @@ sub _updateDatabase {
         return $count;
     }
     
-    print STDERR "loading js into $web\n";
+    #print STDERR "loading js into $web\n";
     
     Foswiki::Func::loadTemplate('mongodb_js');
     my $foswiki_d2n_js = Foswiki::Func::expandTemplate('foswiki_d2n_js');
