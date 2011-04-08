@@ -1336,27 +1336,21 @@ sub hoistMongoDB {
     ASSERT( ref($node) eq 'Foswiki::Query::Node' );
 
     my $mongoQuery;
-
-    my $lhs = $node->{hoisted0};
-
-    #TODO: should inspect to see if $in is more appropriate.
-    #need to detect nested OR's and unwind them
-    if ( defined( $lhs->{'$or'} ) ) {
-        $lhs = $lhs->{'$or'};
-
-        #print STDERR "---+++--- $lhs, ".ref($lhs)."\n";
-        $mongoQuery = { '$or' => [ @$lhs, $node->{hoisted1} ] };
+    
+    my @elements;
+    my $i = 0;
+    while (defined($node->{'hoisted'.$i})) {
+        my $elem = $node->{'hoisted'.$i};
+        if (defined($elem->{'$or'})) {
+            #this might be un-necessary in the new nary node world
+            my $ors = $elem->{'$or'};
+            push(@elements, @$ors);
+        } else {
+            push(@elements, $elem);
+        }
+        $i++;
     }
-    elsif ( defined( $node->{hoisted1}->{'$or'} ) ) {
-
-        my $rhs = $node->{hoisted1}->{'$or'};
-        $mongoQuery = { '$or' => [ $lhs, @$rhs ] };
-    }
-    else {
-        $mongoQuery = { '$or' => [ $lhs, $node->{hoisted1} ] };
-    }
-
-    return $mongoQuery;
+    return {'$or' => \@elements};
 }
 
 package Foswiki::Query::OP_not;
