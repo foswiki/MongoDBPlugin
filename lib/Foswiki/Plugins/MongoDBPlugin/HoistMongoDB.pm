@@ -22,8 +22,8 @@ use Assert;
 
 use Foswiki::Query::HoistREs ();
 
-use constant MONITOR => 0;
-use constant MONITOR_DETAIL => 0;
+use constant MONITOR => 1;
+use constant MONITOR_DETAIL => 1;
 
 =begin TML
 
@@ -180,9 +180,11 @@ sub _hoist {
         return Foswiki::Query::OP_dot::hoistMongoDB( $node->{op}, $node );
     }
     my $unreality_arity = $node->{op}->{arity};
+    $unreality_arity = scalar(@{$node->{params}}) if ($node->{op}->{canfold});
+    print STDERR "unreality_arity (". $unreality_arity.")\n" if MONITOR;
+
     if ( ref( $node->{op} ) eq 'Foswiki::Query::OP_dot' ) {
 
-        #print STDERR "OP_dot (". $unreality_arity.")\n" if MONITOR;
         if ( ref( $node->{params}[0]->{op} ) eq 'Foswiki::Query::OP_where' ) {
 
             #print STDERR "erkle ".Dumper($node->{params}[0])."\n";
@@ -244,37 +246,38 @@ sub _hoist {
 
     my $containsQueryFunctions = 0;
 
+    print STDERR " --- start _hoist - $unreality_arity\n" if ( $unreality_arity > 2 );
     #TODO: if 2 constants(NUMBER,STRING) ASSERT
     #TODO: if the first is a constant, swap
     if ( $unreality_arity > 0 ) {
-        print STDERR "arity 1 \n" if MONITOR;
-        $node->{lhs} = _hoist( $node->{params}[0], $level . ' ' );
-        if ( ref( $node->{lhs} ) ne '' ) {
+        print STDERR "arity 1 of $unreality_arity\n" if MONITOR;
+        $node->{hoisted0} = _hoist( $node->{params}[0], $level . ' ' );
+        if ( ref( $node->{hoisted0} ) ne '' ) {
 
-            print STDERR "ref($node->{lhs}) == " . ref( $node->{lhs} ) . "\n"
+            print STDERR "ref($node->{hoisted0}) == " . ref( $node->{hoisted0} ) . "\n"
               if MONITOR;
-            $node->{ERROR} = $node->{lhs}->{ERROR}
-              if ( defined( $node->{lhs}->{ERROR} ) );
+            $node->{ERROR} = $node->{hoisted0}->{ERROR}
+              if ( defined( $node->{hoisted0}->{ERROR} ) );
             $containsQueryFunctions |=
-              defined( $node->{lhs}->{'####need_function'} );
-            $node->{'####delay_function'} = 'l'.$node->{lhs}->{'####delay_function'}
-              if ( defined( $node->{lhs}->{'####delay_function'} ) );
+              defined( $node->{hoisted0}->{'####need_function'} );
+            $node->{'####delay_function'} = 'l'.$node->{hoisted0}->{'####delay_function'}
+              if ( defined( $node->{hoisted0}->{'####delay_function'} ) );
         }
     }
 
     if ( ( $unreality_arity > 1 ) and ( defined( $node->{params}[1] ) ) ) {
-        print STDERR "arity 2 \n" if MONITOR;
-        $node->{rhs} = _hoist( $node->{params}[1], $level . ' ' );
-        if ( ref( $node->{rhs} ) ne '' ) {
-            $node->{ERROR} = $node->{rhs}->{ERROR}
-              if ( defined( $node->{rhs}->{ERROR} ) );
+        print STDERR "arity 2 of $unreality_arity\n" if MONITOR;
+        $node->{hoisted1} = _hoist( $node->{params}[1], $level . ' ' );
+        if ( ref( $node->{hoisted1} ) ne '' ) {
+            $node->{ERROR} = $node->{hoisted1}->{ERROR}
+              if ( defined( $node->{hoisted1}->{ERROR} ) );
             $containsQueryFunctions |=
-              defined( $node->{rhs}->{'####need_function'} );
-            $node->{'####delay_function'} = 'r'.$node->{rhs}->{'####delay_function'}
-              if ( defined( $node->{rhs}->{'####delay_function'} ) );
+              defined( $node->{hoisted1}->{'####need_function'} );
+            $node->{'####delay_function'} = 'r'.$node->{hoisted1}->{'####delay_function'}
+              if ( defined( $node->{hoisted1}->{'####delay_function'} ) );
         }
     }
-    die 'totally unimplemented' if ( $unreality_arity > 2 );
+    print STDERR 'totally unimplemented '.$unreality_arity if ( $unreality_arity > 2 );
 
     #monitor($node) if MONITOR;
 
@@ -324,14 +327,14 @@ print STDERR "..............(".Dumper($node).")\n" if MONITOR;
     #need to convert to js for lc/uc/length  etc :(
     # '####need_function'
     if ($containsQueryFunctions) {
-        if ( ref( $node->{lhs} ) eq 'HASH' ) {
-            if (defined($node->{lhs}->{'####delay_function'})) {
+        if ( ref( $node->{hoisted0} ) eq 'HASH' ) {
+            if (defined($node->{hoisted0}->{'####delay_function'})) {
                 print STDERR "--- qwe \n" if Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::MONITOR;
 
-                $node->{'####delay_function'} = 'k'.$node->{lhs}->{'####delay_function'};
+                $node->{'####delay_function'} = 'k'.$node->{hoisted0}->{'####delay_function'};
             }
             print STDERR "--- asd \n" if Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::MONITOR;
-             $node->{lhs} = convertToJavascript( $node->{lhs} );
+             $node->{hoisted0} = convertToJavascript( $node->{hoisted0} );
         }
 
         my $hoistedNode;
@@ -380,9 +383,9 @@ sub monitor {
 
     #TODO: mmm, do we only have unary and binary ops?
 
-    print STDERR "----lhs: " . Data::Dumper::Dumper( $node->{lhs} );
+    print STDERR "----lhs: " . Data::Dumper::Dumper( $node->{hoisted0} );
     if ( $node->{op}->{arity} > 1 ) {
-        print STDERR "----rhs: " . Data::Dumper::Dumper( $node->{rhs} );
+        print STDERR "----rhs: " . Data::Dumper::Dumper( $node->{hoisted1} );
     }
     print STDERR " \n";
 
@@ -541,10 +544,10 @@ sub convertToJavascript {
         next if ( $key eq '####delay_function' );
         $statement .= ' && ' if ( $statement ne '' );
 
-        #BEWARE: if ref($node->{lhs}) eq 'HASH' then $key is going to be wrong.
-        if ( ref( $node->{lhs} ) eq 'HASH' ) {
+        #BEWARE: if ref($node->{hoisted0}) eq 'HASH' then $key is going to be wrong.
+        if ( ref( $node->{hoisted0} ) eq 'HASH' ) {
             die 'unexpectedly';
-            $key = convertToJavascript( $node->{lhs} );
+            $key = convertToJavascript( $node->{hoisted0} );
         }
 
         #convert $ops into js ones
@@ -789,11 +792,11 @@ sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
     ASSERT(ref($node) eq 'Foswiki::Query::Node');
-    ASSERT(ref($node->{lhs}) eq '');
-    #ASSERT(ref($node->{rhs}) eq '');
+    ASSERT(ref($node->{hoisted0}) eq '');
+    #ASSERT(ref($node->{hoisted1}) eq '');
 
     ASSERT( $node->{op}->{name} eq '=' ) if DEBUG;
-    return { $node->{lhs} => $node->{rhs} };
+    return { $node->{hoisted0} => $node->{hoisted1} };
 }
 
 package Foswiki::Query::OP_like;
@@ -807,7 +810,7 @@ sub hoistMongoDB {
     ASSERT(ref($node) eq 'Foswiki::Query::Node');
 
 
-    if ( ref( $node->{rhs} ) ne '' ) {
+    if ( ref( $node->{hoisted1} ) ne '' ) {
 
         die 'not implemented yet' if (defined($node->{insensitive}));
 
@@ -816,12 +819,12 @@ sub hoistMongoDB {
         return {
             '$where' =>
               Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::convertToJavascript(
-                { $node->{lhs} => { '#like' => $node->{rhs} } }
+                { $node->{hoisted0} => { '#like' => $node->{hoisted1} } }
               )
         };
     }
 
-    my $rhs = quotemeta( $node->{rhs} );
+    my $rhs = quotemeta( $node->{hoisted1} );
     $rhs =~ s/\\\?/./g;
     $rhs =~ s/\\\*/.*/g;
 
@@ -831,7 +834,7 @@ sub hoistMongoDB {
         $rhs = qr/^$rhs$/;
     }
 
-    return { $node->{lhs} => $rhs };
+    return { $node->{hoisted0} => $rhs };
 }
 
 package Foswiki::Query::OP_match;
@@ -844,7 +847,7 @@ sub hoistMongoDB {
     my $node = shift;
     ASSERT(ref($node) eq 'Foswiki::Query::Node');
 
-    if ( ref( $node->{rhs} ) ne '' ) {
+    if ( ref( $node->{hoisted1} ) ne '' ) {
         #            die 'er, no, can\'t regex on a function';
         # re-write one as $where
         
@@ -853,12 +856,12 @@ sub hoistMongoDB {
         return {
             '$where' =>
               Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::convertToJavascript(
-                { $node->{lhs} => { '#match' => $node->{rhs} } }
+                { $node->{hoisted0} => { '#match' => $node->{hoisted1} } }
               )
         };
     }
 
-    my $rhs = quotemeta( $node->{rhs} );
+    my $rhs = quotemeta( $node->{hoisted1} );
     $rhs =~ s/\\\././g;
     $rhs =~ s/\\\*/*/g;
 
@@ -871,7 +874,7 @@ sub hoistMongoDB {
         $rhs = qr/$rhs/;
     }
 
-    return { $node->{lhs} => $rhs };
+    return { $node->{hoisted0} => $rhs };
 }
 
 =begin TML
@@ -930,7 +933,7 @@ sub hoistMongoDB {
             print STDERR "------------rhs =="
               . Data::Dumper::Dumper($rhs)
               . "\n" if Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::MONITOR;
-              $rhs = $node->{rhs};
+              $rhs = $node->{hoisted1};
         } else {
             $rhs = $node->{params}[1]->{params}[0];        
         }
@@ -941,13 +944,13 @@ sub hoistMongoDB {
               . ref($lhs->{op})
               . " OOO \n" if Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::MONITOR_DETAIL;
               #return $node->{op}->hoistMongoDB($node);
-              if (ref($lhs) ne '' and ref($lhs->{op}) eq 'Foswiki::Query::OP_ref') { # and defined($node->{lhs}->{'#ref'})) {
-print STDERR "+_+_+_+_+_+_+_+_+_+_+_+_+_+_GIMPLE($rhs)(".Data::Dumper::Dumper($lhs).") => ".$lhs->{rhs}.'.'.$node->{params}[1]->{params}[0]."\n" if Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::MONITOR;
-                return {'#ref' => [$lhs->{lhs}, $lhs->{rhs}.'.'.$node->{params}[1]->{params}[0]], '####delay_function' => 13};
-                $lhs->{rhs} .= '.'.$node->{rhs};
-                return {'#ref' => [$lhs->{lhs}, $lhs->{rhs}], '####delay_function' => 13};
+              if (ref($lhs) ne '' and ref($lhs->{op}) eq 'Foswiki::Query::OP_ref') { # and defined($node->{hoisted0}->{'#ref'})) {
+print STDERR "+_+_+_+_+_+_+_+_+_+_+_+_+_+_GIMPLE($rhs)(".Data::Dumper::Dumper($lhs).") => ".$lhs->{hoisted1}.'.'.$node->{params}[1]->{params}[0]."\n" if Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::MONITOR;
+                return {'#ref' => [$lhs->{hoisted0}, $lhs->{hoisted1}.'.'.$node->{params}[1]->{params}[0]], '####delay_function' => 13};
+                $lhs->{hoisted1} .= '.'.$node->{hoisted1};
+                return {'#ref' => [$lhs->{hoisted0}, $lhs->{hoisted1}], '####delay_function' => 13};
               }
-              $lhs = $node->{lhs};
+              $lhs = $node->{hoisted0};
         } else {
             $lhs = $node->{params}[0]->{params}[0];
         }
@@ -1025,21 +1028,21 @@ sub hoistMongoDB {
 #this is more a limitation of the mongodb drivers - internally, mongodb (i'm told) can doit.
 
     my %andHash;
-    if (ref($node->{lhs}) eq 'HASH') {
-        %andHash = %{ $node->{lhs} };
+    if (ref($node->{hoisted0}) eq 'HASH') {
+        %andHash = %{ $node->{hoisted0} };
     } else {
         $andHash{'$where'} =
           Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::convertToJavascript(
             {
-                '#where' => $node->{lhs}
+                '#where' => $node->{hoisted0}
             });
     }
-    if (ref($node->{rhs}) eq '') {
-        $node->{rhs} =             {
-                '$where' => Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::convertStringToJS($node->{rhs})
+    if (ref($node->{hoisted1}) eq '') {
+        $node->{hoisted1} =             {
+                '$where' => Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::convertStringToJS($node->{hoisted1})
             };
     }
-    foreach my $key ( keys( %{ $node->{rhs} } ) ) {
+    foreach my $key ( keys( %{ $node->{hoisted1} } ) ) {
         if ( defined( $andHash{$key} ) ) {
             my $conflictResolved = 0;
             if ( $key =~ /^\$.*/ ) {
@@ -1054,7 +1057,7 @@ sub hoistMongoDB {
 
                     my ( $rfield, $rhsIn, $rNum ) =
                       Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::convertOrToIn(
-                        $node->{rhs}->{$key} );
+                        $node->{hoisted1}->{$key} );
                     my ( $lfield, $lhsIn, $lNum ) =
                       Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::convertOrToIn(
                         $andHash{$key} );
@@ -1072,7 +1075,7 @@ sub hoistMongoDB {
                                 }
                                 else {
                                     $andHash{$lfield} = $lhsIn;
-                                    $andHash{'$or'} = $node->{rhs}->{$key};
+                                    $andHash{'$or'} = $node->{hoisted1}->{$key};
                                 }
                             }
                             else {
@@ -1086,7 +1089,7 @@ sub hoistMongoDB {
                         }
                         else {
                             $andHash{$lfield} = $lhsIn;
-                            $andHash{'$or'} = $node->{rhs}->{$key};
+                            $andHash{'$or'} = $node->{hoisted1}->{$key};
                         }
                         $conflictResolved = 1;
                     }
@@ -1108,16 +1111,16 @@ sub hoistMongoDB {
 #                    use Data::Dumper;
 #                         print STDERR "----+++++++++++++++++ $key ||"
 #                           . Dumper($andHash{$key}) . "||"
-#                           . Dumper($node->{rhs}->{$key}) . "||"
+#                           . Dumper($node->{hoisted1}->{$key}) . "||"
 #                           . ref( $andHash{$key} ) . "||"
-#                           . ref( $node->{rhs}->{$key} ) . "||\n";
+#                           . ref( $node->{hoisted1}->{$key} ) . "||\n";
 
                 if (    ( ref( $andHash{$key} ) ne 'HASH' )
-                    and ( ref( $node->{rhs}->{$key} ) ne 'HASH' ) )
+                    and ( ref( $node->{hoisted1}->{$key} ) ne 'HASH' ) )
                 {
                     #simplest case - both are implicit 'eq'
                     
-                    if ( $andHash{$key} eq $node->{rhs}->{$key} ) {
+                    if ( $andHash{$key} eq $node->{hoisted1}->{$key} ) {
                         #they're the same, ignore the second..
                         $conflictResolved = 1;
 
@@ -1127,10 +1130,10 @@ sub hoistMongoDB {
                     }
                 }
                 elsif ( ( ref( $andHash{$key} ) eq 'HASH' ) #if we're already in a non-trivial compare.
-                    and ( ref( $node->{rhs}->{$key} ) eq 'HASH' ) )
+                    and ( ref( $node->{hoisted1}->{$key} ) eq 'HASH' ) )
                 {
                     if (    ( defined( $andHash{$key}->{'$ne'} ) )
-                        and ( defined( ( $node->{rhs}->{$key}->{'$ne'} ) ) ) )
+                        and ( defined( ( $node->{hoisted1}->{$key}->{'$ne'} ) ) ) )
                     {
 #TODO: ERROR: this presumes that there isn't already a $nin. 
                         ###(A != 'qe') AND (A != 'zx') transforms to {A: {$nin: ['qe', 'zx']}} (and regex $ne too?)
@@ -1139,7 +1142,7 @@ sub hoistMongoDB {
                         }
                         push(@{$andHash{$key}->{'$nin'}}, $andHash{$key}->{'$ne'});
                         delete $andHash{$key}->{'$ne'};
-                        push(@{$andHash{$key}->{'$nin'}}, $node->{rhs}->{$key}->{'$ne'});
+                        push(@{$andHash{$key}->{'$nin'}}, $node->{hoisted1}->{$key}->{'$ne'});
 
                         $conflictResolved = 1;
                     }
@@ -1147,26 +1150,26 @@ sub hoistMongoDB {
                         #print STDERR "($key) is a hash on both sides - convert to js \n";
                     }
                 }
-                elsif ( ( ref( $andHash{$key} ) eq 'HASH' )and ( ref( $node->{rhs}->{$key} ) ne 'HASH' )) {
+                elsif ( ( ref( $andHash{$key} ) eq 'HASH' )and ( ref( $node->{hoisted1}->{$key} ) ne 'HASH' )) {
                     #$andHash{$key} complex - beware.
-                    #$node->{rhs}->{$key} simple - can we toss at $in
+                    #$node->{hoisted1}->{$key} simple - can we toss at $in
                     if (not defined($andHash{$key}->{'$in'})) {
                         $andHash{$key}->{'$in'} = ();
                     }
-                    push(@{$andHash{$key}->{'$in'}}, $node->{rhs}->{$key});
+                    push(@{$andHash{$key}->{'$in'}}, $node->{hoisted1}->{$key});
                     $conflictResolved = 1;
-                } elsif ( ( ref( $andHash{$key} ) ne 'HASH' )and ( ref( $node->{rhs}->{$key} ) eq 'HASH' )) {
+                } elsif ( ( ref( $andHash{$key} ) ne 'HASH' )and ( ref( $node->{hoisted1}->{$key} ) eq 'HASH' )) {
                          $andHash{$key} = {
                             '$in' => [
                                 $andHash{$key}
                             ]
                         };
-                        if (defined( $node->{rhs}->{$key}->{'$ne'} )) {
-                            $andHash{$key}->{'$nin'} = [$node->{rhs}->{$key}->{'$ne'}];
+                        if (defined( $node->{hoisted1}->{$key}->{'$ne'} )) {
+                            $andHash{$key}->{'$nin'} = [$node->{hoisted1}->{$key}->{'$ne'}];
                             $conflictResolved = 1;
                         }
-                        if (defined( $node->{rhs}->{$key}->{'$not'} )) {
-                            $andHash{$key}->{'$nin'} = [$node->{rhs}->{$key}->{'$not'}];
+                        if (defined( $node->{hoisted1}->{$key}->{'$not'} )) {
+                            $andHash{$key}->{'$nin'} = [$node->{hoisted1}->{$key}->{'$not'}];
                             $conflictResolved = 1;
                         }
                 } else {
@@ -1183,7 +1186,7 @@ sub hoistMongoDB {
                     $andHash{'$where'} =
                       Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::convertToJavascript(
                         {
-                            $key     => $node->{rhs}->{$key},
+                            $key     => $node->{hoisted1}->{$key},
                             '#where' => $andHash{'$where'}
                         }
                       );
@@ -1193,13 +1196,13 @@ sub hoistMongoDB {
                     # re-write one as $where
                     $andHash{'$where'} =
                       Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::convertToJavascript(
-                        { $key => $node->{rhs}->{$key} } );
+                        { $key => $node->{hoisted1}->{$key} } );
                 }
 
             }
         }
         else {
-            $andHash{$key} = $node->{rhs}->{$key};
+            $andHash{$key} = $node->{hoisted1}->{$key};
         }
 
     }
@@ -1217,7 +1220,7 @@ sub hoistMongoDB {
 
     my $mongoQuery;
 
-    my $lhs = $node->{lhs};
+    my $lhs = $node->{hoisted0};
 
     #TODO: should inspect to see if $in is more appropriate.
     #need to detect nested OR's and unwind them
@@ -1225,15 +1228,15 @@ sub hoistMongoDB {
         $lhs = $lhs->{'$or'};
 
         #print STDERR "---+++--- $lhs, ".ref($lhs)."\n";
-        $mongoQuery = { '$or' => [ @$lhs, $node->{rhs} ] };
+        $mongoQuery = { '$or' => [ @$lhs, $node->{hoisted1} ] };
     }
-    elsif ( defined( $node->{rhs}->{'$or'} ) ) {
+    elsif ( defined( $node->{hoisted1}->{'$or'} ) ) {
 
-        my $rhs = $node->{rhs}->{'$or'};
+        my $rhs = $node->{hoisted1}->{'$or'};
         $mongoQuery = { '$or' => [ $lhs, @$rhs ] };
     }
     else {
-        $mongoQuery = { '$or' => [ $lhs, $node->{rhs} ] };
+        $mongoQuery = { '$or' => [ $lhs, $node->{hoisted1} ] };
     }
 
     return $mongoQuery;
@@ -1247,13 +1250,13 @@ sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
     ASSERT(ref($node) eq 'Foswiki::Query::Node') if DEBUG;
-    ASSERT(not defined($node->{rhs})) if DEBUG;
+    ASSERT(not defined($node->{hoisted1})) if DEBUG;
 
     my %query;
 
     #no, $not is a dirty little thing that needs to go inside lhs :(
     #EXCEPT when we're doing AND
-    my $lhs = $node->{lhs};
+    my $lhs = $node->{hoisted0};
 
     if ( ( ref($lhs) eq '' ) or ( ref($lhs) eq 'Regexp' ) ) {
 
@@ -1324,11 +1327,11 @@ sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
     ASSERT(ref($node) eq 'Foswiki::Query::Node');
-   ASSERT(ref($node->{lhs}) eq '');
-    ASSERT(ref($node->{rhs}) eq '');
+   ASSERT(ref($node->{hoisted0}) eq '');
+    ASSERT(ref($node->{hoisted1}) eq '');
 
 
-    return { $node->{lhs} => { '$gte' => $node->{rhs} } };
+    return { $node->{hoisted0} => { '$gte' => $node->{hoisted1} } };
 }
 
 package Foswiki::Query::OP_gt;
@@ -1339,7 +1342,7 @@ sub hoistMongoDB {
     my $node = shift;
     ASSERT(ref($node) eq 'Foswiki::Query::Node');
 
-    return { $node->{lhs} => { '$gt' => $node->{rhs} } };
+    return { $node->{hoisted0} => { '$gt' => $node->{hoisted1} } };
 }
 
 package Foswiki::Query::OP_lte;
@@ -1349,11 +1352,11 @@ sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
     ASSERT(ref($node) eq 'Foswiki::Query::Node');
-   ASSERT(ref($node->{lhs}) eq '');
-    ASSERT(ref($node->{rhs}) eq '');
+   ASSERT(ref($node->{hoisted0}) eq '');
+    ASSERT(ref($node->{hoisted1}) eq '');
 
 
-    return { $node->{lhs} => { '$lte' => $node->{rhs} } };
+    return { $node->{hoisted0} => { '$lte' => $node->{hoisted1} } };
 }
 
 package Foswiki::Query::OP_lt;
@@ -1363,10 +1366,10 @@ sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
     ASSERT(ref($node) eq 'Foswiki::Query::Node');
-   ASSERT(ref($node->{lhs}) eq '');
-#    ASSERT(ref($node->{rhs}) eq '');
+   ASSERT(ref($node->{hoisted0}) eq '');
+#    ASSERT(ref($node->{hoisted1}) eq '');
 
-    return { $node->{lhs} => { '$lt' => $node->{rhs} } };
+    return { $node->{hoisted0} => { '$lt' => $node->{hoisted1} } };
 }
 
 package Foswiki::Query::OP_ne;
@@ -1376,10 +1379,10 @@ sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
     ASSERT(ref($node) eq 'Foswiki::Query::Node');
-    #ASSERT(ref($node->{lhs}) eq '');
-    ASSERT(ref($node->{rhs}) eq '');
+    #ASSERT(ref($node->{hoisted0}) eq '');
+    ASSERT(ref($node->{hoisted1}) eq '');
 
-    return { $node->{lhs} => { '$ne' => $node->{rhs} } };
+    return { $node->{hoisted0} => { '$ne' => $node->{hoisted1} } };
 }
 
 package Foswiki::Query::OP_ob;
@@ -1391,7 +1394,7 @@ sub hoistMongoDB {
     my $node = shift;
     ASSERT(ref($node) eq 'Foswiki::Query::Node');
 
-    return $node->{lhs};
+    return $node->{hoisted0};
 }
 
 package Foswiki::Query::OP_where;
@@ -1410,20 +1413,20 @@ sub hoistMongoDB {
 #and thus, need to re-do the mongodb schema so that meta 'arrays' are arrays again.
 #and that means the FIELD: name based shorcuts need to be re-written :/ de-indexing the queries :(
 
-    if (ref($node->{lhs}) ne '') {
+    if (ref($node->{hoisted0}) ne '') {
         #some darned bugger thought field[name="white"][value="black"] was worth parsing to
         
-        #add $node->{rhs} to the lhs' $elemMatch
-        my @k = keys(%{$node->{lhs}});
-        my @v = each(%{$node->{rhs}});
+        #add $node->{hoisted1} to the lhs' $elemMatch
+        my @k = keys(%{$node->{hoisted0}});
+        my @v = each(%{$node->{hoisted1}});
 
-        $node->{lhs}->{$k[0]}->{'$elemMatch'}->{$v[0]} = $v[1];
+        $node->{hoisted0}->{$k[0]}->{'$elemMatch'}->{$v[0]} = $v[1];
 
-        return $node->{lhs};
+        return $node->{hoisted0};
     }
 
     return {
-        $node->{lhs} . '.__RAW_ARRAY' => { '$elemMatch' => $node->{rhs} } };
+        $node->{hoisted0} . '.__RAW_ARRAY' => { '$elemMatch' => $node->{hoisted1} } };
 }
 
 package Foswiki::Query::OP_d2n;
@@ -1434,7 +1437,7 @@ sub hoistMongoDB {
     my $node = shift;
     ASSERT(ref($node) eq 'Foswiki::Query::Node');
 
-    return { '#d2n' => $node->{lhs}, '####need_function' => 1 };
+    return { '#d2n' => $node->{hoisted0}, '####need_function' => 1 };
 }
 
 package Foswiki::Query::OP_lc;
@@ -1445,7 +1448,7 @@ sub hoistMongoDB {
     my $node = shift;
     ASSERT(ref($node) eq 'Foswiki::Query::Node');
 
-    return { '#lc' => $node->{lhs}, '####need_function' => 1 };
+    return { '#lc' => $node->{hoisted0}, '####need_function' => 1 };
 }
 
 package Foswiki::Query::OP_length;
@@ -1456,7 +1459,7 @@ sub hoistMongoDB {
     my $node = shift;
     ASSERT(ref($node) eq 'Foswiki::Query::Node');
 
-    return { '#length' => $node->{lhs}, '####need_function' => 1 };
+    return { '#length' => $node->{hoisted0}, '####need_function' => 1 };
 }
 
 package Foswiki::Query::OP_uc;
@@ -1467,7 +1470,7 @@ sub hoistMongoDB {
     my $node = shift;
     ASSERT(ref($node) eq 'Foswiki::Query::Node');
 
-    return { '#uc' => $node->{lhs}, '####need_function' => 1 };
+    return { '#uc' => $node->{hoisted0}, '####need_function' => 1 };
 }
 
 package Foswiki::Query::OP_int;
@@ -1478,7 +1481,7 @@ sub hoistMongoDB {
     my $node = shift;
     ASSERT(ref($node) eq 'Foswiki::Query::Node');
 
-    return { '#int' => $node->{lhs}, '####need_function' => 1 };
+    return { '#int' => $node->{hoisted0}, '####need_function' => 1 };
 }
 
 #maths
@@ -1491,7 +1494,7 @@ sub hoistMongoDB {
     ASSERT(ref($node) eq 'Foswiki::Query::Node');
 
     return {
-        '#div'               => [ $node->{lhs}, $node->{rhs} ],
+        '#div'               => [ $node->{hoisted0}, $node->{hoisted1} ],
         '####delay_function' => 15
     };
 }
@@ -1505,7 +1508,7 @@ sub hoistMongoDB {
     ASSERT(ref($node) eq 'Foswiki::Query::Node');
 
     return {
-        '#minus'             => [ $node->{lhs}, $node->{rhs} ],
+        '#minus'             => [ $node->{hoisted0}, $node->{hoisted1} ],
         '####delay_function' => 16
     };
 }
@@ -1519,7 +1522,7 @@ sub hoistMongoDB {
     ASSERT(ref($node) eq 'Foswiki::Query::Node');
 
     return {
-        '#plus'              => [ $node->{lhs}, $node->{rhs} ],
+        '#plus'              => [ $node->{hoisted0}, $node->{hoisted1} ],
         '####delay_function' => 17
     };
 }
@@ -1533,7 +1536,7 @@ sub hoistMongoDB {
     ASSERT(ref($node) eq 'Foswiki::Query::Node');
 
     return {
-        '#mult'              => [ $node->{lhs}, $node->{rhs} ],
+        '#mult'              => [ $node->{hoisted0}, $node->{hoisted1} ],
         '####delay_function' => 18
     };
 }
@@ -1547,7 +1550,7 @@ sub hoistMongoDB {
     ASSERT(ref($node) eq 'Foswiki::Query::Node');
 
     return {
-        '#neg'               => [ $node->{lhs}, $node->{rhs} ],
+        '#neg'               => [ $node->{hoisted0}, $node->{hoisted1} ],
         '####delay_function' => 19,
         '####numeric'        => 1
     };
@@ -1562,7 +1565,7 @@ sub hoistMongoDB {
     ASSERT(ref($node) eq 'Foswiki::Query::Node');
 
     return {
-        '#pos'               => [ $node->{lhs}, $node->{rhs} ],
+        '#pos'               => [ $node->{hoisted0}, $node->{hoisted1} ],
         '####delay_function' => 21,
         '####numeric'        => 1
     };
@@ -1597,7 +1600,7 @@ sub hoistMongoDB {
 
     return { 
             '####delay_function' => 22,
-            '#ref' => [ $node->{lhs}, $node->{rhs} ]
+            '#ref' => [ $node->{hoisted0}, $node->{hoisted1} ]
         };
 }
 ######################################
