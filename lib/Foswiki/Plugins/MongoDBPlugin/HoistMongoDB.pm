@@ -249,35 +249,21 @@ sub _hoist {
     print STDERR " --- start _hoist - $unreality_arity\n" if ( $unreality_arity > 2 );
     #TODO: if 2 constants(NUMBER,STRING) ASSERT
     #TODO: if the first is a constant, swap
-    if ( $unreality_arity > 0 ) {
-        print STDERR "arity 1 of $unreality_arity\n" if MONITOR;
-        $node->{hoisted0} = _hoist( $node->{params}[0], $level . ' ' );
-        if ( ref( $node->{hoisted0} ) ne '' ) {
+    for (my $i = 0;$i < $unreality_arity; $i++) {
+        print STDERR "arity $i of $unreality_arity\n" if MONITOR;
+        $node->{'hoisted'.$i} = _hoist( $node->{params}[$i], $level . ' ' );
+        if ( ref( $node->{'hoisted'.$i} ) ne '' ) {
 
-            print STDERR "ref($node->{hoisted0}) == " . ref( $node->{hoisted0} ) . "\n"
+            print STDERR "ref($node->{'hoisted'.$i}) == " . ref( $node->{'hoisted'.$i} ) . "\n"
               if MONITOR;
-            $node->{ERROR} = $node->{hoisted0}->{ERROR}
-              if ( defined( $node->{hoisted0}->{ERROR} ) );
+            $node->{ERROR} = $node->{'hoisted'.$i}->{ERROR}
+              if ( defined( $node->{'hoisted'.$i}->{ERROR} ) );
             $containsQueryFunctions |=
-              defined( $node->{hoisted0}->{'####need_function'} );
-            $node->{'####delay_function'} = 'l'.$node->{hoisted0}->{'####delay_function'}
-              if ( defined( $node->{hoisted0}->{'####delay_function'} ) );
+              defined( $node->{'hoisted'.$i}->{'####need_function'} );
+            $node->{'####delay_function'} = $i.$node->{'hoisted'.$i}->{'####delay_function'}
+              if ( defined( $node->{'hoisted'.$i}->{'####delay_function'} ) );
         }
     }
-
-    if ( ( $unreality_arity > 1 ) and ( defined( $node->{params}[1] ) ) ) {
-        print STDERR "arity 2 of $unreality_arity\n" if MONITOR;
-        $node->{hoisted1} = _hoist( $node->{params}[1], $level . ' ' );
-        if ( ref( $node->{hoisted1} ) ne '' ) {
-            $node->{ERROR} = $node->{hoisted1}->{ERROR}
-              if ( defined( $node->{hoisted1}->{ERROR} ) );
-            $containsQueryFunctions |=
-              defined( $node->{hoisted1}->{'####need_function'} );
-            $node->{'####delay_function'} = 'r'.$node->{hoisted1}->{'####delay_function'}
-              if ( defined( $node->{hoisted1}->{'####delay_function'} ) );
-        }
-    }
-    print STDERR 'totally unimplemented '.$unreality_arity if ( $unreality_arity > 2 );
 
     #monitor($node) if MONITOR;
 
