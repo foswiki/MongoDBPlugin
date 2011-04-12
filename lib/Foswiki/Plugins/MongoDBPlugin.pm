@@ -320,7 +320,7 @@ sub _updateTopic {
 
 #TODO: foswiki's sort by TOPICINFO.author sorts by WikiName, not CUID - so need to make an internal version of this
 # to support sort=editby => 'TOPICINFO._authorWikiName',
-                    $meta->{$key}->{_authorWikiName} =
+                    $meta->{'TOPICINFO'}->{_authorWikiName} =
                       Foswiki::Func::getWikiName( $meta->{$key}->{author} );
                 }
             }
@@ -330,6 +330,10 @@ sub _updateTopic {
     $meta->{_raw_text} = $raw_text || $savedMeta->getEmbeddedStoreForm();
 
     my $ret = getMongoDB()->update( $web, 'current', "$web.$topic", $meta );
+    
+    #need to clean up meta obj
+    #TODO: clearly, I need to do a deep copy above :(
+    delete $meta->{TOPICINFO}->{_authorWikiName};
 }
 
 #restHandler used to update the javascript saved in MongoDB

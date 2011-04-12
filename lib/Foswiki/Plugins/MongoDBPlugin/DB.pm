@@ -35,7 +35,7 @@ $MongoDB::Cursor::slave_okay = 1;
 #I wish
 #use constant MONITOR => $Foswiki::cfg{MONITOR}{'Foswiki::Plugins::MongoDBPlugin'} || 0;
 use constant MONITOR => 0;
-use constant MONITOR_INDEX => 1;
+use constant MONITOR_INDEX => 0;
 
 sub new {
     my $class  = shift;
@@ -117,8 +117,8 @@ sub update {
     my $hash           = shift;
 
     #    use Data::Dumper;
-    print STDERR "+++++ mongo update $database, $collectionName, $address \n" if MONITOR;
-    print STDERR " == ".Dumper($hash)."\n" if MONITOR;
+    #print STDERR "+++++ mongo update $database, $collectionName, $address \n" if MONITOR;
+    #print STDERR " == ".Dumper($hash)."\n" if MONITOR;
 
     my $collection = $self->_getCollection($database, $collectionName);
 

@@ -2,9 +2,10 @@
 %TMPL:DEF{foswiki_getField_js}%function(obj, address) {
     var ptr = obj;
 //address is of the form 'this.TOPICINFO.version' and needs to be separated into individual return undefined if this['TOPICINFO'] == undefined etc
-
+//print('getField('+address);
     var addrs = address.split('.');
     for (var i in addrs) {
+        //print(i);
         var name = addrs[i];
         if (ptr == undefined) {
             return ptr;
@@ -30,7 +31,20 @@
     if (value == undefined) {
         return value;
     }
-    return value.length;
+    //return value.length;
+    var size=0, key;
+    //print('getLength');
+    for (key in value) {
+        if (
+            (value.hasOwnProperty(key)) &&
+            (key.charAt(0) != '_') &&
+            (key != '_authorWikiName')
+            ){ 
+                size++;
+                //print(key)
+             }
+    }
+    return size;
 }%TMPL:END%
 %TMPL:DEF{foswiki_normaliseTopic_js}%function(web, topic) {
     //if there's a dot or slash, look for last one, and chop off there

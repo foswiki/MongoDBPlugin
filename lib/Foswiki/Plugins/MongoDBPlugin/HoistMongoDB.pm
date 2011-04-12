@@ -90,6 +90,7 @@ sub hoist {
 #one reason for doing it here, after we've made the mongo queries, is that later, they may implement it and we can remove the kludge
         kludge($mongoDBQuery);
     }
+    $mongoDBQuery->{'$where'} = "".$mongoDBQuery->{'$where'} if (defined($mongoDBQuery->{'$where'}));
 
     return $mongoDBQuery;
 }
@@ -514,6 +515,9 @@ sub convertStringToJS {
 
     return convertToJavascript($string) if ( ref($string) eq 'HASH' );
 
+    #foswiki special constants: undefined, now.. ?
+    return $string if ($string eq 'null');
+
     return $string if ( $string =~ /^'.*'^/ );
 
 #TODO: i _think_ the line below is ok, its needed to make ::test_hoistLengthLHSString work
@@ -728,6 +732,7 @@ sub convertToJavascript {
         }
     }
     print STDERR "----returning $statement\n" if MONITOR;
+    $statement = "$statement";  #make sure we're a string at this point
     return $statement;
 }
 
@@ -830,6 +835,21 @@ sub hoistMongoDB {
     #ASSERT(ref($node->{hoisted1}) eq '');
 
     ASSERT( $node->{op}->{name} eq '=' ) if DEBUG;
+    
+    #TODO: i think there are other cases that will pop up as 'needs js'
+    #TODO: see above, where we should 'optimise' so that if there is a constant on the lhs, and a meta feild on the rhs, that we swap..
+    if (
+        ($node->{hoisted0} eq 'null') or 
+        ($node->{hoisted1} eq 'null')       #TODO: need to find the mongoquery way to test for undefined.
+       ) {
+        return {
+            '$where' =>
+              Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::convertToJavascript(
+                { $node->{hoisted0} => $node->{hoisted1} }
+              )
+        };
+    }
+    
     return { $node->{hoisted0} => $node->{hoisted1} };
 }
 
@@ -928,7 +948,9 @@ use Assert;
 our %aliases = (
     name => '_topic',
     web  => '_web',
-    text => '_text'
+    text => '_text',
+    undefined => 'null',
+    now => time()
 );
 
 sub mapAlias {
