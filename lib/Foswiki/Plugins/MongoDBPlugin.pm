@@ -60,7 +60,7 @@ sub initPlugin {
     getMongoDB();
 
     Foswiki::Func::registerTagHandler( 'MONGODB', \&_MONGODB );
-    Foswiki::Func::registerRESTHandler( 'update', \&_update );
+    Foswiki::Func::registerRESTHandler( 'update',         \&_update );
     Foswiki::Func::registerRESTHandler( 'updateDatabase', \&_updateDatabase );
 
     return 1;
@@ -138,9 +138,11 @@ sub getMongoDB {
             {
                 host => $Foswiki::cfg{MongoDBPlugin}{host}
                   || 'quad.home.org.au',
-                port => $Foswiki::cfg{MongoDBPlugin}{port} || '27017',
+                port => $Foswiki::cfg{MongoDBPlugin}{port}
+                  || '27017',
                 username => $Foswiki::cfg{MongoDBPlugin}{username},
                 password => $Foswiki::cfg{MongoDBPlugin}{password},
+
 #                database => $Foswiki::cfg{MongoDBPlugin}{database} || 'foswiki',
             }
         );
@@ -153,26 +155,29 @@ sub _update {
     my $session = shift;
     my $query   = Foswiki::Func::getCgiQuery();
 
-    my $webParam     = $query->param('updateweb') || 'Sandbox';
-    my $recurse   = Foswiki::Func::isTrue($query->param('recurse'), ($webParam eq 'all'));
-    
+    my $webParam = $query->param('updateweb') || 'Sandbox';
+    my $recurse =
+      Foswiki::Func::isTrue( $query->param('recurse'), ( $webParam eq 'all' ) );
+
     my @webNames;
     if ($recurse) {
-           
-        if ($webParam eq 'all') {
+
+        if ( $webParam eq 'all' ) {
             $webParam = undef;
         }
-        @webNames = Foswiki::Func::getListOfWebs( '' , $webParam );
+        @webNames = Foswiki::Func::getListOfWebs( '', $webParam );
     }
-    unshift(@webNames, $webParam) if (defined($webParam));
+    unshift( @webNames, $webParam ) if ( defined($webParam) );
 
-    #we need to deactivate any listeners :/ () at least stop the loadTopic one from triggering
-    $Foswiki::cfg{Store}{Listeners}{'Foswiki::Plugins::MongoDBPlugin::Listener'} = 0; 
+#we need to deactivate any listeners :/ () at least stop the loadTopic one from triggering
+    $Foswiki::cfg{Store}{Listeners}
+      {'Foswiki::Plugins::MongoDBPlugin::Listener'} = 0;
 
     my $result = "\n importing: \n";
     foreach my $web (@webNames) {
-    #lets make sure we have the javascript we'll rely on later
-    _updateDatabase($session, $web, $query);
+
+        #lets make sure we have the javascript we'll rely on later
+        _updateDatabase( $session, $web, $query );
 
         my @topicList = Foswiki::Func::getTopicList($web);
         print STDERR "start web: $web ($#topicList)\n";
@@ -197,7 +202,7 @@ sub _update {
               )
             {
 
-    #if this happens to be a normal file based store, then we can speed things up a bit by breaking the Store abstraction
+#if this happens to be a normal file based store, then we can speed things up a bit by breaking the Store abstraction
                 $raw_text = Foswiki::Func::readFile($filename);
                 $raw_text =~ s/\r//g;    # Remove carriage returns
                 $meta->setEmbeddedStoreForm($raw_text);
@@ -211,11 +216,12 @@ sub _update {
             _updateTopic( $web, $topic, $meta, $raw_text );
 
             $count++;
-            print STDERR "imported $count\n" if (($count %1000) == 0);
+            print STDERR "imported $count\n" if ( ( $count % 1000 ) == 0 );
         }
-        $result .= $web.': '.$count."\n";
+        print STDERR "imported $count\n";
+        $result .= $web . ': ' . $count . "\n";
     }
-    return $result."\n\n";
+    return $result . "\n\n";
 }
 
 sub _removeTopic {
@@ -227,7 +233,7 @@ sub _removeTopic {
 
     #    $query->{'_attachment'} = $topic if (defined($attachment));
 
-    my $ret = getMongoDB()->remove($web, 'current', $query );
+    my $ret = getMongoDB()->remove( $web, 'current', $query );
 
 }
 
@@ -246,20 +252,22 @@ sub _updateTopic {
     };
 
     foreach my $key ( keys(%$savedMeta) ) {
+
         #print STDERR "------------------ importing $key - "
         #  . ref( $savedMeta->{$key} ) . "\n";
         next if ( $key eq '_session' );
 
-        #not totally sure if there's a benefit to using / not the _indices
-	#TODO: but if I don't use it here, I need to re-create it when loading Meta (and I'm not yet doing that)
+#not totally sure if there's a benefit to using / not the _indices
+#TODO: but if I don't use it here, I need to re-create it when loading Meta (and I'm not yet doing that)
         next if ( $key eq '_indices' );
 
 #TODO: as of Oct 2010, mongodb can't sort on an element in an array, so we de-array the ARRAYs.
 #TODO: use the registered list of META elements, and the type that is registered.
         if ( $Foswiki::Meta::isArrayType{$key} ) {
+
             #print STDERR "---- $key == many\n";
             my $FIELD = $savedMeta->{$key};
-            $meta->{$key} = {'__RAW_ARRAY' => $FIELD};
+            $meta->{$key} = { '__RAW_ARRAY' => $FIELD };
 
             foreach my $elem (@$FIELD) {
                 if ( $key eq 'FIELD' ) {
@@ -268,8 +276,8 @@ sub _updateTopic {
 #even then, we have a hard limit of 40 indexes, so we're going to have to get more creative.
 #mind you, we don't really need indexes for speed, just to cope with query() resultsets that contain more than 1Meg of documents - so maybe we can delay creation until that happens?
                     getMongoDB()->ensureIndex(
-                        getMongoDB()->_getCollection($web, 'current'),
-                        { $key . '.' . $elem->{name}.'.value' => 1 },
+                        getMongoDB()->_getCollection( $web, 'current' ),
+                        { $key . '.' . $elem->{name} . '.value' => 1 },
                         { name => $key . '.' . $elem->{name} }
                     );
                 }
@@ -279,11 +287,13 @@ sub _updateTopic {
         }
         else {
             if ( ref( $savedMeta->{$key} ) eq '' ) {
+
                 #print STDERR "-A---$key - " . ref( $savedMeta->{$key} ) . "\n";
                 $meta->{$key} = $savedMeta->{$key};
             }
             else {
-                if ($key eq '_indices') {
+                if ( $key eq '_indices' ) {
+
                     #print STDERR "-indicies---($web . $topic) $key\n";
                     $meta->{$key} = $savedMeta->{$key};
                     next;
@@ -292,14 +302,15 @@ sub _updateTopic {
 
   #i don't know why, but this is never triggered, but without it, i get a crash.
   #so, i presume there is a weird case where it happens
-                    #print STDERR "-B---($web . $topic) $key - "
-                    #  . ref( $savedMeta->{$key} ) . "\n";
+  #print STDERR "-B---($web . $topic) $key - "
+  #  . ref( $savedMeta->{$key} ) . "\n";
 
 #print STDERR Dumper($savedMeta->{$key})."\n";
 #print STDERR "\n######################################################## BOOOOOOOOM\n";
                     next;
                 }
-                #shorcut version of the foreach below because atm, we know there is only one element in the array.
+
+#shorcut version of the foreach below because atm, we know there is only one element in the array.
                 $meta->{$key} = $savedMeta->{$key}[0];
 
                 #print STDERR "-C---($web . $topic) $key - ";
@@ -318,55 +329,68 @@ sub _updateTopic {
 
     $meta->{_raw_text} = $raw_text || $savedMeta->getEmbeddedStoreForm();
 
-    my $ret = getMongoDB()->update($web, 'current', "$web.$topic", $meta );
+    my $ret = getMongoDB()->update( $web, 'current', "$web.$topic", $meta );
 }
 
 #restHandler used to update the javascript saved in MongoDB
 sub _updateDatabase {
     my $session = shift;
     my $query   = Foswiki::Func::getCgiQuery();
+
     #TODO: actually, should do all webs if not specified..
     my $web = shift;
-    if (not defined($web) or ($web eq 'MongoDBPlugin')) {
+    if ( not defined($web) or ( $web eq 'MongoDBPlugin' ) ) {
         my $count = 0;
+
         #do all webs..
-        my @webNames = Foswiki::Func::getListOfWebs( '' , undef );
+        my @webNames = Foswiki::Func::getListOfWebs( '', undef );
         foreach $web (@webNames) {
-            $count += _updateDatabase($session, $web);
+            $count += _updateDatabase( $session, $web );
         }
         return $count;
     }
-    
+
     #print STDERR "loading js into $web\n";
-    
+
     Foswiki::Func::loadTemplate('mongodb_js');
     my $foswiki_d2n_js = Foswiki::Func::expandTemplate('foswiki_d2n_js');
-    getMongoDB()->updateSystemJS($web, 'foswiki_d2n', $foswiki_d2n_js);
-    
+    getMongoDB()->updateSystemJS( $web, 'foswiki_d2n', $foswiki_d2n_js );
+
     my $foswiki_getRef_js = Foswiki::Func::expandTemplate('foswiki_getRef_js');
-    getMongoDB()->updateSystemJS($web, 'foswiki_getRef', $foswiki_getRef_js);
+    getMongoDB()->updateSystemJS( $web, 'foswiki_getRef', $foswiki_getRef_js );
 
-    my $foswiki_getField_js = Foswiki::Func::expandTemplate('foswiki_getField_js');
-    getMongoDB()->updateSystemJS($web, 'foswiki_getField', $foswiki_getField_js);
-    
-    my $foswiki_toLowerCase_js = Foswiki::Func::expandTemplate('foswiki_toLowerCase_js');
-    getMongoDB()->updateSystemJS($web, 'foswiki_toLowerCase', $foswiki_toLowerCase_js);
-    
-    my $foswiki_toUpperCase_js = Foswiki::Func::expandTemplate('foswiki_toUpperCase_js');
-    getMongoDB()->updateSystemJS($web, 'foswiki_toUpperCase', $foswiki_toUpperCase_js);
-    
+    my $foswiki_getField_js =
+      Foswiki::Func::expandTemplate('foswiki_getField_js');
+    getMongoDB()
+      ->updateSystemJS( $web, 'foswiki_getField', $foswiki_getField_js );
+
+    my $foswiki_toLowerCase_js =
+      Foswiki::Func::expandTemplate('foswiki_toLowerCase_js');
+    getMongoDB()
+      ->updateSystemJS( $web, 'foswiki_toLowerCase', $foswiki_toLowerCase_js );
+
+    my $foswiki_toUpperCase_js =
+      Foswiki::Func::expandTemplate('foswiki_toUpperCase_js');
+    getMongoDB()
+      ->updateSystemJS( $web, 'foswiki_toUpperCase', $foswiki_toUpperCase_js );
+
     my $foswiki_length_js = Foswiki::Func::expandTemplate('foswiki_length_js');
-    getMongoDB()->updateSystemJS($web, 'foswiki_length', $foswiki_length_js);
+    getMongoDB()->updateSystemJS( $web, 'foswiki_length', $foswiki_length_js );
 
-    my $foswiki_normaliseTopic_js = Foswiki::Func::expandTemplate('foswiki_normaliseTopic_js');
-    getMongoDB()->updateSystemJS($web, 'foswiki_normaliseTopic', $foswiki_normaliseTopic_js);
-    
-    my $foswiki_getDatabaseName_js = Foswiki::Func::expandTemplate('foswiki_getDatabaseName_js');
-    getMongoDB()->updateSystemJS($web, 'foswiki_getDatabaseName', $foswiki_getDatabaseName_js);
-    
+    my $foswiki_normaliseTopic_js =
+      Foswiki::Func::expandTemplate('foswiki_normaliseTopic_js');
+    getMongoDB()
+      ->updateSystemJS( $web, 'foswiki_normaliseTopic',
+        $foswiki_normaliseTopic_js );
+
+    my $foswiki_getDatabaseName_js =
+      Foswiki::Func::expandTemplate('foswiki_getDatabaseName_js');
+    getMongoDB()
+      ->updateSystemJS( $web, 'foswiki_getDatabaseName',
+        $foswiki_getDatabaseName_js );
+
     return 1;
 }
-
 
 # The function used to handle the %EXAMPLETAG{...}% macro
 # You would have one of these for each macro you want to process.
