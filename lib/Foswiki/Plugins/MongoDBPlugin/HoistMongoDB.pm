@@ -266,9 +266,6 @@ sub _hoist {
 
     my $containsQueryFunctions = 0;
 
-    print STDERR " --- start _hoist - $unreality_arity\n"
-      if ( $unreality_arity > 2 );
-
     #TODO: if 2 constants(NUMBER,STRING) ASSERT
     #TODO: if the first is a constant, swap
     for ( my $i = 0 ; $i < $unreality_arity ; $i++ ) {

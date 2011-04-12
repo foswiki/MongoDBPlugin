@@ -35,6 +35,7 @@ $MongoDB::Cursor::slave_okay = 1;
 #I wish
 #use constant MONITOR => $Foswiki::cfg{MONITOR}{'Foswiki::Plugins::MongoDBPlugin'} || 0;
 use constant MONITOR => 0;
+use constant MONITOR_INDEX => 1;
 
 sub new {
     my $class  = shift;
@@ -116,7 +117,8 @@ sub update {
     my $hash           = shift;
 
     #    use Data::Dumper;
-    print STDERR "+++++ mongo update $address == ".Dumper($hash)."\n" if MONITOR;
+    print STDERR "+++++ mongo update $database, $collectionName, $address \n" if MONITOR;
+    print STDERR " == ".Dumper($hash)."\n" if MONITOR;
 
     my $collection = $self->_getCollection($database, $collectionName);
 
@@ -199,17 +201,19 @@ die 'must convert $collection param to be a collection obj';
         #print STDERR "we already have:  ".$index->{name}." index\n";
         if ( $options->{name} eq $index->{name} ) {
 
+            #print STDERR "already exists " . $options->{name} . " index\n" if MONITOR_INDEX;
+
             #already exists, do nothing.
             return;
         }
     }
     if ( scalar( @{ $self->{mongoDBIndexes} } ) >= 40 ) {
         print STDERR
-"*******************ouch. MongoDB can only have 40 indexes per collection\n"
-          if MONITOR;
+"*******************ouch. MongoDB can only have 40 indexes per collection : " . $options->{name} . "\n"
+          if MONITOR_INDEX;
         return;
     }
-    print STDERR "creating " . $options->{name} . " index\n" if MONITOR;
+    print STDERR "creating " . $options->{name} . " index\n" if MONITOR_INDEX;
 
     #TODO: consider doing these in a batch at the end of a request, or?
     $collection->ensure_index( $indexRef, $options );
