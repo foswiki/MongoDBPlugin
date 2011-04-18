@@ -882,10 +882,10 @@ sub hoistMongoDB {
     $rhs =~ s/\\\*/.*/g;
 
     if ( defined( $node->{insensitive} ) ) {
-        $rhs = qr/^$rhs$/i;
+        $rhs = qr/^$rhs$/im;
     }
     else {
-        $rhs = qr/^$rhs$/;
+        $rhs = qr/^$rhs$/m;
     }
 
     return { $node->{hoisted0} => $rhs };
