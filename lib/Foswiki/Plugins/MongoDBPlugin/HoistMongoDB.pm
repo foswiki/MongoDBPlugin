@@ -36,10 +36,18 @@ sub hoist {
     my ( $node, $indent ) = @_;
 
     print STDERR "HoistMongoDB::hoist from: ", $node->stringify(), "\n"
+    #print STDERR "HoistMongoDB::hoist from: ", Dumper($node), "\n"
       if MONITOR
           or MONITOR_DETAIL;
 
-    return undef unless ref( $node->{op} );
+    if (ref( $node->{op} ) eq '') {
+        if (Foswiki::Func::isTrue($node->{params}[0])) {
+            return {};
+        } else {
+            #TODO: or return false, or undef?
+            return {'1' => '0'};
+        }
+    }
 
 #TODO: use IxHash to keep the hash order - _some_ parts of queries are order sensitive
 #    my %mongoQuery = ();

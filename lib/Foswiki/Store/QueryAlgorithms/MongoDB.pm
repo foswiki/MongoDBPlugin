@@ -106,7 +106,7 @@ sub _webQuery {
     #presuming that the inputTopicSet is not yet defined, we need to add the topics=, excludetopic= and web options to the query.
     my $extra_query;
     {
-        my @option_query = ("web='".$web."'");
+        my @option_query = ();
         if ($options->{topic}) {
             push(@option_query, convertTopicPatternToLonghandQuery($options->{topic}));
         }
@@ -121,7 +121,9 @@ sub _webQuery {
         my $queryStr = join(' AND ', @option_query);
         
         #print STDERR "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN($queryStr)\n";
-        
+        if ($queryStr eq '') {
+            $queryStr = '1';
+        }
         my $theParser = $session->search->{queryParser};
         $extra_query = $theParser->parse( $queryStr, $options );
     }
@@ -160,7 +162,7 @@ sub _webQuery {
 
     if ( not defined($mongoQuery) ) {
         print STDERR
-"MongoDB QuerySearch - failed to hoist to MongoDB - please report the error to Sven.\n";
+"MongoDB QuerySearch - failed to hoist to MongoDB (".$query->stringify().") - please report the error to Sven.\n";
 
         #falling through to old regex code
     }
@@ -227,7 +229,7 @@ sub _webQuery {
     }
     
     require Foswiki::Query::HoistREs;
-    my $hoistedREs = Foswiki::Query::HoistREs::collatedHoist($query);
+    my $hoistedREs = Foswiki::Query::HoistREs::hoist($query);
 
     if (    ( !defined( $options->{topic} ) )
         and ( $hoistedREs->{name} ) )

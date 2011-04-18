@@ -1506,7 +1506,54 @@ sub test_hoist_Item10515 {
     );
 }
 
+sub test_hoist_false {
+    my $this = shift;
+    my $s = "0";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
 
+    $this->do_Assert(
+        $query,
+        $mongoDBQuery,
+        {
+            #TODO: this is not really a true query in mongo, and just happens to return nothing :/
+            '1' => '0'
+        }
+    );
+}
+
+sub test_hoist_true {
+    my $this = shift;
+    my $s = "1";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert(
+        $query,
+        $mongoDBQuery,
+        {
+        }
+    );
+}
+sub test_hoist_explicit_true {
+    my $this = shift;
+    my $s = "1";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert(
+        $query,
+        $mongoDBQuery,
+        {
+        }
+    );
+}
 
 #test written to match Fn_SEARCH::verify_formQuery2
 #Item10520: in Sven's reading of System.QuerySearch, this should return no results, as there is no field of the name 'TestForm'
