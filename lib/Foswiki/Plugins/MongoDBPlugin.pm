@@ -91,7 +91,8 @@ sub completePageHandler {
 
 }
 
-sub afterSaveHandler {
+#replaced by the listeners
+sub DISABLEDafterSaveHandler {
     return
       if ( $enableOnSaveUpdates != 1 )
       ;    #disabled - they can make save's take too long
