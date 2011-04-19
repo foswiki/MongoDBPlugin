@@ -129,7 +129,7 @@ $_[0]->{count}{$_[1]->web} = {} unless (defined($_[0]->{count}{$_[1]->web}));
 $_[0]->{count}{$_[1]->web}{$_[1]->topic} = 0 unless (defined($_[0]->{count}{$_[1]->web}{$_[1]->topic}));
 
 $_[0]->{count}{$_[1]->web}{$_[1]->topic}++;
-die 'here' if ($_[0]->{count}{$_[1]->web}{$_[1]->topic} > 10); #sometime there is recursion, and this way i can track it down
+#die 'here' if ($_[0]->{count}{$_[1]->web}{$_[1]->topic} > 10); #sometime there is recursion, and this way i can track it down
 
 
     #allow the MongoDBPlugin to disable the listener when running a web update resthandler
