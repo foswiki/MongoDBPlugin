@@ -134,18 +134,14 @@ sub DISABLED_afterAttachmentSaveHandler {
 sub getMongoDB {
     if ( not defined( $Foswiki::Func::SESSION->{MongoDB} ) ) {
         require Foswiki::Plugins::MongoDBPlugin::DB;
-        my $mongoDB = new Foswiki::Plugins::MongoDBPlugin::DB(
-            {
-                host => $Foswiki::cfg{MongoDBPlugin}{host}
-                  || 'quad.home.org.au',
-                port => $Foswiki::cfg{MongoDBPlugin}{port}
-                  || '27017',
-                username => $Foswiki::cfg{MongoDBPlugin}{username},
-                password => $Foswiki::cfg{MongoDBPlugin}{password},
-
-#                database => $Foswiki::cfg{MongoDBPlugin}{database} || 'foswiki',
-            }
-        );
+        
+        #need to remove undes username and pwd
+        delete $Foswiki::cfg{MongoDBPlugin}{username} if (defined($Foswiki::cfg{MongoDBPlugin}{username}) and $Foswiki::cfg{MongoDBPlugin}{username} eq '');
+        delete $Foswiki::cfg{MongoDBPlugin}{password} if (defined($Foswiki::cfg{MongoDBPlugin}{password}) and $Foswiki::cfg{MongoDBPlugin}{password} eq '');
+        delete $Foswiki::cfg{MongoDBPlugin}{database} if (defined($Foswiki::cfg{MongoDBPlugin}{database}) and $Foswiki::cfg{MongoDBPlugin}{database} eq '');
+        delete $Foswiki::cfg{MongoDBPlugin}{port};  #deprecated
+        
+        my $mongoDB = new Foswiki::Plugins::MongoDBPlugin::DB({cfg => $Foswiki::cfg{MongoDBPlugin}} );
     }
     return $Foswiki::Func::SESSION->{MongoDB};
 }

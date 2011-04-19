@@ -283,9 +283,9 @@ sub _connect {
     my $self = shift;
 
     if ( not defined( $self->{connection} ) ) {
+        
         $self->{connection} = MongoDB::Connection->new(
-            host => $self->{host},
-            port => $self->{port}
+            $self->{cfg},
         );
         ASSERT( $self->{connection} ) if DEBUG;
     }
