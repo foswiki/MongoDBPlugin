@@ -30,6 +30,7 @@ use strict;
 use Foswiki::Func    ();    # The plugins API
 use Foswiki::Plugins ();    # For the API version
 use Data::Dumper;
+use Assert;
 
 our $VERSION = '$Rev: 5771 $';
 our $RELEASE = '1.1.1';
