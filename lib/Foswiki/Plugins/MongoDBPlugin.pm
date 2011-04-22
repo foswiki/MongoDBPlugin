@@ -189,12 +189,23 @@ sub _update {
     }
     unshift( @webNames, $webParam ) if ( defined($webParam) );
 
-#we need to deactivate any listeners :/ () at least stop the loadTopic one from triggering
-    $Foswiki::cfg{Store}{Listeners}
-      {'Foswiki::Plugins::MongoDBPlugin::Listener'} = 0;
-
     my $result = "\n importing: \n";
     foreach my $web (@webNames) {
+        $result .= updateWebCache($web);
+    }
+    return $result . "\n\n";
+}
+
+sub updateWebCache {
+    my $web = shift;
+
+    my $result = '';
+    
+    my $query   = Foswiki::Func::getCgiQuery();
+    my $session = $Foswiki::Plugins::SESSION;
+
+#we need to deactivate any listeners :/ () at least stop the loadTopic one from triggering
+    $session->{store}->setListenerPriority('Foswiki::Plugins::MongoDBPlugin::Listener', 0);
 
         #lets make sure we have the javascript we'll rely on later
         _updateDatabase( $session, $web, $query );
@@ -240,9 +251,12 @@ sub _update {
         }
         print STDERR "imported $count\n";
         $result .= $web . ': ' . $count . "\n";
-    }
-    return $result . "\n\n";
+        
+$session->{store}->setListenerPriority('Foswiki::Plugins::MongoDBPlugin::Listener', 1);
+
+      return $result;
 }
+
 
 sub _removeTopic {
     my $web   = shift;
@@ -254,6 +268,8 @@ sub _removeTopic {
     #    $query->{'_attachment'} = $topic if (defined($attachment));
 
     my $ret = getMongoDB()->remove( $web, 'current', $query );
+    
+    #TODO: if topic undefined, actually delete database?
 
 }
 
@@ -264,7 +280,7 @@ sub _updateTopic {
     my $raw_text  = shift
       ; #if we already have the embeddedStoreForm store form, we can avoid re-serialising.
 
-    #print STDERR "-update($web, $topic)\n";
+    print STDERR "-update($web, $topic)\n";
 
     my $meta = {
         _web   => $web,

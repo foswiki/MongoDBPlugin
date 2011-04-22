@@ -42,6 +42,10 @@ Event triggered when a new Meta object is inserted into the store
 sub insert {
     my $self = shift;
     my %args = @_;
+    
+    print STDERR "inserting ".join(',',keys(%args))."\n" if MONITOR;
+    print STDERR "     (".$args{newmeta}->web.", ".($args{newmeta}->topic||'UNDEF').")\n" if MONITOR;
+
 
     return if ( defined( $args{newattachment} ) );
     
@@ -76,7 +80,26 @@ sub update {
     return if ( defined( $args{oldattachment} ) );
 
     #TODO: not doing web create/move etc yet
-    return if ( not defined( $args{newmeta}->topic ) );
+    if ( not defined( $args{newmeta}->topic ) ) {
+        
+        if ( defined( $args{oldmeta} ) ) {
+            if ($args{oldmeta}->web ne $args{newmeta}->web) {
+                $self->remove( oldmeta => $args{oldmeta} );
+                print STDERR "Removed web (".$args{oldmeta}->web.")\n" if MONITOR;
+                
+                #Force a full scan from filesystem
+                print STDERR "Scan new web (".$args{newmeta}->web.")\n" if MONITOR;
+                Foswiki::Plugins::MongoDBPlugin::updateWebCache( $args{newmeta}->web);
+
+                return;
+            }
+            print STDERR "1. Not sure how we got to this point in updating the Listener\n";
+        } else {
+            print STDERR "2. Not sure how we got to this point in updating the Listener\n";
+        }
+
+        return;
+    }
 
     #TODO: do this differently when we support previous revs
     if ( defined( $args{oldmeta} ) ) {
@@ -84,8 +107,10 @@ sub update {
         #move topic is (currently) a delete&insert
         $self->remove( oldmeta => $args{oldmeta} );
     }
-    Foswiki::Plugins::MongoDBPlugin::_updateTopic( $args{newmeta}->web,
-        $args{newmeta}->topic, $args{newmeta} );
+    if ( defined( $args{newmeta}->topic ) ) {
+        Foswiki::Plugins::MongoDBPlugin::_updateTopic( $args{newmeta}->web,
+            $args{newmeta}->topic, $args{newmeta} );
+    }
 }
 
 =begin TML
@@ -98,15 +123,16 @@ We are removing the given object.
 sub remove {
     my $self = shift;
     my %args = @_;
-
     ASSERT( $args{oldmeta} ) if DEBUG;
+    #lets not delete the topic if we're actually deleting an attachment
+    return if ( defined( $args{oldattachment} ) );
 
     print STDERR "removing ".join(',',keys(%args))."\n" if MONITOR;
     print STDERR "     (".$args{oldmeta}->web.", ".($args{oldmeta}->topic||'UNDEF').")\n" if MONITOR;
 
-    #TODO: find the old topic object, and remove it.
+    #works for topics and webs
     Foswiki::Plugins::MongoDBPlugin::_removeTopic( $args{oldmeta}->web,
-        $args{oldmeta}->topic );
+            $args{oldmeta}->topic );
 }
 
 =begin TML
@@ -151,6 +177,7 @@ $_[0]->{count}{$_[1]->web}{$_[1]->topic}++;
             }
 
         #this code can do nothing - ignore it
+        #it fakes the existance of a topic
         if (    ( $_[1]->web eq 'Sandbox' )
             and ( $_[1]->topic eq 'SvenDoesNotExist' ) )
         {
@@ -159,8 +186,6 @@ $_[0]->{count}{$_[1]->web}{$_[1]->topic}++;
             $_[1]->{_latestIsLoaded} = 1;
             return ( 1, 1 );
         }
-
-        print STDERR "===== loadTopic(".$_[1]->web." , ".$_[1]->topic.", version)\n" if MONITOR;
 
         #rebless into a mighter version of Meta
         bless( $_[1], 'Foswiki::Plugins::MongoDBPlugin::Meta' );
@@ -175,6 +200,9 @@ $_[0]->{count}{$_[1]->web}{$_[1]->topic}++;
         }
 
         $session->search->metacache->addMeta( $_[1]->web, $_[1]->topic, $_[1] );
+
+        print STDERR "===== loadTopic(".$_[1]->web." , ".$_[1]->topic.", version)  => ".$_[1]->getLoadedRev()."\n" if MONITOR;
+
 
         return ( $_[1]->getLoadedRev(), 1 );
     }
