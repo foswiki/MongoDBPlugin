@@ -46,10 +46,6 @@ $Foswiki::cfg{MongoDBPlugin}{wtimeout} = 1000;
 #$Foswiki::cfg{MongoDBPlugin}{password} = undef;
 
 
-## **BOOLEAN**
-## Foswiki 2.0 Store Listener - (when using Mongo as an accellerator, and not as a store)
-##$Foswiki::cfg{Store}{Listeners}{'Foswiki::Plugins::MongoDBPlugin::Listener'} = 1; 
-
 # **BOOLEAN**
 # enable debug logging
 $Foswiki::cfg{MONITOR}{'Foswiki::Plugins::MongoDBPlugin'} = 0;

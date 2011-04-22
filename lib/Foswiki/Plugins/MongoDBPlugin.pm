@@ -20,6 +20,10 @@
 
 package Foswiki::Plugins::MongoDBPlugin;
 
+BEGIN {
+    #print STDERR ">>><<<****** starting MongoDBPlugin..\n";
+}
+
 # Always use strict to enforce variable scoping
 use strict;
 
@@ -65,6 +69,25 @@ sub initPlugin {
 
     return 1;
 }
+
+=begin TML
+
+---++ earlyInitPlugin()
+
+This handler is called before any other handler, and before it has been
+determined if the plugin is enabled or not. Use it with great care!
+
+If it returns a non-null error string, the plugin will be disabled.
+
+=cut
+
+sub earlyInitPlugin {
+    ## Foswiki 2.0 Store Listener now used all the time
+    $Foswiki::Plugins::SESSION->{store}->setListenerPriority('Foswiki::Plugins::MongoDBPlugin::Listener', 1);
+
+    return undef;
+}
+
 
 =begin TML
 

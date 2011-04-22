@@ -5,9 +5,10 @@ use Foswiki::Plugins::MongoDBPlugin       ();
 use Foswiki::Plugins::MongoDBPlugin::Meta ();
 use Foswiki::Search ();
 use Foswiki::Func ();
-
-
 use Assert;
+
+use constant MONITOR => 0;
+
 
 =begin TML
 
@@ -26,7 +27,7 @@ sub new {
     $Foswiki::cfg{Plugins}{MongoDBPlugin}{EnableOnSaveUpdates} = 0;
     $Foswiki::Plugins::MongoDBPlugin::enableOnSaveUpdates = 0;
 
-#print STDERR "***************************************MongoDB Listening****************************\n";
+    print STDERR "***************************************MongoDB Listening****************************\n" if MONITOR;
 
     return $self;
 }
@@ -100,8 +101,8 @@ sub remove {
 
     ASSERT( $args{oldmeta} ) if DEBUG;
 
-#print STDERR "removing ".join(',',keys(%args))."\n";
-#print STDERR "     (".$args{oldmeta}->web.", ".($args{oldmeta}->topic||'UNDEF').")\n";
+    print STDERR "removing ".join(',',keys(%args))."\n" if MONITOR;
+    print STDERR "     (".$args{oldmeta}->web.", ".($args{oldmeta}->topic||'UNDEF').")\n" if MONITOR;
 
     #TODO: find the old topic object, and remove it.
     Foswiki::Plugins::MongoDBPlugin::_removeTopic( $args{oldmeta}->web,
@@ -144,7 +145,7 @@ $_[0]->{count}{$_[1]->web}{$_[1]->topic}++;
 
             if ($session->search->metacache->hasCached( $_[1]->web, $_[1]->topic )) {
                 return; #bugger, infinite loop time
-  #print STDERR "===== metacache hasCached(".$_[1]->web." , ".$_[1]->topic.", version)\n";
+                print STDERR "===== metacache hasCached(".$_[1]->web." , ".$_[1]->topic.", version)\n" if MONITOR;
                 $_[1] =  $session->search->metacache->getMeta( $_[1]->web, $_[1]->topic );
                 return ($_[1]->getLoadedRev(),1);
             }
@@ -159,7 +160,7 @@ $_[0]->{count}{$_[1]->web}{$_[1]->topic}++;
             return ( 1, 1 );
         }
 
-  #print STDERR "===== loadTopic(".$_[1]->web." , ".$_[1]->topic.", version)\n";
+        print STDERR "===== loadTopic(".$_[1]->web." , ".$_[1]->topic.", version)\n" if MONITOR;
 
         #rebless into a mighter version of Meta
         bless( $_[1], 'Foswiki::Plugins::MongoDBPlugin::Meta' );
@@ -170,7 +171,7 @@ $_[0]->{count}{$_[1]->web}{$_[1]->topic}++;
             bless( $_[1], 'Foswiki::Form' );
 
             $session->{forms}->{ $_[1]->web . '.' . $_[1]->topic } = $_[1];
-            #print STDERR "------ init Form obj\n";
+            print STDERR "------ init Form obj\n" if MONITOR;
         }
 
         $session->search->metacache->addMeta( $_[1]->web, $_[1]->topic, $_[1] );
