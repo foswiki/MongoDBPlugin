@@ -131,7 +131,7 @@ sub remove {
     print STDERR "     (".$args{oldmeta}->web.", ".($args{oldmeta}->topic||'UNDEF').")\n" if MONITOR;
 
     #works for topics and webs
-    Foswiki::Plugins::MongoDBPlugin::_removeTopic( $args{oldmeta}->web,
+    Foswiki::Plugins::MongoDBPlugin::_remove( $args{oldmeta}->web,
             $args{oldmeta}->topic );
 }
 

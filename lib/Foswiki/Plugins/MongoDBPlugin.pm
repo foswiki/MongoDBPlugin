@@ -259,18 +259,18 @@ $session->{store}->setListenerPriority('Foswiki::Plugins::MongoDBPlugin::Listene
 }
 
 
-sub _removeTopic {
+sub _remove {
     my $web   = shift;
     my $topic = shift;
+    my $attachment = shift;
 
-    my $query = { '_web' => $web };
+    my $query = { };
     $query->{'_topic'} = $topic if ( defined($topic) );
 
-    #    $query->{'_attachment'} = $topic if (defined($attachment));
+    #attachment not implemented
+    return if (defined($attachment));
 
     my $ret = getMongoDB()->remove( $web, 'current', $query );
-    
-    #TODO: if topic undefined, actually delete database?
 
 }
 

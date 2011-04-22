@@ -227,9 +227,16 @@ sub remove {
     my $collectionName = shift;
     my $mongoDbQuery           = shift;
 
-    my $collection = $self->_getCollection($database, $collectionName);
-
-    $collection->remove($mongoDbQuery);
+    if (scalar(keys(%$mongoDbQuery)) == 0) {
+        #remove web - so drop database.
+        print STDERR "...........Dropping $database\n" if MONITOR;
+        my $db   = $self->_getDatabase($database);
+        $db->drop();
+    } else {
+        my $collection = $self->_getCollection($database, $collectionName);
+        print STDERR "...........remove ".join(',', keys(%$mongoDbQuery))."\n" if MONITOR;
+        $collection->remove($mongoDbQuery);
+    }
 }
 
 sub updateSystemJS {
