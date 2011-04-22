@@ -139,7 +139,7 @@ sub DISABLED_afterRenameHandler {
 
     print STDERR
 "afterRenameHandler: ( $oldWeb, $oldTopic, $oldAttachment, $newWeb, $newTopic,
-        $newAttachment )\n";
+        $newAttachment )\n" if DEBUG;
 
     #eturn getMongoDB()->rename();
 }
@@ -280,7 +280,7 @@ sub _updateTopic {
     my $raw_text  = shift
       ; #if we already have the embeddedStoreForm store form, we can avoid re-serialising.
 
-    print STDERR "-update($web, $topic)\n";
+    print STDERR "-update($web, $topic)\n" if DEBUG;
 
     my $meta = {
         _web   => $web,
