@@ -359,6 +359,12 @@ sub _updateTopic {
 # to support sort=editby => 'TOPICINFO._authorWikiName',
                     $meta->{'TOPICINFO'}->{_authorWikiName} =
                       Foswiki::Func::getWikiName( $meta->{$key}->{author} );
+                      
+                    #Item10611: Paul found that the date, rev and version TOPICINFO is sometimes a string and other times a number
+                    #rectify to always a string atm
+                    $meta->{'TOPICINFO'}->{version} = ''.$meta->{'TOPICINFO'}->{version};
+                    $meta->{'TOPICINFO'}->{date} .= ''.$meta->{'TOPICINFO'}->{date};
+                    $meta->{'TOPICINFO'}->{rev} .= ''.$meta->{'TOPICINFO'}->{rev};
                 }
             }
         }
