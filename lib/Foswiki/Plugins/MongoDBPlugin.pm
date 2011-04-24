@@ -357,7 +357,14 @@ sub _updateTopic {
             }
         }
     }
-
+    #workaround for Item10675 - a not-foswiki .txt file
+    if (not defined($meta->{'TOPICINFO'})) {
+                    $meta->{'TOPICINFO'}->{version} = '1';
+                    $meta->{'TOPICINFO'}->{date} = '0';
+                    $meta->{'TOPICINFO'}->{rev} = '1';
+                    $meta->{'TOPICINFO'}->{author} = 'BaseUserMapping_999';
+                    $meta->{'TOPICINFO'}->{_authorWikiName} = 'UnknownUser';
+    }
 
     $meta->{_raw_text} = $savedMeta->getEmbeddedStoreForm();
 
