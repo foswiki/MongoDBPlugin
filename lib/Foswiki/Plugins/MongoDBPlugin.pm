@@ -216,36 +216,19 @@ sub updateWebCache {
 
         my $count = 0;
         foreach my $topic (@topicList) {
-            my ( $meta, $text, $raw_text )
-              ;    # = Foswiki::Func::readTopic( $web, $topic );
-            my $filename =
-              join( '/', ( $Foswiki::cfg{PubDir}, $web, $topic . '.txt' ) );
-            if (
-                ( 1 == 2 )
-                and (
-                    (
-                        $Foswiki::cfg{Store}{Implementation} eq
-                        'Foswiki::Store::RcsWrap'
-                    )
-                    or ( $Foswiki::cfg{Store}{Implementation} eq
-                        'Foswiki::Store::RcsLite' )
-                )
-                and ( -e $filename )
-              )
-            {
+              my  ( $meta, $text ) = Foswiki::Func::readTopic( $web, $topic );
 
-#if this happens to be a normal file based store, then we can speed things up a bit by breaking the Store abstraction
-                $raw_text = Foswiki::Func::readFile($filename);
-                $raw_text =~ s/\r//g;    # Remove carriage returns
-                $meta->setEmbeddedStoreForm($raw_text);
-                $text = $meta->text();
-            }
-            else {
-                ( $meta, $text ) = Foswiki::Func::readTopic( $web, $topic );
+            #top revision
+            _updateTopic( $web, $topic, $meta );
+            
+            #TODO: if $rev isn't == 1, then need to go thhrough the history and load that too.
+            my $rev = $meta->getRevisionInfo()->{version};
+            while (--$rev > 0) {
+                ( $meta, $text ) = Foswiki::Func::readTopic( $web, $topic, $rev );
+                #add a new entry into the versions collection too
+                _updateTopic( $web, $topic, $meta, {history_only=>1} );
             }
 
-            #TODO: listener called for webs too.. (delete, move etc)
-            _updateTopic( $web, $topic, $meta, $raw_text );
 
             $count++;
             print STDERR "imported $count\n" if ( ( $count % 1000 ) == 0 );
@@ -278,8 +261,7 @@ sub _updateTopic {
     my $web       = shift;
     my $topic     = shift;
     my $savedMeta = shift;
-    my $raw_text  = shift
-      ; #if we already have the embeddedStoreForm store form, we can avoid re-serialising.
+    my $options = shift;
 
     print STDERR "-update($web, $topic)\n" if DEBUG;
 
@@ -314,6 +296,12 @@ sub _updateTopic {
 #mind you, we don't really need indexes for speed, just to cope with query() resultsets that contain more than 1Meg of documents - so maybe we can delay creation until that happens?
                     getMongoDB()->ensureIndex(
                         getMongoDB()->_getCollection( $web, 'current' ),
+                        { $key . '.' . $elem->{name} . '.value' => 1 },
+                        { name => $key . '.' . $elem->{name} }
+                    );
+                    #TODO: need to abstract it out so this level of code doesn't care about collection name
+                    getMongoDB()->ensureIndex(
+                        getMongoDB()->_getCollection( $web, 'versions' ),
                         { $key . '.' . $elem->{name} . '.value' => 1 },
                         { name => $key . '.' . $elem->{name} }
                     );
@@ -363,16 +351,19 @@ sub _updateTopic {
                     #Item10611: Paul found that the date, rev and version TOPICINFO is sometimes a string and other times a number
                     #rectify to always a string atm
                     $meta->{'TOPICINFO'}->{version} = ''.$meta->{'TOPICINFO'}->{version};
-                    $meta->{'TOPICINFO'}->{date} .= ''.$meta->{'TOPICINFO'}->{date};
-                    $meta->{'TOPICINFO'}->{rev} .= ''.$meta->{'TOPICINFO'}->{rev};
+                    $meta->{'TOPICINFO'}->{date} = ''.$meta->{'TOPICINFO'}->{date};
+                    $meta->{'TOPICINFO'}->{rev} = ''.$meta->{'TOPICINFO'}->{rev};
                 }
             }
         }
     }
 
-    $meta->{_raw_text} = $raw_text || $savedMeta->getEmbeddedStoreForm();
 
-    my $ret = getMongoDB()->update( $web, 'current', "$web.$topic", $meta );
+    $meta->{_raw_text} = $savedMeta->getEmbeddedStoreForm();
+
+    my $ret = getMongoDB()->update( $web, 'current', "$web.$topic", $meta ) unless $options->{history_only};
+    #add a new entry into the versions collection too
+    $ret = getMongoDB()->update( $web, 'versions', "$web.$topic@".$meta->{'TOPICINFO'}->{rev}, $meta );
     
     #need to clean up meta obj
     #TODO: clearly, I need to do a deep copy above :(
