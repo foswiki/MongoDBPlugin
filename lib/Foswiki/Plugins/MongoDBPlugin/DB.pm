@@ -28,6 +28,8 @@ use Assert;
 use Data::Dumper;
 use Time::HiRes ();
 
+use Foswiki::Func;  #TODO: remove this its there for diagnostics (i think)
+
 #lets declare it ok to run queries on slaves.
 #http://search.cpan.org/~kristina/MongoDB-0.42/lib/MongoDB/Cursor.pm#slave_okay
 $MongoDB::Cursor::slave_okay = 1;
@@ -263,6 +265,9 @@ use MongoDB::Code;
 sub getDatabaseName {
     my $self           = shift;
     my $web       = shift;
+    
+    #make sure the web exists?
+    die "getDatabaseName($web) does not exist" unless (Foswiki::Func::webExists($web));
     
     #using webname as database name, so we need to sanitise
     #replace / with __ and pre-pend foswiki__ ?
