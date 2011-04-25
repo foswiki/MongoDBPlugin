@@ -220,6 +220,9 @@ sub ensureIndex {
     my $options    = shift;
 
     ASSERT( defined( $options->{name} ) ) if DEBUG;
+    
+    #force the index to be made in the background - so we don't timeout the cursor
+    $options->{background} = 1;
 
     if ( ref($collection) eq '' ) {
 die 'must convert $collection param to be a collection obj';
