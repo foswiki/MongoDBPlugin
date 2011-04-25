@@ -3,12 +3,11 @@ package Foswiki::Plugins::MongoDBPlugin::Listener;
 
 use Foswiki::Plugins::MongoDBPlugin       ();
 use Foswiki::Plugins::MongoDBPlugin::Meta ();
-use Foswiki::Search ();
-use Foswiki::Func ();
+use Foswiki::Search                       ();
+use Foswiki::Func                         ();
 use Assert;
 
 use constant MONITOR => 0;
-
 
 =begin TML
 
@@ -27,7 +26,9 @@ sub new {
     $Foswiki::cfg{Plugins}{MongoDBPlugin}{EnableOnSaveUpdates} = 0;
     $Foswiki::Plugins::MongoDBPlugin::enableOnSaveUpdates = 0;
 
-    print STDERR "***************************************MongoDB Listening****************************\n" if MONITOR;
+    print STDERR
+"***************************************MongoDB Listening****************************\n"
+      if MONITOR;
 
     return $self;
 }
@@ -42,15 +43,20 @@ Event triggered when a new Meta object is inserted into the store
 sub insert {
     my $self = shift;
     my %args = @_;
-    
-    print STDERR "inserting ".join(',',keys(%args))."\n" if MONITOR;
-    print STDERR "     (".$args{newmeta}->web.", ".($args{newmeta}->topic||'UNDEF').")\n" if MONITOR;
 
+    print STDERR "inserting " . join( ',', keys(%args) ) . "\n" if MONITOR;
+    print STDERR "     ("
+      . $args{newmeta}->web . ", "
+      . ( $args{newmeta}->topic || 'UNDEF' ) . ")\n"
+      if MONITOR;
 
     return if ( defined( $args{newattachment} ) );
-    
-    #creating a new web... so we need to add the js we use to get foswiki style functionality
-    Foswiki::Plugins::MongoDBPlugin::_updateDatabase($args{newmeta}->{_session}, $args{newmeta}->web) if ($args{newmeta}->topic eq 'WebPreferences');
+
+#creating a new web... so we need to add the js we use to get foswiki style functionality
+    Foswiki::Plugins::MongoDBPlugin::_updateDatabase(
+        $args{newmeta}->{_session},
+        $args{newmeta}->web )
+      if ( $args{newmeta}->topic eq 'WebPreferences' );
 
     Foswiki::Plugins::MongoDBPlugin::_updateTopic( $args{newmeta}->web,
         $args{newmeta}->topic, $args{newmeta} );
@@ -81,21 +87,27 @@ sub update {
 
     #TODO: not doing web create/move etc yet
     if ( not defined( $args{newmeta}->topic ) ) {
-        
+
         if ( defined( $args{oldmeta} ) ) {
-            if ($args{oldmeta}->web ne $args{newmeta}->web) {
+            if ( $args{oldmeta}->web ne $args{newmeta}->web ) {
                 $self->remove( oldmeta => $args{oldmeta} );
-                print STDERR "Removed web (".$args{oldmeta}->web.")\n" if MONITOR;
-                
+                print STDERR "Removed web (" . $args{oldmeta}->web . ")\n"
+                  if MONITOR;
+
                 #Force a full scan from filesystem
-                print STDERR "Scan new web (".$args{newmeta}->web.")\n" if MONITOR;
-                Foswiki::Plugins::MongoDBPlugin::updateWebCache( $args{newmeta}->web);
+                print STDERR "Scan new web (" . $args{newmeta}->web . ")\n"
+                  if MONITOR;
+                Foswiki::Plugins::MongoDBPlugin::updateWebCache(
+                    $args{newmeta}->web );
 
                 return;
             }
-            print STDERR "1. Not sure how we got to this point in updating the Listener\n";
-        } else {
-            print STDERR "2. Not sure how we got to this point in updating the Listener\n";
+            print STDERR
+              "1. Not sure how we got to this point in updating the Listener\n";
+        }
+        else {
+            print STDERR
+              "2. Not sure how we got to this point in updating the Listener\n";
         }
 
         return;
@@ -124,15 +136,19 @@ sub remove {
     my $self = shift;
     my %args = @_;
     ASSERT( $args{oldmeta} ) if DEBUG;
+
     #lets not delete the topic if we're actually deleting an attachment
     return if ( defined( $args{oldattachment} ) );
 
-    print STDERR "removing ".join(',',keys(%args))."\n" if MONITOR;
-    print STDERR "     (".$args{oldmeta}->web.", ".($args{oldmeta}->topic||'UNDEF').")\n" if MONITOR;
+    print STDERR "removing " . join( ',', keys(%args) ) . "\n" if MONITOR;
+    print STDERR "     ("
+      . $args{oldmeta}->web . ", "
+      . ( $args{oldmeta}->topic || 'UNDEF' ) . ")\n"
+      if MONITOR;
 
     #works for topics and webs
     Foswiki::Plugins::MongoDBPlugin::_remove( $args{oldmeta}->web,
-            $args{oldmeta}->topic );
+        $args{oldmeta}->topic );
 }
 
 =begin TML
@@ -145,67 +161,82 @@ NOTE: atm, this will only get called if the Store says yes, this meta item exist
 =cut
 
 sub loadTopic {
-#    my $self    = shift;
-#    my $_[1]    = shift;
-#    my $_[2] = shift;
-    
-    my $session = $_[1]->{_session};    #TODO: naughty, but we seem to get called before Foswiki::Func::SESSION is set up :(
+    #    my $self    = shift;
+    #    my $_[1]    = shift;
+    #    my $_[2] = shift;
 
-$_[0]->{count} = {} unless (defined($_[0]->{count}));
-$_[0]->{count}{$_[1]->web} = {} unless (defined($_[0]->{count}{$_[1]->web}));
-$_[0]->{count}{$_[1]->web}{$_[1]->topic} = 0 unless (defined($_[0]->{count}{$_[1]->web}{$_[1]->topic}));
+    my $session =
+      $_[1]
+      ->{_session}; #TODO: naughty, but we seem to get called before Foswiki::Func::SESSION is set up :(
 
-$_[0]->{count}{$_[1]->web}{$_[1]->topic}++;
+    $_[0]->{count} = {} unless ( defined( $_[0]->{count} ) );
+    $_[0]->{count}{ $_[1]->web } = {}
+      unless ( defined( $_[0]->{count}{ $_[1]->web } ) );
+    $_[0]->{count}{ $_[1]->web }{ $_[1]->topic } = 0
+      unless ( defined( $_[0]->{count}{ $_[1]->web }{ $_[1]->topic } ) );
+
+    $_[0]->{count}{ $_[1]->web }{ $_[1]->topic }++;
+
 #die 'here' if ($_[0]->{count}{$_[1]->web}{$_[1]->topic} > 10); #sometime there is recursion, and this way i can track it down
 
+#allow the MongoDBPlugin to disable the listener when running a web update resthandler
+    return
+      if (
+        not $Foswiki::cfg{Store}{Listeners}
+        {'Foswiki::Plugins::MongoDBPlugin::Listener'} );
 
-    #allow the MongoDBPlugin to disable the listener when running a web update resthandler
-    return if (not $Foswiki::cfg{Store}{Listeners}{'Foswiki::Plugins::MongoDBPlugin::Listener'});
-
-    if ( defined( $Foswiki::cfg{Plugins}{MongoDBPlugin}{ExperimentalCode} )
-        and $Foswiki::cfg{Plugins}{MongoDBPlugin}{ExperimentalCode} )
+    if (
+        ( defined( $_[2] ) ) and    #topic versioning in mongodb
+        (
+            defined( $Foswiki::cfg{Plugins}{MongoDBPlugin}{ExperimentalCode} )
+            and $Foswiki::cfg{Plugins}{MongoDBPlugin}{ExperimentalCode}
+        )
+      )
     {
-
-        return
-          if ( defined($_[2]) );   #not doing topic versioning in mongodb yet
-
-            if ($session->search->metacache->hasCached( $_[1]->web, $_[1]->topic )) {
-                return; #bugger, infinite loop time
-                print STDERR "===== metacache hasCached(".$_[1]->web." , ".$_[1]->topic.", version)\n" if MONITOR;
-                $_[1] =  $session->search->metacache->getMeta( $_[1]->web, $_[1]->topic );
-                return ($_[1]->getLoadedRev(),1);
-            }
-
-        #this code can do nothing - ignore it
-        #it fakes the existance of a topic
-        if (    ( $_[1]->web eq 'Sandbox' )
-            and ( $_[1]->topic eq 'SvenDoesNotExist' ) )
-        {
-            $_[1]->text('This is not really a topic');
-            $_[1]->{_loadedRev}      = 1;
-            $_[1]->{_latestIsLoaded} = 1;
-            return ( 1, 1 );
-        }
-
+        print STDERR "============ listener request for $_[2]\n" if MONITOR;
+        #return;
+        #query the versions collection - via  MongoDBPlugin::Meta 
         #rebless into a mighter version of Meta
         bless( $_[1], 'Foswiki::Plugins::MongoDBPlugin::Meta' );
-        $_[1]->reload();    #get the latest version
-        $_[1]->{_latestIsLoaded} = 1;
-        if ( $_[1]->topic =~ /Form$/ ) {
-            use Foswiki::Form;
-            bless( $_[1], 'Foswiki::Form' );
-
-            $session->{forms}->{ $_[1]->web . '.' . $_[1]->topic } = $_[1];
-            print STDERR "------ init Form obj\n" if MONITOR;
-        }
-
-        $session->search->metacache->addMeta( $_[1]->web, $_[1]->topic, $_[1] );
-
-        print STDERR "===== loadTopic(".$_[1]->web." , ".$_[1]->topic.", version)  => ".$_[1]->getLoadedRev()."\n" if MONITOR;
-
-
+        $_[1]->reload($_[2]);    #get the requested version
         return ( $_[1]->getLoadedRev(), 1 );
     }
+
+    if ( $session->search->metacache->hasCached( $_[1]->web, $_[1]->topic ) ) {
+        return;                     #bugger, infinite loop time
+        print STDERR "===== metacache hasCached("
+          . $_[1]->web . " , "
+          . $_[1]->topic
+          . ", version)\n"
+          if MONITOR;
+        $_[1] =
+          $session->search->metacache->getMeta( $_[1]->web, $_[1]->topic );
+        return ( $_[1]->getLoadedRev(), 1 );
+    }
+
+    #rebless into a mighter version of Meta
+    bless( $_[1], 'Foswiki::Plugins::MongoDBPlugin::Meta' );
+    $_[1]->reload();    #get the latest version
+    $_[1]->{_latestIsLoaded} = 1;
+    if ( $_[1]->topic =~ /Form$/ ) {
+        use Foswiki::Form;
+        bless( $_[1], 'Foswiki::Form' );
+
+        $session->{forms}->{ $_[1]->web . '.' . $_[1]->topic } = $_[1];
+        print STDERR "------ init Form obj\n" if MONITOR;
+    }
+
+    $session->search->metacache->addMeta( $_[1]->web, $_[1]->topic, $_[1] );
+
+    print STDERR "===== loadTopic("
+      . $_[1]->web . " , "
+      . $_[1]->topic
+      . ", version)  => "
+      . $_[1]->getLoadedRev() . "\n"
+      if MONITOR;
+
+    return ( $_[1]->getLoadedRev(), 1 );
+
 }
 
 1;
