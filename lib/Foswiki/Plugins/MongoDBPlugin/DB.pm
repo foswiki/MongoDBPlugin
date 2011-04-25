@@ -27,6 +27,8 @@ use MongoDB::Cursor;
 use Assert;
 use Data::Dumper;
 use Time::HiRes ();
+use Tie::IxHash          ();
+
 
 use Foswiki::Func;  #TODO: remove this its there for diagnostics (i think)
 
@@ -57,13 +59,21 @@ sub query {
     my $ixhQuery       = shift;
     my $queryAttrs     = shift || {};
 
-    my $startTime = [Time::HiRes::gettimeofday];
+    #remove all the history versions from the result.
+    if (ref($ixhQuery) eq 'Tie::IxHash') {
+        $ixhQuery->Unshift('_history' => {'$exists' => 0});
+    } else {
+        $ixhQuery->{_history} = {'$exists' => 0};
+    }    
 
+    my $startTime = [Time::HiRes::gettimeofday];
+    
     my $collection = $self->_getCollection($database, 'current');
     print STDERR "searching mongo : "
       . Dumper($ixhQuery) . " , "
       . Dumper($queryAttrs) . "\n"
       if MONITOR;
+
 
 #debugging for upstream
 #print STDERR "----------------------------------------------------------------------------------\n" if DEBUG;
@@ -117,6 +127,7 @@ sub update {
     my $collectionName = shift;
     my $address        = shift;
     my $hash           = shift;
+    my $history_only   = shift; #set to true when importing so that we don't make a 'current rev' entry
 
     #    use Data::Dumper;
     print STDERR "+++++ mongo update $database, $collectionName, $address \n" if MONITOR;
@@ -125,12 +136,18 @@ sub update {
     my $collection = $self->_getCollection($database, $collectionName);
 
 #TODO: not the most efficient place to create and index, but I want to be sure, to be sure.
-    $self->ensureIndex( $collection, { _topic => 1 }, { name => '_topic' } );
+#    $self->ensureIndex( $collection, { _topic => 1 }, { name => '_topic' } );
 #    $self->ensureIndex(
 #        $collection,
 #        { _topic => 1,             _web   => 1 },
 #        { name   => '_topic:_web', unique => 1 }
 #    );
+    $self->ensureIndex(
+        $collection,
+        { _topic => 1,             'TOPICINFO.rev'   => -1 },
+        { name   => '_topic:_rev' }
+    );
+
     $self->ensureIndex(
         $collection,
         { 'TOPICINFO.author' => 1 },
@@ -150,11 +167,28 @@ sub update {
 #TODO: maybe should use the auto indexed '_id' (or maybe we can use this as a tuid - unique foreach rev of each topic..)
 #then again, atm, its totally random, so may be good for sharding.
 
+    #indicate that all existing topics are _not_ the HEAD anymore
+    if (not $history_only) {
+        my $object = $collection->find_one({ _topic=>$hash->{_topic}, '_history' => {'$exists' => 0}});
+        if (defined($object->{_id})) {
+            $object->{_history} = 1;
+            $collection->save($object);
+        }
+    }
+    
+    #add a new entry into the versions collection too
+    #$ret = getMongoDB()->update( $web, 'current', "$web.$topic@".$meta->{'TOPICINFO'}->{rev}, $meta );
+    
+    $hash->{address} = $address.'@'.$hash->{'TOPICINFO'}->{rev};
+    $hash->{_history} = 1 if $history_only;
+    
+    #print STDERR "making new entry ".$hash->{address}."\n";
     $collection->update(
-        { address  => $address },
-        { address  => $address, %$hash },
+        { address  => $hash->{address} },
+        { address  => $hash->{address}, %$hash },
         { 'upsert' => 1 }
     );
+
 }
 
 #BUGGER. compound indexes won't help with large queries
@@ -267,7 +301,9 @@ sub getDatabaseName {
     my $web       = shift;
     
     #make sure the web exists?
-    die "getDatabaseName($web) does not exist" unless (Foswiki::Func::webExists($web));
+    if (defined($Foswiki::Plugins::SESSION->{store})) { #unit tests.. :/
+        #die "getDatabaseName($web) does not exist" unless (Foswiki::Func::webExists($web));
+    }
     
     #using webname as database name, so we need to sanitise
     #replace / with __ and pre-pend foswiki__ ?
@@ -310,18 +346,17 @@ sub _MONGODB {
     my $params = shift;
 
     my $web   = $params->{web};
-    my $database = $web;
     my $topic = $params->{topic};
 
-    my $collection = $self->_getCollection($database, 'current');
-    my $data = $collection->find_one( { _web => $web, _topic => $topic } );
+    my $database = $self->_getDatabase($web);
+    
+    #this will return the list of commands and how to use them
+    #my $result = $database->run_command( ['listCommands'=>1] );
+    
+    my $result = $database->run_command( ['collStats'=>'current'] );
 
-    use Foswiki::Plugins::MongoDBPlugin::Meta;
-    my $meta =
-      new Foswiki::Plugins::MongoDBPlugin::Meta( $self, $data->{_web},
-        $data->{_topic}, $data );
 
-    return $meta->stringify();
+    return "\n<verbatim>\n".Dumper($result)."\n</verbatim>\n";
 
     #return join(', ', map { "$_: ".($data->{$_}||'UNDEF')."\n" } keys(%$data));
 }

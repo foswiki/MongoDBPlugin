@@ -263,7 +263,7 @@ sub _updateTopic {
     my $savedMeta = shift;
     my $options = shift;
 
-    print STDERR "-update($web, $topic)\n" if DEBUG;
+    #print STDERR "-update($web, $topic)\n" if DEBUG;
 
     my $meta = {
         _web   => $web,
@@ -296,12 +296,6 @@ sub _updateTopic {
 #mind you, we don't really need indexes for speed, just to cope with query() resultsets that contain more than 1Meg of documents - so maybe we can delay creation until that happens?
                     getMongoDB()->ensureIndex(
                         getMongoDB()->_getCollection( $web, 'current' ),
-                        { $key . '.' . $elem->{name} . '.value' => 1 },
-                        { name => $key . '.' . $elem->{name} }
-                    );
-                    #TODO: need to abstract it out so this level of code doesn't care about collection name
-                    getMongoDB()->ensureIndex(
-                        getMongoDB()->_getCollection( $web, 'versions' ),
                         { $key . '.' . $elem->{name} . '.value' => 1 },
                         { name => $key . '.' . $elem->{name} }
                     );
@@ -350,27 +344,25 @@ sub _updateTopic {
                       
                     #Item10611: Paul found that the date, rev and version TOPICINFO is sometimes a string and other times a number
                     #rectify to always a string atm
-                    $meta->{'TOPICINFO'}->{version} = ''.$meta->{'TOPICINFO'}->{version};
-                    $meta->{'TOPICINFO'}->{date} = ''.$meta->{'TOPICINFO'}->{date};
-                    $meta->{'TOPICINFO'}->{rev} = ''.$meta->{'TOPICINFO'}->{rev};
+                    $meta->{'TOPICINFO'}->{version} = int($meta->{'TOPICINFO'}->{version});
+                    $meta->{'TOPICINFO'}->{date} = int($meta->{'TOPICINFO'}->{date});
+                    $meta->{'TOPICINFO'}->{rev} = int($meta->{'TOPICINFO'}->{rev});
                 }
             }
         }
     }
     #workaround for Item10675 - a not-foswiki .txt file
     if (not defined($meta->{'TOPICINFO'})) {
-                    $meta->{'TOPICINFO'}->{version} = '1';
-                    $meta->{'TOPICINFO'}->{date} = '0';
-                    $meta->{'TOPICINFO'}->{rev} = '1';
+                    $meta->{'TOPICINFO'}->{version} = 1;
+                    $meta->{'TOPICINFO'}->{date} = 0;
+                    $meta->{'TOPICINFO'}->{rev} = 1;
                     $meta->{'TOPICINFO'}->{author} = 'BaseUserMapping_999';
                     $meta->{'TOPICINFO'}->{_authorWikiName} = 'UnknownUser';
     }
 
     $meta->{_raw_text} = $savedMeta->getEmbeddedStoreForm();
 
-    my $ret = getMongoDB()->update( $web, 'current', "$web.$topic", $meta ) unless $options->{history_only};
-    #add a new entry into the versions collection too
-    $ret = getMongoDB()->update( $web, 'versions', "$web.$topic@".$meta->{'TOPICINFO'}->{rev}, $meta );
+    my $ret = getMongoDB()->update( $web, 'current', "$web.$topic", $meta, $options->{history_only});
     
     #need to clean up meta obj
     #TODO: clearly, I need to do a deep copy above :(
@@ -457,10 +449,12 @@ sub _MONGODB {
  #    # For example, %EXAMPLETAG{'hamburger' sideorder="onions"}%
  #    # $params->{_DEFAULT} will be 'hamburger'
  #    # $params->{sideorder} will be 'onions'
+ 
+ my $webToShow = $params->{_DEFAULT} || 'Sandbox';
 
     return getMongoDB()->_MONGODB(
         {
-            web => 'Sandbox',
+            web => $webToShow,#'Lauries/GlossaryData',
 
             #SMELL: ok, so i'm passing all sorts of stuff
             %$params    #over-ride the defaults

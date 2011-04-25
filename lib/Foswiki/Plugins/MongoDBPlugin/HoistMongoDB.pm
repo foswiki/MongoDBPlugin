@@ -65,7 +65,7 @@ sub hoist {
       )
     {
 
-        #this can happen if the entire query is something like "d2n(banana)"
+        #this can happen if the entire query is something like d2n(banana)
         #ideally, the parser should be converting that into a logical tree -
         #but for now, our parser is dumb, forcing hoisting code to suck
         print STDERR "\n......final convert..........\n" if MONITOR;
@@ -888,7 +888,7 @@ sub hoistMongoDB {
     my $rhs = quotemeta( $node->{hoisted1} );
     $rhs =~ s/\\\?/./g;
     $rhs =~ s/\\\*/.*/g;
-
+    
     if ( defined( $node->{insensitive} ) ) {
         $rhs = qr/^$rhs$/im;
     }

@@ -45,7 +45,7 @@ sub new {
 
     #print STDERR ": make me a new MongoDB::Meta with $web.$topic \n";
 
-#TODO: if $data is undef - see if its in mongoDB already, and if so, load it... ((OR... this should happen in the load/reload mess))
+#TODO: if $data is undef - see if its in mongoDB already, and if so, load it... ((OR... this should happen in the load/ mess))
 
     $meta->loadFromBSONData($data);
     return $meta;
@@ -91,19 +91,18 @@ sub reload {
     {
         my $collection =
           Foswiki::Plugins::MongoDBPlugin::getMongoDB->_getCollection(
-            $this->{_web}, 'versions' );
-            #TODO: ugh, damn, MongoDB find_one won't do order, so the result of a partially specified key is randomish
+            $this->{_web}, 'current' );
         $data = $collection->find_one(
-            { _web => $this->{_web}, _topic => $this->{_topic}, 'TOPICINFO.rev' => "$rev" } );
-         print STDERR "----- meta->reload(".join(',', ($this->{_web}, $this->{_web}, $rev))."\n";
+            { _web => $this->{_web}, _topic => $this->{_topic}, 'TOPICINFO.rev' => int($rev) } );
+         #print STDERR "----- meta->reload(".join(',', ($this->{_web}, $this->{_topic}, $rev))."\n";
     }
     else {
         my $collection =
           Foswiki::Plugins::MongoDBPlugin::getMongoDB->_getCollection(
             $this->{_web}, 'current' );
         $data = $collection->find_one(
-            { _web => $this->{_web}, _topic => $this->{_topic} } );
-#         print STDERR "----- meta->reload(".join(',', ($this->{_web}, $this->{_web}, '$rev'))."\n";
+            { address => $this->{_web}.'.'.$this->{_topic} } );
+         #print STDERR "----- meta->reload(".join(',', ($this->{_web}, $this->{_topic}, 'norev'))."\n";
     }
 
     $this->loadFromBSONData($data);
