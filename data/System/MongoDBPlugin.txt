@@ -34,7 +34,7 @@ Sorting works for fields that are strings, but doesn't yet manage to autoconvert
 ---+++ Caveats
    1 Your topics (as stored internally in the Meta obj) must be smaller than 4M.
    2 the schema is likely to change regularly, so when upgrading, re-importing will probably be necessary
-   3 tested with foswiki 1.1.0, _not_ trunk
+   3 Works __only__ with foswik trunk - to be 1.2 or 2.0 - will _not_ work with foswiki 1.1
    4 the query SEARCH =~ operator is currently not Hoisted to a regex, so is un-necessarily slow (both with and without mongodb)
    5 sorting _is_ different, Foswiki magically orders numerically if all the hits happen to be numeric, whereas Mongo treats strings as strings.
    6 web order appears to not have been implemented in the general store? so Mongo has to do it somewhere (unit tests have wrong order)
@@ -55,14 +55,17 @@ the last MongoDB query tool =X-Foswiki-Monitor-MongoDBPlugin-lastQueryTimee=.
 ---++ Info
 
 Many thanks to the following sponsors for supporting this work:
-   * fosiki.com
+   * [[http://fosiki.com][fosiki - Sven Dowideit's Wiki Consulting]]
+   * [[http://www.taxonomy.org.au][TRIN]], The Taxonomy Research & Information Network with the [[http://www.anbg.gov.au/cpbr/][Centre for Australian National Biodiversity Research]]
+
 
 |  Author(s): | Foswiki:Main.SvenDowideit |
-|  Copyright: | &copy; 2010 SvenDowideit@fosiki.com |
+|  Copyright: | &copy; 2010-2011 SvenDowideit@fosiki.com |
 |  License: | [[http://www.gnu.org/licenses/gpl.html][GPL 3 (Gnu General Public License)]] |
 |  Release: | %$RELEASE% |
 |  Version: | %$VERSION% |
 |  Change History: | <!-- versions below in reverse order -->&nbsp; |
+|  7 Apr 2011:  | milestone 3 - pretty much full functionality |
 |  Sept 2010: | restart work using foswiki 1.1 |
 |  Feb 2010: | initial implementation spike |
 |  Dependencies: | %$DEPENDENCIES% |
