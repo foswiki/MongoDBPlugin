@@ -134,7 +134,7 @@ sub update {
     my $collection = $self->_getCollection($database, $collectionName);
 
 #TODO: not the most efficient place to create and index, but I want to be sure, to be sure.
-#    $self->ensureIndex( $collection, { _topic => 1 }, { name => '_topic' } );
+    $self->ensureIndex( $collection, { _topic => 1 }, { name => '_topic' } );
 #    $self->ensureIndex(
 #        $collection,
 #        { _topic => 1,             _web   => 1 },
