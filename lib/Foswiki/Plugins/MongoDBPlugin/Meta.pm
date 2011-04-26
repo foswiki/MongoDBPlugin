@@ -83,23 +83,23 @@ sub reload {
     $this->{FILEATTACHMENT} = [];
 
 
+    return unless (Foswiki::Plugins::MongoDBPlugin::getMongoDB->databaseExists($this->{_web}));
+
+    my $collection =
+          Foswiki::Plugins::MongoDBPlugin::getMongoDB->_getCollection(
+            $this->{_web}, 'current' );
+
     my $data;
     if ( defined($rev) and
         ( defined( $Foswiki::cfg{Plugins}{MongoDBPlugin}{ExperimentalCode} )
         and $Foswiki::cfg{Plugins}{MongoDBPlugin}{ExperimentalCode} )
         )
     {
-        my $collection =
-          Foswiki::Plugins::MongoDBPlugin::getMongoDB->_getCollection(
-            $this->{_web}, 'current' );
         $data = $collection->find_one(
             { _web => $this->{_web}, _topic => $this->{_topic}, 'TOPICINFO.rev' => int($rev) } );
          #print STDERR "----- meta->reload(".join(',', ($this->{_web}, $this->{_topic}, $rev))."\n";
     }
     else {
-        my $collection =
-          Foswiki::Plugins::MongoDBPlugin::getMongoDB->_getCollection(
-            $this->{_web}, 'current' );
         $data = $collection->find_one(
             { address => $this->{_web}.'.'.$this->{_topic} } );
          #print STDERR "----- meta->reload(".join(',', ($this->{_web}, $this->{_topic}, 'norev'))."\n";

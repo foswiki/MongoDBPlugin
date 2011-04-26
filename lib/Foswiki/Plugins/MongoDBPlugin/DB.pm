@@ -28,9 +28,7 @@ use Assert;
 use Data::Dumper;
 use Time::HiRes ();
 use Tie::IxHash          ();
-
-
-use Foswiki::Func;  #TODO: remove this its there for diagnostics (i think)
+use Foswiki::Func;
 
 #lets declare it ok to run queries on slaves.
 #http://search.cpan.org/~kristina/MongoDB-0.42/lib/MongoDB/Cursor.pm#slave_okay
@@ -303,29 +301,40 @@ sub getDatabaseName {
     my $self           = shift;
     my $web       = shift;
     
-    #make sure the web exists?
-    if (defined($Foswiki::Plugins::SESSION->{store})) { #unit tests.. :/
-        #die "getDatabaseName($web) does not exist" unless (Foswiki::Func::webExists($web));
-    }
-    
     #using webname as database name, so we need to sanitise
     #replace / with __ and pre-pend foswiki__ ?
     $web =~ s/\//__/g;
     return 'foswiki__'.$web;
 }
-sub _getDatabase {
-    my $self           = shift;
-    my $database       = shift;
+sub databaseExists {
+    my $self = shift;
+    my $web = shift;
+
+    my $name = $self->getDatabaseName($web);
     
     my $connection = $self->_connect();
-    return $connection->get_database( $self->getDatabaseName($database) );
+    my @dbs = $connection->database_names;
+    foreach my $db_name (@dbs) {
+        return 1 if ($name eq $db_name);
+    }
+    return;
+}
+
+sub _getDatabase {
+    my $self           = shift;
+    my $web       = shift;
+    
+    my $name = $self->getDatabaseName($web);
+   
+    my $connection = $self->_connect();
+    return $connection->get_database( $name );
 }
 sub _getCollection {
     my $self           = shift;
-    my $database       = shift;
+    my $web       = shift;
     my $collectionName = shift;
     
-    my $db   = $self->_getDatabase($database);
+    my $db   = $self->_getDatabase($web);
 
     return $db->get_collection($collectionName);
 }
