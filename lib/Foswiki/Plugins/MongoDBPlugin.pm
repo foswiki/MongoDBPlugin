@@ -219,7 +219,7 @@ sub updateWebCache {
               my  ( $meta, $text ) = Foswiki::Func::readTopic( $web, $topic );
 
             #top revision
-            _updateTopic( $web, $topic, $meta );
+            _updateTopic( $web, $topic, $meta, {history_only => 0} );
             
             #TODO: if $rev isn't == 1, then need to go thhrough the history and load that too.
             my $rev = $meta->getRevisionInfo()->{version};
@@ -359,10 +359,12 @@ sub _updateTopic {
                     $meta->{'TOPICINFO'}->{author} = 'BaseUserMapping_999';
                     $meta->{'TOPICINFO'}->{_authorWikiName} = 'UnknownUser';
     }
+    $meta->{'TOPICINFO'}->{rev} = 1 if ($meta->{'TOPICINFO'}->{rev} < 1);
+    $meta->{'TOPICINFO'}->{version} = 1 if ($meta->{'TOPICINFO'}->{version} < 1);
 
     $meta->{_raw_text} = $savedMeta->getEmbeddedStoreForm();
 
-    my $ret = getMongoDB()->update( $web, 'current', "$web.$topic", $meta, $options->{history_only});
+    my $ret = getMongoDB()->update( $web, 'current', "$web.$topic", $meta, $options->{history_only} || 0);
     
     #need to clean up meta obj
     #TODO: clearly, I need to do a deep copy above :(

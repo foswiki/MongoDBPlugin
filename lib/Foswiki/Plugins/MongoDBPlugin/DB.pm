@@ -164,23 +164,28 @@ sub update {
 
 #TODO: maybe should use the auto indexed '_id' (or maybe we can use this as a tuid - unique foreach rev of each topic..)
 #then again, atm, its totally random, so may be good for sharding.
+    $hash->{address} = $address.'@'.$hash->{'TOPICINFO'}->{rev};
 
     #indicate that all existing topics are _not_ the HEAD anymore
-    if (not $history_only) {
+    if ($history_only == 0) {
         my $object = $collection->find_one({ _topic=>$hash->{_topic}, '_history' => {'$exists' => 0}});
         if (defined($object->{_id})) {
             $object->{_history} = 1;
             $collection->save($object);
         }
+        #add a new entry into the versions collection too (this is the duplicate version thing)
+#        print STDERR 'update '.$address."\n";
+#        $collection->update(
+#            { address  => $address },
+#            { address  => $address, %$hash },
+#            { 'upsert' => 1 }
+#        );
     }
     
-    #add a new entry into the versions collection too
-    #$ret = getMongoDB()->update( $web, 'current', "$web.$topic@".$meta->{'TOPICINFO'}->{rev}, $meta );
     
-    $hash->{address} = $address.'@'.$hash->{'TOPICINFO'}->{rev};
-    $hash->{_history} = 1 if $history_only;
+    $hash->{_history} = 1 if ($history_only ==1);
     
-    #print STDERR "making new entry ".$hash->{address}."\n";
+    print STDERR "making new entry ".$hash->{address}."\n";
     $collection->update(
         { address  => $hash->{address} },
         { address  => $hash->{address}, %$hash },

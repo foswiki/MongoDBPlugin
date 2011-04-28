@@ -227,7 +227,7 @@ sub loadTopic {
     }
 
     $session->search->metacache->addMeta( $_[1]->web, $_[1]->topic, $_[1] );
-
+    
     print STDERR "===== loadTopic("
       . $_[1]->web . " , "
       . $_[1]->topic
@@ -237,6 +237,43 @@ sub loadTopic {
 
     return ( $_[1]->getLoadedRev(), 1 );
 
+}
+
+sub getRevisionHistory {
+    my $this = shift;
+    my $meta = shift;
+    my $attachment = shift;
+    
+    return if (defined($attachment));
+    
+    my $session =
+      $meta
+      ->{_session}; #TODO: naughty, but we seem to get called before Foswiki::Func::SESSION is set up :(
+
+    if ((not defined($attachment)) and ($this->{_latestIsLoaded})) {
+        #why poke around in revision history (slow) if we 'have the latest'
+use Foswiki::Iterator::NumberRangeIterator;
+        return new Foswiki::Iterator::NumberRangeIterator( $this->{_loadedRev}, 1 );
+    }
+    
+    
+
+    if ( $session->search->metacache->hasCached( $meta->web, $meta->topic ) ) {
+        print STDERR "===== metacache hasCached("
+          . $meta->web . " , "
+          . $meta->topic
+          . ", version)\n"
+          if MONITOR;
+        $meta =
+          $session->search->metacache->getMeta( $meta->web, $meta->topic );
+        if ((not defined($attachment)) and ($meta->{_latestIsLoaded})) {
+            #why poke around in revision history (slow) if we 'have the latest'
+    use Foswiki::Iterator::NumberRangeIterator;
+            return new Foswiki::Iterator::NumberRangeIterator( $meta->{_loadedRev}, 1 );
+        }
+    }
+
+    return undef;
 }
 
 1;

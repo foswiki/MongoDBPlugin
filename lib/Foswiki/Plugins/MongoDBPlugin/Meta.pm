@@ -101,7 +101,7 @@ sub reload {
     }
     else {
         $data = $collection->find_one(
-            { address => $this->{_web}.'.'.$this->{_topic} } );
+            { _web => $this->{_web}, _topic => $this->{_topic}, _history => {'$exists' => 0}} );
          #print STDERR "----- meta->reload(".join(',', ($this->{_web}, $this->{_topic}, 'norev'))."\n";
     }
 
