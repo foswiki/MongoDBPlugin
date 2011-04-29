@@ -1,5 +1,5 @@
 %META:TOPICPARENT{name="Plugins"}%
----+!! !MongoDBPlugin
+---+!! !%TOPIC%
 <!--
 One line description, required for extensions repository catalog.
 BuildContrib will fill in the SHORTDESCRIPTION with the value of
@@ -12,52 +12,96 @@ prefer.
 %TOC%
 
 ---++ Usage
-This is an experimental attempt to utilise [[http://mongodb.org][MongoDB]] for all aspects of serialisation in foswiki.
+This is an experimental attempt to utilise [[http://mongodb.org][MongoDB]] to cache and search/query all topics stored in Foswiki. This is achieved by:
+   * Bulk-loading topics for the first time with the =%TOPIC%/update= restHandler (see below)
+   * Maintaining any new or changed topics by way of a [[%SCRIPTURLPATH{"configure"}%/configure#Store][Store]] listener (={Store}{Listeners}= expert setting in configure)
+   * Executing all searches and queries with !MongoDB instead of the traditional !BruteForce/grep approach by providing new search and query algorithms (={Store}{SearchAlgorithm}=, ={Store}{QueryAlgorithm}= in configure)
 
-At this point the Plugin is used to populate the MongoDB. All user topic Saves are automatically copied into the MongoDB, 
-and you can batch load using the restHandler:
-   * %SCRIPTURL{rest}%/MongoDBPlugin/update?updateweb=Main (just the Main web)
-   * %SCRIPTURL{rest}%/MongoDBPlugin/update?updateweb=all (all webs recursivly)
-   * %SCRIPTURL{rest}%/MongoDBPlugin/update?updateweb=Lauries;recurse=true (Lauries web and its subwebs recursivly)
+To check on progress and bugs please visit Foswikitask:%TOPIC%.
 
-To update the javascript stored in MongoDB
-   * %SCRIPTURL{rest}%/MongoDBPlugin/updateDatabase
+#LoadBrowser
+---+++ Loading from web browser
+%TOPIC% registers some rest handlers which may be accessed via web browser:
+   * %SCRIPTURL{rest}%/%TOPIC%/update?updateweb=%USERSWEB% (just the %USERSWEB% web)
+   * %SCRIPTURL{rest}%/%TOPIC%/update?updateweb=all (all webs recursivly)
+   * %SCRIPTURL{rest}%/%TOPIC%/update?updateweb=Lauries;recurse=true (Lauries web and its subwebs recursivly)
+   * %SCRIPTURL{rest}%/%TOPIC%/updateDatabase (updates server-side javascript code stored in !MongoDB)
 
+#LoadCLI
+---+++ Loading from command line
+It may be unreasonable to run the above scripts via web browser if you have any non-trivial amount of data, so on a
+production system it's best to invoke the rest script from the command line where the process won't be affected by
+timemouts and webserver restarts. The following examples assume:
+   * Your web server user is =www-data= (default on Debian systems)
+   * The path to the root of your Foswiki installation is =/path/to/foswiki=
+
+%JQREQUIRE{"chili"}%<verbatim class="bash">cd /path/to/foswiki
+sudo -u www-data bin/./rest /MongoDBPlugin/update -updateweb Sandbox</verbatim>
+
+If this is working and you're ready to load your entire Foswiki, it's best to run in the background detached from your terminal session as follows:
+<verbatim class="bash">cd /path/to/foswiki
+sudo -u www-data nohup bin/./rest /MongoDBPlugin/update -updateweb all -recurse on &</verbatim>
+
+You can keep an eye on the progress of the load by looking at the =nohup.out= file which will be created in =/path/to/foswiki= (with =tail -f nohup.out=, for example).
+
+Because every version of every topic is loaded, loading a large wiki can be __very slow__. On an installation using separate virtual machines for Foswiki and !MongoDB, with 205,000 topics - most of which only have 1 or 2 revisions, this process takes ~6 hours.
 
 ---++ Technical details
-This initial version serialises the internal Meta object directly into _one_ collection, using web.name as a unique index.
-
-In the process showing a proof of concept that works 
-
-Sorting works for fields that are strings, but doesn't yet manage to autoconvert to numerical sorting if all fields happen to contain only numerical characters.
 
 ---+++ Caveats
-   1 Your topics (as stored internally in the Meta obj) must be smaller than 4M.
-   2 the schema is likely to change regularly, so when upgrading, re-importing will probably be necessary
-   3 Works __only__ with foswik trunk - to be 1.2 or 2.0 - will _not_ work with foswiki 1.1
-   4 the query SEARCH =~ operator is currently not Hoisted to a regex, so is un-necessarily slow (both with and without mongodb)
-   5 sorting _is_ different, Foswiki magically orders numerically if all the hits happen to be numeric, whereas Mongo treats strings as strings.
-   6 web order appears to not have been implemented in the general store? so Mongo has to do it somewhere (unit tests have wrong order)
+   1 Sorting works for fields that are strings, but doesn't yet manage to autoconvert to numerical sorting if all fields happen to contain only numerical characters.
+   2 Sorting _is_ different, Foswiki magically orders numerically if all the hits happen to be numeric, whereas Mongo treats strings as strings.
+   3 Your topics (as stored internally in the Meta obj) must be smaller than <del>4M</del> <ins>8M</ins>. %GREEN%TODO: Quantify BSON overhead%ENDCOLOR%
+   4 The schema is likely to change regularly, so when upgrading, re-importing will probably be necessary
+   5 Works __only__ with foswik trunk - to be 1.2 or 2.0 - will _not_ work with foswiki 1.1
+   6 The %SYSTEMWEB%.QuerySearch ==~= operator is currently not hoisted to a regex, so is un-necessarily slow (both with and without mongodb) - %GREEN%TODO: Check if this is still true%ENDCOLOR%
+   7 Web order appears to not have been implemented in the general store? So Mongo has to do it somewhere (unit tests have wrong order)
 
 ---+++ Metrics
----++++ HTTP reposnse header =X-Foswiki-Monitor-MongoDBPlugin-lastQueryTime=
-you can use 
-=curl -I http://x61/f/bin/view/Lauries/TestQuery1= to get just the header info (foswiki goes through and does a complete render for =HEAD= requests atm.
+---++++ HTTP reposnse header =X-Foswiki-Monitor-%TOPIC%-lastQueryTime=
+You can use 
+=curl -I %SCRIPTURL{view}%/Lauries/TestQuery1= to get just the header info (foswiki goes through and does a complete render for =HEAD= requests atm.
 
-in combination with Foswiki::Extensions.DebugLogPlugin, you will then be able to see both the time taken to render the topic =X-Foswiki-Monitor-DebugLogPlugin-Rendertime= and the time 
-the last MongoDB query tool =X-Foswiki-Monitor-MongoDBPlugin-lastQueryTimee=.
+In combination with Foswiki::Extensions.DebugLogPlugin, you will then be able to see both the time taken to render the topic =X-Foswiki-Monitor-DebugLogPlugin-Rendertime= and the time 
+the last MongoDB query tool =X-Foswiki-Monitor-%TOPIC%-lastQueryTimee=.
 
+#InstallingMongoDB
+---++ Installing and configuring !MongoDB
+Installing and configuring !MongoDB isn't too hard as far as database products go, but it's worth noting some tips here:
+   * Currently %TOPIC% schema uses a separate database for each Foswiki web and subweb. By default, the minimum overhead for a !MongoDB database is 200MB. If you have a lot of webs, and most of them don't have thousands of topics in them, then this overhead is a little extreme. 
+      %JQREQUIRE{"chili"}%Place these configuration directives in your =mongodb.conf=: <verbatim>
+ noprealloc = true
+ smallfiles = true</verbatim>
+      This will make the minimum cost of each new web only 16MB (8MB NS and 8MB data). Alternatively you could change your upstart/init scripts to add the following options to the =mongod= startup:
+ <verbatim class="bash">--noprealloc --smallfiles</verbatim>
+   * For Debian-based distros, you really should use the [[http://www.mongodb.org/display/DOCS/Ubuntu+and+Debian+packages][10gen packages]]
+   * In terms of configuring the database options, %TOPIC%'s default configuration should "just work" with an out-of-the-box !MongoDB installation if it's done on the same server as Foswiki (localhost)
+   * In production, running !MongoDB on a different server can free up the Foswiki server to handle more requests
+   * We don't quite have =slave_ok= working yet (this is where we distribute queries across a bunch of replicas), so don't expect any performance increase if you set up a replSet
+   * Due to liberal usage of =db.eval= (executing javascript in !MongoDB) to resolve some parts of the %SYSTEMWEB%.QuerySearch language (for example, ref queries), sharding is definitely not supported
 
 ---++ Installation Instructions
 
 %$INSTALL_INSTRUCTIONS%
+
+After [[#InstallingMongoDB][installing MongoDB]] and [[#LoadBrowser][loading your data]] you will also need to use [[%SCRIPTURLPATH{"configure"}%][configure]] to:
+   * Access the [[%SCRIPTURLPATH{"configure"}%#Store][Store]] tab
+   * Change ={Store}{SearchAlgorithm}= to use =Foswiki::Store::SearchAlgorithms::MongoDB=
+   * Change ={Store}{QueryAlgorithm}= to use =Foswiki::Store::QueryAlgorithms::MongoDB=
+   * Show expert settings
+   * Enter the following text in the ={Store}{Listeners}= setting:
+   <verbatim> {
+   'Foswiki::Plugins::MongoDBPlugin::Listener' => 1
+ }</verbatim>
+
+If you are using a replica set, don't forget to list all replSet members in the =[[%SCRIPTURLPATH{"configure"}%#MongoDBPlugin$Extensions][{MongoDBPlugin}{host}]]= setting, for example:
+<verbatim>mongodb://mongo1.example.org:27017,mongo2.example.org:27017,mongo3.example.org:27017</verbatim>
 
 ---++ Info
 
 Many thanks to the following sponsors for supporting this work:
    * [[http://fosiki.com][fosiki - Sven Dowideit's Wiki Consulting]]
    * [[http://www.taxonomy.org.au][TRIN]], The Taxonomy Research & Information Network with the [[http://www.anbg.gov.au/cpbr/][Centre for Australian National Biodiversity Research]]
-
 
 |  Author(s): | Foswiki:Main.SvenDowideit |
 |  Copyright: | &copy; 2010-2011 SvenDowideit@fosiki.com |
@@ -69,7 +113,7 @@ Many thanks to the following sponsors for supporting this work:
 |  Sept 2010: | restart work using foswiki 1.1 |
 |  Feb 2010: | initial implementation spike |
 |  Dependencies: | %$DEPENDENCIES% |
-|  Home page: | http://foswiki.org/bin/view/Extensions/MongoDBPlugin |
-|  Support: | http://foswiki.org/bin/view/Support/MongoDBPlugin |
+|  Home page: | http://foswiki.org/bin/view/Extensions/%TOPIC% |
+|  Support: | http://foswiki.org/bin/view/Support/%TOPIC% |
 
 <!-- Do _not_ attempt to edit this topic; it is auto-generated. -->
