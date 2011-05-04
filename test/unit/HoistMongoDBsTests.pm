@@ -1655,6 +1655,38 @@ sub test_hoist_ref_TOPICINFO_longhand_plus {
         }
     );
 }
+sub test_hoist_CREATEINFO_longhand {
+    my $this = shift;
+    my $s = "META:CREATEINFO.date > 12346787";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
 
+    $this->do_Assert(
+        $query,
+        $mongoDBQuery,
+        {
+            'CREATEINFO.date' => {'$gt' => 12346787 }
+        }
+    );
+}
+
+sub test_hoist_ref_CREATEINFO_longhand {
+    my $this = shift;
+    my $s = "'AnotherTopic'/META:CREATEINFO.date";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert(
+        $query,
+        $mongoDBQuery,
+        {
+            '$where' => '(foswiki_getField(foswiki_getRef(\'localhost\', foswiki_getDatabaseName(this._web)+\'.current\', this._web, \'AnotherTopic\'), \'CREATEINFO.date\'))'
+        }
+    );
+}
 
 1;

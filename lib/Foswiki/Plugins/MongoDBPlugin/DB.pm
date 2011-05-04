@@ -185,7 +185,7 @@ sub update {
     
     $hash->{_history} = 1 if ($history_only ==1);
     
-    print STDERR "making new entry ".$hash->{address}."\n";
+    #print STDERR "making new entry ".$hash->{address}."\n";
     $collection->update(
         { address  => $hash->{address} },
         { address  => $hash->{address}, %$hash },
