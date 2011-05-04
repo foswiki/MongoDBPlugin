@@ -51,10 +51,12 @@ use Foswiki::Infix::Error;
 # See Foswiki::Query::QueryAlgorithms.pm for details
 sub query {
     my ( $query, $inputTopicSet, $session, $options ) = @_;
+    print STDERR "original parsetree: ".$query->stringify()."\n" if MONITOR;
 
     # Fold constants
     my $context = Foswiki::Meta->new( $session, $session->{webName} );
     $query->simplify( tom => $context, data => $context );
+    print STDERR "simplified parsetree: ".$query->stringify()."\n" if MONITOR;
 
     my $webNames = $options->{web}       || '';
     my $recurse  = $options->{'recurse'} || '';
@@ -131,7 +133,6 @@ sub _webQuery {
     Foswiki::Plugins::MongoDBPlugin::getMongoDB();
 
     if ( $query->evaluatesToConstant() ) {
-
         # SMELL: use any old topic
         my $cache = $Foswiki::Plugins::SESSION->search->metacache->get( $web,
             'WebPreferences' );

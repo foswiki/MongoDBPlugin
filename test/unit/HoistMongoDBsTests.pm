@@ -1488,6 +1488,54 @@ sub test_hoist_ref4 {
         }
     );
 }
+sub test_hoist_ref4_longhand {
+    my $this = shift;
+    my $s = "META:FORM.name='TaxonProfile.Relationships.RelationshipForm' AND Source/META:TOPICINFO.rev!=SourceRev";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert(
+        $query,
+        $mongoDBQuery,
+        {
+          '$where' => ' ( (foswiki_getField(this, \'FORM.name\') == \'TaxonProfile.Relationships.RelationshipForm\') )  &&  ((foswiki_getField(foswiki_getRef(\'localhost\', foswiki_getDatabaseName(this._web)+\'.current\', this._web, foswiki_getField(this, \'FIELD.Source.value\')), \'TOPICINFO.rev\')) != foswiki_getField(this, \'FIELD.SourceRev.value\')) '
+        }
+    );
+}
+sub test_hoist_parent {
+    my $this = shift;
+    my $s = "parent.name='WebHome'";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert(
+        $query,
+        $mongoDBQuery,
+        {
+            'TOPICPARENT.name' => 'WebHome'
+        }
+    );
+}
+sub test_hoist_parent_longhand {
+    my $this = shift;
+    my $s = "META:TOPICPARENT.name='WebHome'";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert(
+        $query,
+        $mongoDBQuery,
+        {
+            'TOPICPARENT.name' => 'WebHome'
+        }
+    );
+}
 
 sub test_hoist_Item10515 {
     my $this = shift;
@@ -1573,5 +1621,40 @@ sub DISABLEtest_hoist_ImplicitFormNameBUG {
         }
     );
 }
+
+sub test_hoist_ref_TOPICINFO_longhand {
+    my $this = shift;
+    my $s = "'AnotherTopic'/META:TOPICINFO.date";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert(
+        $query,
+        $mongoDBQuery,
+        {
+            '$where' => '(foswiki_getField(foswiki_getRef(\'localhost\', foswiki_getDatabaseName(this._web)+\'.current\', this._web, \'AnotherTopic\'), \'TOPICINFO.date\'))'
+        }
+    );
+}
+
+sub test_hoist_ref_TOPICINFO_longhand_plus {
+    my $this = shift;
+    my $s = "(not (name = 'AnotherTopic' or name = 'WebHome' or name = 'BarnicalBob')) and 'AnotherTopic'/META:TOPICINFO.date";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert(
+        $query,
+        $mongoDBQuery,
+        {
+            '$where' => " ( ((! ( this._topic == 'AnotherTopic' || this._topic == 'WebHome' || this._topic == 'BarnicalBob' ) )) )  &&  ((foswiki_getField(foswiki_getRef('localhost', foswiki_getDatabaseName(this._web)+'.current', this._web, 'AnotherTopic'), 'TOPICINFO.date'))) "
+        }
+    );
+}
+
 
 1;

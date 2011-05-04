@@ -5,13 +5,15 @@
 //print('getField('+address);
     var addrs = address.split('.');
     for (var i in addrs) {
-        //print(i);
         var name = addrs[i];
+        //print(i+' => '+name);
         if (ptr == undefined) {
+            //print('return ptr undefined');
             return ptr;
         }
         ptr = ptr[name];
     }
+    //print('return '+ptr);
     return ptr;
 }%TMPL:END%
 %TMPL:DEF{foswiki_toLowerCase_js}%function(value) {

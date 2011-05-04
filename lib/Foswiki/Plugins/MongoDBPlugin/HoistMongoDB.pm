@@ -971,8 +971,9 @@ sub mapAlias {
     }
     elsif ( defined( $Foswiki::Query::Node::aliases{$name} ) ) {
         $name = $Foswiki::Query::Node::aliases{$name};
-        $name =~ s/^META://;    #might remove this fomr the mongodb schema
     }
+    $name =~ s/^META://;
+
     return $name;
 }
 
