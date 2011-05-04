@@ -161,6 +161,17 @@ sub update {
         { 'TOPICPARENT.name' => 1 },
         { name               => 'TOPICPARENT.name' }
     );
+    $self->ensureIndex(
+        $collection,
+        { 'CREATEINFO.author' => 1 },
+        { name               => 'CREATEINFO.author' }
+    );
+    $self->ensureIndex(
+        $collection,
+        { 'CREATEINFO.date' => 1 },
+        { name             => 'CREATEINFO.date' }
+    );
+
 
 #TODO: maybe should use the auto indexed '_id' (or maybe we can use this as a tuid - unique foreach rev of each topic..)
 #then again, atm, its totally random, so may be good for sharding.
