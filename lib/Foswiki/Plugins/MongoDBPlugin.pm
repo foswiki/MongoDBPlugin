@@ -59,6 +59,8 @@ sub initPlugin {
 
     $enableOnSaveUpdates =
       $Foswiki::cfg{Plugins}{$pluginName}{EnableOnSaveUpdates} || 0;
+      
+    $Foswiki::Func::SESSION->{MongoDB}->{lastQueryTime} = ();
 
     #SMELL: ew
     #TODO: this sets our Global Connextion into the session :(
