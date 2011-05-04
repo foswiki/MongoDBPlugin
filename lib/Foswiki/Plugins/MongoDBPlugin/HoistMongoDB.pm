@@ -460,6 +460,7 @@ my %js_func_map = (
 
 sub convertFunction {
     my ( $value, $key ) = @_;
+    
     if (   ( $key eq '#lc' )
         or ( $key eq '#uc' )
         or ( $key eq '#length' )
@@ -486,6 +487,9 @@ sub convertFunction {
         my $ref =
 'foswiki_getRef(\'localhost\', foswiki_getDatabaseName(this._web)+\'.current\', this._web, '
           . convertStringToJS( $$value[0] ) . ')';
+          
+        ASSERT($addr =~ /this/) if DEBUG
+          
         $addr =~ s/this/$ref/;
         return $addr;
     }

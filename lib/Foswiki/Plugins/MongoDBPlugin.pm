@@ -264,6 +264,7 @@ sub _updateTopic {
     my $options = shift;
 
     #print STDERR "-update($web, $topic)\n" if DEBUG;
+    $savedMeta->getRev1Info('createdate');
 
     my $meta = {
         _web   => $web,
@@ -272,8 +273,8 @@ sub _updateTopic {
 
     foreach my $key ( keys(%$savedMeta) ) {
 
-        #print STDERR "------------------ importing $key - "
-        #  . ref( $savedMeta->{$key} ) . "\n";
+#        print STDERR "------------------ importing $key - "
+#          . ref( $savedMeta->{$key} ) . "\n";
         next if ( $key eq '_session' );
 
 #not totally sure if there's a benefit to using / not the _indices
@@ -326,6 +327,16 @@ sub _updateTopic {
 
 #print STDERR Dumper($savedMeta->{$key})."\n";
 #print STDERR "\n######################################################## BOOOOOOOOM\n";
+                    if ( $key eq '_getRev1Info' ) {
+                        $key = 'CREATEINFO';
+                        $meta->{'CREATEINFO'} = $savedMeta->{_getRev1Info}->{rev1info};
+                        #lets numericafy them
+                        $meta->{'CREATEINFO'}->{version} = int($meta->{'CREATEINFO'}->{version});
+                        $meta->{'CREATEINFO'}->{date} = int($meta->{'CREATEINFO'}->{date});
+                        #use Data::Dumper;
+                        #print STDERR "$topic: ".(defined($savedMeta->{'TOPICINFO'}[0]->{version})?($savedMeta->{'TOPICINFO'}[0]->{version}):'undef')." ".Dumper($meta->{'CREATEINFO'})."\n";
+                    }
+
                     next;
                 }
 

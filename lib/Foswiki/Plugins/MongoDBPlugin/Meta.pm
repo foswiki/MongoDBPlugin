@@ -147,6 +147,9 @@ sub loadFromBSONData {
 
     $this->{_loadedRev} =
       Foswiki::Store::cleanUpRevID( $this->{TOPICINFO}[0]->{version} );
+      
+    $this->{_getRev1Info}->{rev1info} = $data->{'CREATEINFO'};
+    delete $this->{CREATEINFO};
 
     # SMELL: removed see getLoadedRev - should remove any
     # non-numeric rev's (like the $rev stuff from svn)
