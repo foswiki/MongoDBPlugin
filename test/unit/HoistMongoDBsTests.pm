@@ -1488,6 +1488,22 @@ sub test_hoist_ref4 {
         }
     );
 }
+sub test_hoist_ref4_or {
+    my $this = shift;
+    my $s = "form.name='TaxonProfile.Relationships.RelationshipForm' OR Source/info.rev!=SourceRev";
+    my $queryParser = new Foswiki::Query::Parser();
+    my $query       = $queryParser->parse($s);
+    my $mongoDBQuery =
+      Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+
+    $this->do_Assert(
+        $query,
+        $mongoDBQuery,
+        {
+          '$where' => ' ( foswiki_getField(this, \'FORM.name\') == \'TaxonProfile.Relationships.RelationshipForm\' || (foswiki_getField(foswiki_getRef(\'localhost\', foswiki_getDatabaseName(this._web), \'current\', this._web, foswiki_getField(this, \'FIELD.Source.value\')), \'TOPICINFO.rev\')) != foswiki_getField(this, \'FIELD.SourceRev.value\') ) '
+        }
+    );
+}
 sub test_hoist_ref4_longhand {
     my $this = shift;
     my $s = "META:FORM.name='TaxonProfile.Relationships.RelationshipForm' AND Source/META:TOPICINFO.rev!=SourceRev";

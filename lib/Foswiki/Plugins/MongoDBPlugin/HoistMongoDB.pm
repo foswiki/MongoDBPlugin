@@ -679,12 +679,12 @@ sub convertToJavascript {
             }
             elsif ( ( $key eq '$or' ) or ( $key eq '$nor' ) ) {
 
-                $js_key = '$or' if ( $key eq '$nor' );
+                $js_key = '||' if ( $key eq '$nor' );
 
                 #er, assuming $key == $or - $in and $nin will kick me
                 my $new = ' ( '
                   . join(
-                    ' ' . convertStringToJS($js_key) . ' ',
+                    ' ' . ($js_key) . ' ',
                     map { convertToJavascript($_) } @$value
                   ) . ' ) ';
                 $new = '(!' . $new . ')' if ( $key eq '$nor' );
@@ -1373,7 +1373,9 @@ sub hoistMongoDB {
     my $i = 0;
     while (defined($node->{'hoisted'.$i})) {
         my $elem = $node->{'hoisted'.$i};
-        if (defined($elem->{'$or'})) {
+        if (ref($elem) eq '') {
+            push(@elements, {'$where' => $elem});
+        } elsif (defined($elem->{'$or'})) {
             #this might be un-necessary in the new nary node world
             my $ors = $elem->{'$or'};
             push(@elements, @$ors);
