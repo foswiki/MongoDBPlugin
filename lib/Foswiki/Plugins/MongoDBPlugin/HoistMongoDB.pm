@@ -485,7 +485,7 @@ sub convertFunction {
         my $addr = '(' . convertStringToJS( $$value[1] ) . ')';
 ##%TMPL:DEF{foswiki_getRef_js}%function(host, collection, currentqueryweb, topic) {
         my $ref =
-'foswiki_getRef(\'localhost\', foswiki_getDatabaseName(this._web)+\'.current\', this._web, '
+'foswiki_getRef(\'localhost\', foswiki_getDatabaseName(this._web), \'current\', this._web, '
           . convertStringToJS( $$value[0] ) . ')';
           
         ASSERT($addr =~ /this/) if DEBUG

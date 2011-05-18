@@ -61,12 +61,16 @@
 }%TMPL:END%
 %TMPL:DEF{foswiki_getDatabaseName_js}%function(web) {
     web = web.replace(/\//, '__');
+    web = web.replace(/\./, '__');
     return 'foswiki__'+web;
 }%TMPL:END%
 
-%TMPL:DEF{foswiki_getRef_js}%function(host, collection, web, topic) {
-    conn = new Mongo(host);
-    current = conn.getCollection(collection); //collection is actually database.collection
+%TMPL:DEF{foswiki_getRef_js}%function(host, dbname, collection, web, topic) {
+    //first stab at JOIN to other DB - but this was a v1.5 idea
+    //conn = new Mongo(host);
+    //current = conn.getCollection(dbname+'.'+collection); //collection is actually database.collection
+    //newer sister
+    current = db.getSisterDB(dbname).getCollection(collection);
     
     if (topic ==undefined) {
         return topic;

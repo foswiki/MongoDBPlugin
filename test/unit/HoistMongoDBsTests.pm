@@ -1431,7 +1431,7 @@ sub test_hoist_ref {
         $query,
         $mongoDBQuery,
         {
-          '$where' => "(foswiki_getField(foswiki_getRef(\'localhost\', foswiki_getDatabaseName(this._web)+\'.current\', this._web, 'AnotherTopic'), 'FIELD.number.value')) == 12"
+          '$where' => "(foswiki_getField(foswiki_getRef(\'localhost\', foswiki_getDatabaseName(this._web), \'current\', this._web, 'AnotherTopic'), 'FIELD.number.value')) == 12"
           #"(foswiki_getRef('AnotherTopic').FIELD.number.value) == 12",
         }
     );
@@ -1450,7 +1450,7 @@ sub test_hoist_ref2 {
         $query,
         $mongoDBQuery,
         {
-          '$where' => '(foswiki_getField(foswiki_getRef(\'localhost\', foswiki_getDatabaseName(this._web)+\'.current\', this._web, foswiki_getField(this, \'FIELD.Source.value\')), \'TOPICINFO.rev\')) != foswiki_getField(this, \'FIELD.SourceRev.value\')'
+          '$where' => '(foswiki_getField(foswiki_getRef(\'localhost\', foswiki_getDatabaseName(this._web), \'current\', this._web, foswiki_getField(this, \'FIELD.Source.value\')), \'TOPICINFO.rev\')) != foswiki_getField(this, \'FIELD.SourceRev.value\')'
 
         }
     );
@@ -1468,7 +1468,7 @@ sub test_hoist_ref3 {
         $query,
         $mongoDBQuery,
         {
-          '$where' => 'foswiki_getField(this, \'FIELD.SourceRev.value\') > (foswiki_getField(foswiki_getRef(\'localhost\', foswiki_getDatabaseName(this._web)+\'.current\', this._web, foswiki_getField(this, \'FIELD.Source.value\')), \'TOPICINFO.rev\'))'
+          '$where' => 'foswiki_getField(this, \'FIELD.SourceRev.value\') > (foswiki_getField(foswiki_getRef(\'localhost\', foswiki_getDatabaseName(this._web), \'current\', this._web, foswiki_getField(this, \'FIELD.Source.value\')), \'TOPICINFO.rev\'))'
         }
     );
 }
@@ -1484,7 +1484,7 @@ sub test_hoist_ref4 {
         $query,
         $mongoDBQuery,
         {
-          '$where' => ' ( (foswiki_getField(this, \'FORM.name\') == \'TaxonProfile.Relationships.RelationshipForm\') )  &&  ((foswiki_getField(foswiki_getRef(\'localhost\', foswiki_getDatabaseName(this._web)+\'.current\', this._web, foswiki_getField(this, \'FIELD.Source.value\')), \'TOPICINFO.rev\')) != foswiki_getField(this, \'FIELD.SourceRev.value\')) '
+          '$where' => ' ( (foswiki_getField(this, \'FORM.name\') == \'TaxonProfile.Relationships.RelationshipForm\') )  &&  ((foswiki_getField(foswiki_getRef(\'localhost\', foswiki_getDatabaseName(this._web), \'current\', this._web, foswiki_getField(this, \'FIELD.Source.value\')), \'TOPICINFO.rev\')) != foswiki_getField(this, \'FIELD.SourceRev.value\')) '
         }
     );
 }
@@ -1500,7 +1500,7 @@ sub test_hoist_ref4_longhand {
         $query,
         $mongoDBQuery,
         {
-          '$where' => ' ( (foswiki_getField(this, \'FORM.name\') == \'TaxonProfile.Relationships.RelationshipForm\') )  &&  ((foswiki_getField(foswiki_getRef(\'localhost\', foswiki_getDatabaseName(this._web)+\'.current\', this._web, foswiki_getField(this, \'FIELD.Source.value\')), \'TOPICINFO.rev\')) != foswiki_getField(this, \'FIELD.SourceRev.value\')) '
+          '$where' => ' ( (foswiki_getField(this, \'FORM.name\') == \'TaxonProfile.Relationships.RelationshipForm\') )  &&  ((foswiki_getField(foswiki_getRef(\'localhost\', foswiki_getDatabaseName(this._web), \'current\', this._web, foswiki_getField(this, \'FIELD.Source.value\')), \'TOPICINFO.rev\')) != foswiki_getField(this, \'FIELD.SourceRev.value\')) '
         }
     );
 }
@@ -1634,7 +1634,7 @@ sub test_hoist_ref_TOPICINFO_longhand {
         $query,
         $mongoDBQuery,
         {
-            '$where' => '(foswiki_getField(foswiki_getRef(\'localhost\', foswiki_getDatabaseName(this._web)+\'.current\', this._web, \'AnotherTopic\'), \'TOPICINFO.date\'))'
+            '$where' => '(foswiki_getField(foswiki_getRef(\'localhost\', foswiki_getDatabaseName(this._web), \'current\', this._web, \'AnotherTopic\'), \'TOPICINFO.date\'))'
         }
     );
 }
@@ -1651,7 +1651,7 @@ sub test_hoist_ref_TOPICINFO_longhand_plus {
         $query,
         $mongoDBQuery,
         {
-            '$where' => " ( ((! ( this._topic == 'AnotherTopic' || this._topic == 'WebHome' || this._topic == 'BarnicalBob' ) )) )  &&  ((foswiki_getField(foswiki_getRef('localhost', foswiki_getDatabaseName(this._web)+'.current', this._web, 'AnotherTopic'), 'TOPICINFO.date'))) "
+            '$where' => " ( ((! ( this._topic == 'AnotherTopic' || this._topic == 'WebHome' || this._topic == 'BarnicalBob' ) )) )  &&  ((foswiki_getField(foswiki_getRef('localhost', foswiki_getDatabaseName(this._web), 'current', this._web, 'AnotherTopic'), 'TOPICINFO.date'))) "
         }
     );
 }
@@ -1684,7 +1684,7 @@ sub test_hoist_ref_CREATEINFO_longhand {
         $query,
         $mongoDBQuery,
         {
-            '$where' => '(foswiki_getField(foswiki_getRef(\'localhost\', foswiki_getDatabaseName(this._web)+\'.current\', this._web, \'AnotherTopic\'), \'CREATEINFO.date\'))'
+            '$where' => '(foswiki_getField(foswiki_getRef(\'localhost\', foswiki_getDatabaseName(this._web), \'current\', this._web, \'AnotherTopic\'), \'CREATEINFO.date\'))'
         }
     );
 }
