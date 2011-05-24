@@ -72,7 +72,11 @@ sub hoist {
         $mongoDBQuery = { '$where' => convertToJavascript($mongoDBQuery) };
     }
 
-    die $mongoDBQuery if ( ref($mongoDBQuery) eq '' );
+    if ( ref($mongoDBQuery) eq '' ) {
+        #node simplified() to hell?
+        return { '$where' => $mongoDBQuery };
+
+    }
 
 #TODO: sadly, the exception throwing wasn't working so I'm using a brutish propogate error
     if ( defined( $mongoDBQuery->{ERROR} ) ) {
@@ -1046,8 +1050,16 @@ sub hoistMongoDB {
         else {
             $lhs = $node->{params}[0]->{params}[0];
         }
+        
+#the $node->simplify() makes a non-node mess of the parse tree
+#lets see if its a hash, and the rhs is a key..
+if ((ref( $lhs ) eq 'HASH') and (defined($lhs->{$rhs}))) {
+    return $lhs->{$rhs};
+}
 
         print STDERR "-------------------------------- hoist OP_dot("
+          . ref( $lhs ) . ", "
+          . ref( $rhs ) . ", "
           . ref( $node->{op} ) . ", "
           . Data::Dumper::Dumper($node) . ")\n"
           if Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::MONITOR;
