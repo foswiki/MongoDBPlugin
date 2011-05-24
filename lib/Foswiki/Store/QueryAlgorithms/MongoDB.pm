@@ -123,10 +123,10 @@ sub _webQuery {
         
         #print STDERR "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN($queryStr)\n";
         if ($queryStr eq '') {
-            $queryStr = '1';
+        } else {
+            my $theParser = $session->search->{queryParser};
+            $extra_query = $theParser->parse( $queryStr, $options );
         }
-        my $theParser = $session->search->{queryParser};
-        $extra_query = $theParser->parse( $queryStr, $options );
     }
 
 #SMELL: initialise the mongoDB hack. needed if the mondoPlugin is not enabled, but the algo is selected :/
@@ -150,8 +150,10 @@ sub _webQuery {
             $query = $extra_query;
         }
     } else {
-        my $and = new Foswiki::Query::OP_and();
-        $query = Foswiki::Query::Node->newNode( $and, ($extra_query, $query) );
+        if (defined($extra_query)) {
+            my $and = new Foswiki::Query::OP_and();
+            $query = Foswiki::Query::Node->newNode( $and, ($extra_query, $query) );
+        }
     }
     
     print STDERR "modified parsetree: ".$query->stringify()."\n" if MONITOR;
