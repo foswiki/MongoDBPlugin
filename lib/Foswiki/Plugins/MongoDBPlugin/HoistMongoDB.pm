@@ -35,7 +35,8 @@ use constant MONITOR_DETAIL => 0;
 sub hoist {
     my ( $node, $indent ) = @_;
     
-    ASSERT(defined($node)) if DEBUG;
+    #yes, the simplifier will send an undef parse tree for a query="'1'"
+    #ASSERT(defined($node)) if DEBUG;
 
     print STDERR "HoistMongoDB::hoist from: ", (defined($node)?$node->stringify():'undef'), "\n"
     #print STDERR "HoistMongoDB::hoist from: ", Dumper($node), "\n"
