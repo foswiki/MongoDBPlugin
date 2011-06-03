@@ -11,7 +11,7 @@ use Foswiki::Meta;
 use Data::Dumper;
 use strict;
 
-use constant MONITOR => 0;
+use constant MONITOR => 1;
 
 #list of operators we can output
 my @MongoOperators = qw/$or $not $nin $in/;
@@ -70,7 +70,8 @@ sub do_SimplifiedAssert {
     $query->simplify( tom => $context, data => $context );
     print STDERR "PosterHoistS ",$query->stringify()."\n" if MONITOR;
     
-    if  ( $query->evaluatesToConstant() ) {
+#    if  ( $query->evaluatesToConstant() ) {
+    if (1==2){
         #not an interesting hoist.
         #should test for true/false..
         print STDERR "simplified to a constant..\n";
@@ -728,6 +729,22 @@ sub test_hoistLengthLHSString {
     $this->do_Assert( $s,
         {
             '$where' => "foswiki_length('something') == 9"
+        },
+        {
+        }
+        );
+}
+sub test_hoistLengthLHSString_false {
+    my $this        = shift;
+    my $s           = "length('FALSEsomething') = 9";
+
+
+    $this->do_Assert( $s,
+        {
+            '$where' => "foswiki_length('FALSEsomething') == 9"
+        },
+        {
+            '1' => '0'
         }
         );
 }
@@ -867,7 +884,6 @@ sub test_hoist_maths {
            '$where' =>  " ( ((12)-(foswiki_getField(this, 'FIELD.Namespace.value')) < 86395) )  &&  ((foswiki_getField(this, 'FIELD.TermGroup.value'))/(12) > (foswiki_getField(this, 'FIELD.WebScale.value'))*(42.8)) "
         }        );
 }
-
 sub test_hoist_concat {
     my $this        = shift;
     my $s           = "'asd' + 'qwe' = 'asdqwe'";
@@ -876,6 +892,8 @@ sub test_hoist_concat {
     $this->do_Assert( $s,
         {
            '$where' => '(\'asd\')+(\'qwe\') == \'asdqwe\''
+        },
+        {
         }
         );
 }
@@ -888,7 +906,8 @@ sub test_hoist_concat2 {
     $this->do_Assert( $s,
         {
            '$where' => '(2)+(3) == 5'
-        }
+        },
+        {}
         );
 }
 sub test_hoist_concat3 {
@@ -899,6 +918,49 @@ sub test_hoist_concat3 {
     $this->do_Assert( $s,
         {
            '$where' => '(2)+(3) == 5'
+        },
+        {}
+        );
+}
+sub test_hoist_concat_false {
+    my $this        = shift;
+    my $s           = "'FALSEasd' + 'qwe' = 'asdqwe'";
+
+
+    $this->do_Assert( $s,
+        {
+           '$where' => '(\'FALSEasd\')+(\'qwe\') == \'asdqwe\''
+        },
+        {
+            '1' => '0'
+        }
+        );
+}
+#this one is a nasty perler-ism
+sub test_hoist_concat2_false {
+    my $this        = shift;
+    my $s           = "'9' + '3' = '5'";
+
+
+    $this->do_Assert( $s,
+        {
+           '$where' => '(9)+(3) == 5'
+        },
+        {
+                        '1' => '0'
+        }
+        );
+}
+sub test_hoist_concat3_false {
+    my $this        = shift;
+    my $s           = "9 + 3 = 5";
+
+
+    $this->do_Assert( $s,
+        {
+           '$where' => '(9)+(3) == 5'
+        },
+        {            '1' => '0'
         }
         );
 }
@@ -1281,7 +1343,9 @@ sub test_hoist_ref {
 
         {
           '$where' => "(foswiki_getField(foswiki_getRef(\'localhost\', foswiki_getDatabaseName(this._web), \'current\', this._web, 'AnotherTopic'), 'FIELD.number.value')) == 12"
-          #"(foswiki_getRef('AnotherTopic').FIELD.number.value) == 12",
+        },
+        {
+            '1' => '0'
         }
     );
 }
@@ -1412,6 +1476,20 @@ sub test_hoist_false {
         }
     );
 }
+sub test_hoist_explicit_false {
+    my $this = shift;
+    my $s = "'0'";
+
+
+    $this->do_Assert(
+        $s,
+
+        {
+            #TODO: this is not really a true query in mongo, and just happens to return nothing :/
+            '1' => '0'
+        }
+    );
+}
 
 sub test_hoist_true {
     my $this = shift;
@@ -1427,7 +1505,7 @@ sub test_hoist_true {
 }
 sub test_hoist_explicit_true {
     my $this = shift;
-    my $s = "1";
+    my $s = "'1'";
 
 
     $this->do_Assert(

@@ -23,7 +23,7 @@ use Foswiki::Store::Interfaces::QueryAlgorithm ();
 our @ISA = ('Foswiki::Store::Interfaces::QueryAlgorithm');
 
 use strict;
-use constant MONITOR => 0;
+use constant MONITOR => 1;
 
 BEGIN {
 
@@ -156,7 +156,7 @@ sub _webQuery {
         }
     }
     
-    print STDERR "modified parsetree: ".$query->stringify()."\n" if MONITOR;
+    print STDERR "modified parsetree: ".(defined($query)?$query->stringify():'undef')."\n" if MONITOR;
 
     #try HoistMongoDB first
     my $mongoQuery =

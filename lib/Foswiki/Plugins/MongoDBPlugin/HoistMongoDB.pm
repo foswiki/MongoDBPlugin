@@ -34,14 +34,16 @@ use constant MONITOR_DETAIL => 0;
 
 sub hoist {
     my ( $node, $indent ) = @_;
+    
+    ASSERT(defined($node)) if DEBUG;
 
-    print STDERR "HoistMongoDB::hoist from: ", $node->stringify(), "\n"
+    print STDERR "HoistMongoDB::hoist from: ", (defined($node)?$node->stringify():'undef'), "\n"
     #print STDERR "HoistMongoDB::hoist from: ", Dumper($node), "\n"
       if MONITOR
           or MONITOR_DETAIL;
 
-    if (ref( $node->{op} ) eq '') {
-        if (Foswiki::Func::isTrue($node->{params}[0])) {
+    if (not defined($node) or ref( $node->{op} ) eq '') {
+        if (not defined($node) or Foswiki::Func::isTrue($node->{params}[0])) {
             return {};
         } else {
             #TODO: or return false, or undef?
