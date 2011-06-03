@@ -1055,8 +1055,9 @@ sub hoistMongoDB {
         
 #the $node->simplify() makes a non-node mess of the parse tree
 #lets see if its a hash, and the rhs is a key..
-if ((ref( $lhs ) eq 'HASH') and (defined($lhs->{$rhs}))) {
-    return $lhs->{$rhs};
+if (ref( $lhs ) eq 'HASH') {
+    return $lhs->{$rhs} if (defined($lhs->{$rhs}));
+    return {'1'=>'0'};   #dereferencing an undef is FALSE.. (ie 'NonExistantTopic'/info.date == {}.date
 }
 
         print STDERR "-------------------------------- hoist OP_dot("

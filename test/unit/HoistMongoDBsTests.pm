@@ -11,7 +11,7 @@ use Foswiki::Meta;
 use Data::Dumper;
 use strict;
 
-use constant MONITOR => 1;
+use constant MONITOR => 0;
 
 #list of operators we can output
 my @MongoOperators = qw/$or $not $nin $in/;
@@ -1575,10 +1575,13 @@ sub test_hoist_ref_TOPICINFO_longhand_plus_WEBHome {
         }
     );
 }
+
 sub test_hoist_ref_TOPICINFO_longhand_plus {
     my $this = shift;
     my $s = "(not (name = 'AnotherTopic' or name = 'WebHome' or name = 'BarnicalBob')) and 'AnotherTopic'/META:TOPICINFO.date";
 
+    #just to make sure that this topic actually does not exist.
+    $this->assert(not Foswiki::Func::topicExists($this->{test_web}, 'AnotherTopic'));
 
     $this->do_Assert(
         $s,
@@ -1586,8 +1589,8 @@ sub test_hoist_ref_TOPICINFO_longhand_plus {
         {
             '$where' => " ( ((! ( this._topic == 'AnotherTopic' || this._topic == 'WebHome' || this._topic == 'BarnicalBob' ) )) )  &&  ((foswiki_getField(foswiki_getRef('localhost', foswiki_getDatabaseName(this._web), 'current', this._web, 'AnotherTopic'), 'TOPICINFO.date'))) "
         },
-        {#TODO: THIS FAILS, as 'AnotherTopic'/META:TOPICINFO returns 0, and then the op_dot dereferences
-          '$where' => "foswiki_getField(foswiki_getRef('localhost', foswiki_getDatabaseName(this._web), 'current', this._web, 'AnotherTopic'), \'FIELD.date.value\')",
+        {
+          '1' => '0',   #our false
           '$nor' => [
                       {
                         '_topic' => 'AnotherTopic'
@@ -1599,7 +1602,6 @@ sub test_hoist_ref_TOPICINFO_longhand_plus {
                         '_topic' => 'BarnicalBob'
                       }
                     ]
-
         }
     );
 }
