@@ -1518,16 +1518,28 @@ sub test_hoist_explicit_true {
 
 #test written to match Fn_SEARCH::verify_formQuery2
 #Item10520: in Sven's reading of System.QuerySearch, this should return no results, as there is no field of the name 'TestForm'
-sub DISABLEtest_hoist_ImplicitFormNameBUG {
+sub test_hoist_ImplicitFormNameBUG {
     my $this = shift;
     my $s = "FormName";
-
 
     $this->do_Assert(
         $s,
 
         {
-          '$where' => '(foswiki_getField(this, \'FIELD.FormName.name\') )'
+          '$where' => 'foswiki_getField(this, \'FIELD.FormName.value\')'
+        }
+    );
+}
+#this is just to show that the above eg should be 'ok'
+sub test_hoist_ExplicitFormNameCompre {
+    my $this = shift;
+    my $s = "FormName = 'qwe'";
+
+    $this->do_Assert(
+        $s,
+
+        {
+              'FIELD.FormName.value' => 'qwe'
         }
     );
 }

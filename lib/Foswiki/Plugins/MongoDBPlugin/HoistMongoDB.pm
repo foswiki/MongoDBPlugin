@@ -44,12 +44,19 @@ sub hoist {
           or MONITOR_DETAIL;
 
     if (not defined($node) or ref( $node->{op} ) eq '') {
-        if (not defined($node) or Foswiki::Func::isTrue($node->{params}[0])) {
-            return {};
-        } else {
-            #TODO: or return false, or undef?
-            return {'1' => '0'};
-        }
+        return {} if (not defined($node)) ; #undef == true?
+        return {} if (not defined($node->{params}[0])) ; #undef == true?
+        return {} if ("$node->{params}[0]" eq '1') ;
+        return {'1' => '0'} if ("$node->{params}[0]" eq '0') ;
+        #print STDERR "r($node->{params}[0])".Data::Dumper($node)."\n";
+        #too naive - a SEARCH{"FieldName" gets tripped up by isTrue :(
+        #TODO: mmm, maybe use the op-type?
+#        if (Foswiki::Func::isTrue($node->{params}[0])) {
+#            return {};
+#        } else {
+#            #TODO: or return false, or undef?
+#            return {'1' => '0'};
+#        }
     }
 
 #TODO: use IxHash to keep the hash order - _some_ parts of queries are order sensitive
@@ -76,6 +83,7 @@ sub hoist {
     }
 
     if ( ref($mongoDBQuery) eq '' ) {
+        return { '$where' => convertToJavascript($mongoDBQuery) };
         #node simplified() to hell?
         return { '$where' => $mongoDBQuery };
 
@@ -574,6 +582,11 @@ sub convertStringToJS {
 sub convertToJavascript {
     my $node      = shift;
     my $statement = '';
+    
+    if (ref($node) eq '') {
+        #support annoying incomplete, non-boolean queries like SEARCH{"FieldName"
+        return convertStringToJS($node);
+    }
 
     ASSERT( ref($node) eq 'HASH' ) if DEBUG;
 
