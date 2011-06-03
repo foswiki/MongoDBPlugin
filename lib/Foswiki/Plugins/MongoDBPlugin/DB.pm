@@ -103,7 +103,7 @@ my $db   = $self->_getDatabase( $database );
 ##      . $cursor->count
 ##      . " (long_count = ".Dumper($long_count).") "
 ##      . " _BUT_ has_next is "
-##      . ( $cursor->has_next() ? 'true' : 'false' ) . "\n" if DEBUG;
+##      . ( $cursor->has_next() ? 'true' : 'false' ) . "\n" if MONITOR;
 
 #more debugging
 #print STDERR "get_collection(system.profile)".Dumper($db->get_collection("system.profile")->find->all)."\n";

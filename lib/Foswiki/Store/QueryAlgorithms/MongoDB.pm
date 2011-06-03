@@ -210,6 +210,10 @@ sub _webQuery {
                 }
             }
         }
+        #if ($options->{paging_on}) {
+        #    $queryAttrs->{skip} = $options->{showpage} * $options->{pagesize};
+        #    $queryAttrs->{limit} = $options->{pagesize};
+        #}
 
         my $cursor = doMongoSearch( $web, $options, $mongoQuery, $queryAttrs );
         return new Foswiki::Search::MongoDBInfoCache(
@@ -318,9 +322,6 @@ sub doMongoSearch {
     #  . Dumper($ixhQuery) . " , "
     #  . Dumper($queryAttrs) . "\n";
 
-#    my $collection =
-#      Foswiki::Plugins::MongoDBPlugin::getMongoDB()->_getCollection($web, 'current');
-#    my $cursor = $collection->query($ixhQuery, $queryAttrs);
     my $cursor = Foswiki::Plugins::MongoDBPlugin::getMongoDB()
       ->query($web, 'current', $ixhQuery, $queryAttrs );
 
