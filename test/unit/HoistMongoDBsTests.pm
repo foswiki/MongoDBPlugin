@@ -1530,6 +1530,24 @@ sub test_hoist_ImplicitFormNameBUG {
         }
     );
 }
+#'%SEARCH{"TestForm[name=\'Field1\'].value=\'A Field\'"'
+#TODO: this is a horridly complex way to say "Field1.value='A Field'"
+#but needs to be supported for other Meta attrs too
+sub test_formQuery3 {
+    my $this = shift;
+    my $s = "TestForm[name=\'Field1\'].value=\'A Field\'";
+
+    $this->do_Assert(
+        $s,
+
+        {
+          '$where' => 'foswiki_getField(this, \'FIELD.FormName.value\')'
+        }
+    );
+     
+}
+
+
 #this is just to show that the above eg should be 'ok'
 sub test_hoist_ExplicitFormNameCompre {
     my $this = shift;

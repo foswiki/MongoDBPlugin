@@ -861,6 +861,10 @@ use Assert;
 sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
+    
+    #use Data::Dumper;
+    #print STDERR "OP_eq: $node => ".Dumper($node)."\n" if Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::MONITOR;
+    
     ASSERT( ref($node) eq 'Foswiki::Query::Node' );
     ASSERT( ref( $node->{hoisted0} ) eq '' );
 
