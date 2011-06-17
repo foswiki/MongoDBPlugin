@@ -63,9 +63,8 @@ sub query {
     my $isAdmin  = $session->{users}->isAdmin( $session->{user} );
 
     my $searchAllFlag = ( $webNames =~ /(^|[\,\s])(all|on)([\,\s]|$)/i );
-    my @webs =
-      Foswiki::Plugins::MongoDBPlugin::_getListOfWebs( $webNames, $recurse,
-        $searchAllFlag );
+    my @webs = Foswiki::Store::Interfaces::QueryAlgorithm::getListOfWebs(
+        $webNames, $recurse, $searchAllFlag );
 
     my @resultCacheList;
     foreach my $web (@webs) {
