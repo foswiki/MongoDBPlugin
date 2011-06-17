@@ -9,6 +9,10 @@ use Foswiki::Plugins::MongoDBPlugin::DB;
 use Foswiki::Search::MongoDBInfoCache;
 use Data::Dumper;
 
+use Foswiki::Store::Interfaces::QueryAlgorithm ();
+our @ISA = ('Foswiki::Store::Interfaces::QueryAlgorithm');
+
+
 use constant MONITOR => 0;
 
 BEGIN {
@@ -139,7 +143,12 @@ sub query {
 
     #TODO: $options should become redundant
     $resultset->sortResults($options);
-    return $resultset;
+    
+    #add permissions check
+    $resultset = Foswiki::Store::Interfaces::QueryAlgorithm::addACLFilter( $resultset, $options );
+    
+    #add paging if applicable.
+    return Foswiki::Store::Interfaces::QueryAlgorithm::addPager( $resultset, $options );
 }
 
 #ok, for initial validation, naively call the code with a web.
