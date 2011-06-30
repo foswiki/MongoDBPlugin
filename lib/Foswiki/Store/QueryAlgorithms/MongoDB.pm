@@ -48,9 +48,21 @@ use Foswiki::Query::Node;
 use Foswiki::Query::OP_and;
 use Foswiki::Infix::Error;
 
+
+=begin TML
+
+---++ ClassMethod new( $class,  ) -> $cereal
+
+=cut
+
+sub new {
+    my $self = shift()->SUPER::new( 'SEARCH', @_ );
+    return $self;
+}
+
 # See Foswiki::Query::QueryAlgorithms.pm for details
 sub query {
-    my ( $query, $inputTopicSet, $session, $options ) = @_;
+    my ( $this, $query, $inputTopicSet, $session, $options ) = @_;
     print STDERR "original parsetree: ".$query->stringify()."\n" if MONITOR;
 
     # Fold constants

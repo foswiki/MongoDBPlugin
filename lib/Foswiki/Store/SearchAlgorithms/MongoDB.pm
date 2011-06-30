@@ -7,7 +7,7 @@ use Assert;
 use Foswiki::Plugins::MongoDBPlugin;
 use Foswiki::Plugins::MongoDBPlugin::DB;
 use Foswiki::Search::MongoDBInfoCache;
-use Data::Dumper;
+#use Data::Dumper;
 
 use Foswiki::Store::Interfaces::QueryAlgorithm ();
 our @ISA = ('Foswiki::Store::Interfaces::QueryAlgorithm');
@@ -25,6 +25,19 @@ BEGIN {
     $Foswiki::cfg{Plugins}{MongoDBPlugin}{EnableOnSaveUpdates} = 1;
     print STDERR "****** starting MongoDBPlugin..\n" if MONITOR;
 }
+
+
+=begin TML
+
+---++ ClassMethod new( $class,  ) -> $cereal
+
+=cut
+
+sub new {
+    my $self = shift()->SUPER::new( 'SEARCH', @_ );
+    return $self;
+}
+
 
 =begin TML
 
@@ -100,7 +113,7 @@ this is the new way -
 =cut
 
 sub query {
-    my ( $query, $inputTopicSet, $session, $options ) = @_;
+    my ( $this, $query, $inputTopicSet, $session, $options ) = @_;
 
     if ( ( @{ $query->{tokens} } ) == 0 ) {
         return new Foswiki::Search::InfoCache( $session, '' );
