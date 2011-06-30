@@ -7,11 +7,11 @@ use Assert;
 use Foswiki::Plugins::MongoDBPlugin;
 use Foswiki::Plugins::MongoDBPlugin::DB;
 use Foswiki::Search::MongoDBInfoCache;
+
 #use Data::Dumper;
 
 use Foswiki::Store::Interfaces::QueryAlgorithm ();
 our @ISA = ('Foswiki::Store::Interfaces::QueryAlgorithm');
-
 
 use constant MONITOR => 0;
 
@@ -26,7 +26,6 @@ BEGIN {
     print STDERR "****** starting MongoDBPlugin..\n" if MONITOR;
 }
 
-
 =begin TML
 
 ---++ ClassMethod new( $class,  ) -> $cereal
@@ -37,7 +36,6 @@ sub new {
     my $self = shift()->SUPER::new( 'SEARCH', @_ );
     return $self;
 }
-
 
 =begin TML
 
@@ -101,11 +99,10 @@ sub search {
     }
 
     my $cursor = Foswiki::Plugins::MongoDBPlugin::getMongoDB()
-      ->query($web, 'current', \%elements );
+      ->query( $web, 'current', \%elements );
     return new Foswiki::Search::MongoDBInfoCache( $Foswiki::Plugins::SESSION,
         $web, $options, $cursor );
 }
-
 
 #ok, for initial validation, naively call the code with a web.
 sub _webQuery {
@@ -151,8 +148,9 @@ sub _webQuery {
     my $excludeTopicsRegex =
       Foswiki::Search::MongoDBInfoCache::convertTopicPatternToRegex(
         $options->{excludetopic} );
-#BUGGGGGG - can't add topic= and excludetopic= - same key, it go boom
-#WORSE - there is no actual way to do A and not B in mongodb?
+
+    #BUGGGGGG - can't add topic= and excludetopic= - same key, it go boom
+    #WORSE - there is no actual way to do A and not B in mongodb?
     #print STDERR "--------------------2 _topic => $includeTopicsRegex\n";
     if ( $excludeTopicsRegex ne '' ) {
         $excludeTopicsRegex = qr/$excludeTopicsRegex/;
@@ -326,7 +324,7 @@ sub _webQuery {
     }
 
     my $cursor = Foswiki::Plugins::MongoDBPlugin::getMongoDB()
-      ->query($web, 'current', $ixhQuery, $queryAttrs );
+      ->query( $web, 'current', $ixhQuery, $queryAttrs );
 
     return new Foswiki::Search::MongoDBInfoCache( $Foswiki::Plugins::SESSION,
         $web, $options, $cursor );

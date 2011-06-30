@@ -31,7 +31,7 @@ BEGIN {
 #TODO: make conditional - or figure out how to force this in the MongoDB search and query algo's
     $Foswiki::cfg{Plugins}{MongoDBPlugin}{Module} =
       'Foswiki::Plugins::MongoDBPlugin';
-    $Foswiki::cfg{Plugins}{MongoDBPlugin}{Enabled}             = 1;
+    $Foswiki::cfg{Plugins}{MongoDBPlugin}{Enabled} = 1;
     print STDERR "****** starting MongoDBPlugin..\n" if MONITOR;
 }
 
@@ -48,7 +48,6 @@ use Foswiki::Query::Node;
 use Foswiki::Query::OP_and;
 use Foswiki::Infix::Error;
 
-
 =begin TML
 
 ---++ ClassMethod new( $class,  ) -> $cereal
@@ -63,28 +62,37 @@ sub new {
 # Query over a single web
 sub _webQuery {
     my ( $this, $query, $web, $inputTopicSet, $session, $options ) = @_;
-#TODO: what happens if / when the inputTopicSet exists?
 
-    #presuming that the inputTopicSet is not yet defined, we need to add the topics=, excludetopic= and web options to the query.
+    #TODO: what happens if / when the inputTopicSet exists?
+
+#presuming that the inputTopicSet is not yet defined, we need to add the topics=, excludetopic= and web options to the query.
     my $extra_query;
     {
         my @option_query = ();
-        if ($options->{topic}) {
-            push(@option_query, convertTopicPatternToLonghandQuery($options->{topic}));
+        if ( $options->{topic} ) {
+            push( @option_query,
+                convertTopicPatternToLonghandQuery( $options->{topic} ) );
         }
-        if ($options->{excludetopic}) {
-            push(@option_query, 'NOT('.convertTopicPatternToLonghandQuery($options->{excludetopic}).')');
+        if ( $options->{excludetopic} ) {
+            push(
+                @option_query,
+                'NOT('
+                  . convertTopicPatternToLonghandQuery(
+                    $options->{excludetopic}
+                  )
+                  . ')'
+            );
 
-            
 #> db.current.find({_web: 'Sandbox',  _topic : {'$nin' :[ /AjaxComment/]}}, {_topic:1})
 #> db.current.find({_web: 'Sandbox',  _topic : {'$nin' :[/Web.*/]}}, {_topic:1})
 
         }
-        my $queryStr = join(' AND ', @option_query);
-        
+        my $queryStr = join( ' AND ', @option_query );
+
         #print STDERR "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN($queryStr)\n";
-        if ($queryStr eq '') {
-        } else {
+        if ( $queryStr eq '' ) {
+        }
+        else {
             my $theParser = $session->search->{queryParser};
             $extra_query = $theParser->parse( $queryStr, $options );
         }
@@ -94,6 +102,7 @@ sub _webQuery {
     Foswiki::Plugins::MongoDBPlugin::getMongoDB();
 
     if ( $query->evaluatesToConstant() ) {
+
         # SMELL: use any old topic
         my $cache = $Foswiki::Plugins::SESSION->search->metacache->get( $web,
             'WebPreferences' );
@@ -107,25 +116,31 @@ sub _webQuery {
                 $web );
         }
         else {
+
     #need to do the query - at least to eval topic= and excludetopic= and order=
             $query = $extra_query;
         }
-    } else {
-        if (defined($extra_query)) {
+    }
+    else {
+        if ( defined($extra_query) ) {
             my $and = new Foswiki::Query::OP_and();
-            $query = Foswiki::Query::Node->newNode( $and, ($extra_query, $query) );
+            $query =
+              Foswiki::Query::Node->newNode( $and, ( $extra_query, $query ) );
         }
     }
-    
-    print STDERR "modified parsetree: ".(defined($query)?$query->stringify():'undef')."\n" if MONITOR;
+
+    print STDERR "modified parsetree: "
+      . ( defined($query) ? $query->stringify() : 'undef' ) . "\n"
+      if MONITOR;
 
     #try HoistMongoDB first
     my $mongoQuery =
       Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
 
     if ( not defined($mongoQuery) ) {
-        print STDERR
-"MongoDB QuerySearch - failed to hoist to MongoDB (".$query->stringify().") - please report the error to Sven.\n";
+        print STDERR "MongoDB QuerySearch - failed to hoist to MongoDB ("
+          . $query->stringify()
+          . ") - please report the error to Sven.\n";
 
         #falling through to old regex code
     }
@@ -171,6 +186,7 @@ sub _webQuery {
                 }
             }
         }
+
         #if ($options->{paging_on}) {
         #    $queryAttrs->{skip} = $options->{showpage} * $options->{pagesize};
         #    $queryAttrs->{limit} = $options->{pagesize};
@@ -194,7 +210,7 @@ sub _webQuery {
           Foswiki::Search::InfoCache::getTopicListIterator( $webObject,
             $options );
     }
-    
+
     require Foswiki::Query::HoistREs;
     my $hoistedREs = Foswiki::Query::HoistREs::hoist($query);
 
@@ -284,11 +300,10 @@ sub doMongoSearch {
     #  . Dumper($queryAttrs) . "\n";
 
     my $cursor = Foswiki::Plugins::MongoDBPlugin::getMongoDB()
-      ->query($web, 'current', $ixhQuery, $queryAttrs );
+      ->query( $web, 'current', $ixhQuery, $queryAttrs );
 
     return $cursor;
 }
-
 
 sub convertTopicPatternToLonghandQuery {
     my ($topic) = @_;
@@ -302,13 +317,18 @@ sub convertTopicPatternToLonghandQuery {
 
     # ( 'Web.*', 'FooBar' ) ==> "^(Web.*|FooBar)$"
     #return '^(' . join( '|', @arr ) . ')$';
-    return join(' OR ', map {
-                            if (/\.\*/) {
-                                "name =~ '".$_."'"
-                            } else {
-                                "name='".$_."'"
-                            }
-                        } @arr);
+    return join(
+        ' OR ',
+        map {
+            if (/\.\*/)
+            {
+                "name =~ '" . $_ . "'";
+            }
+            else {
+                "name='" . $_ . "'";
+            }
+          } @arr
+    );
 }
 
 1;
