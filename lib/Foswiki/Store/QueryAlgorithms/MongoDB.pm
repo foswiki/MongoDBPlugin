@@ -60,65 +60,9 @@ sub new {
     return $self;
 }
 
-# See Foswiki::Query::QueryAlgorithms.pm for details
-sub query {
-    my ( $this, $query, $inputTopicSet, $session, $options ) = @_;
-    print STDERR "original parsetree: ".$query->stringify()."\n" if MONITOR;
-
-    # Fold constants
-    my $context = Foswiki::Meta->new( $session, $session->{webName} );
-    $query->simplify( tom => $context, data => $context );
-    print STDERR "simplified parsetree: ".$query->stringify()."\n" if MONITOR;
-
-    my $webNames = $options->{web}       || '';
-    my $recurse  = $options->{'recurse'} || '';
-    my $isAdmin  = $session->{users}->isAdmin( $session->{user} );
-
-    my $searchAllFlag = ( $webNames =~ /(^|[\,\s])(all|on)([\,\s]|$)/i );
-    my @webs = Foswiki::Store::Interfaces::QueryAlgorithm::getListOfWebs(
-        $webNames, $recurse, $searchAllFlag );
-
-    my @resultCacheList;
-    foreach my $web (@webs) {
-
-        # can't process what ain't thar
-        next unless $session->webExists($web);
-
-        my $webObject = Foswiki::Meta->new( $session, $web );
-        my $thisWebNoSearchAll =
-          Foswiki::isTrue( $webObject->getPreference('NOSEARCHALL') );
-
-        # make sure we can report this web on an 'all' search
-        # DON'T filter out unless it's part of an 'all' search.
-        next
-          if ( $searchAllFlag
-            && !$isAdmin
-            && ( $thisWebNoSearchAll || $web =~ /^[\.\_]/ )
-            && $web ne $session->{webName} );
-
-        #TODO: combine these into one great ResultSet
-        my $infoCache =
-          _webQuery( $query, $web, $inputTopicSet, $session, $options );
-        push( @resultCacheList, $infoCache );
-    }
-    my $resultset =
-      new Foswiki::Search::ResultSet( \@resultCacheList, $options->{groupby},
-        $options->{order}, Foswiki::isTrue( $options->{reverse} ) );
-
-    #TODO: $options should become redundant
-    $resultset->sortResults($options);
-    
-    #add permissions check
-    $resultset = Foswiki::Store::Interfaces::QueryAlgorithm::addACLFilter( $resultset, $options );
-    
-    #add paging if applicable.
-    return Foswiki::Store::Interfaces::QueryAlgorithm::addPager( $resultset, $options );
-
-}
-
 # Query over a single web
 sub _webQuery {
-    my ( $query, $web, $inputTopicSet, $session, $options ) = @_;
+    my ( $this, $query, $web, $inputTopicSet, $session, $options ) = @_;
 #TODO: what happens if / when the inputTopicSet exists?
 
     #presuming that the inputTopicSet is not yet defined, we need to add the topics=, excludetopic= and web options to the query.
@@ -373,7 +317,7 @@ This copyright information applies to the MongoDBPlugin:
 
 # Plugin for Foswiki - The Free and Open Source Wiki, http://foswiki.org/
 #
-# Copyright 2010 - SvenDowideit@fosiki.com
+# Copyright 2010-2011 - SvenDowideit@fosiki.com
 #
 # MongoDBPlugin is # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of

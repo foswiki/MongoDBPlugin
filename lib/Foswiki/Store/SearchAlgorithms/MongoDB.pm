@@ -106,67 +106,10 @@ sub search {
         $web, $options, $cursor );
 }
 
-=begin TML
-
-this is the new way -
-
-=cut
-
-sub query {
-    my ( $this, $query, $inputTopicSet, $session, $options ) = @_;
-
-    if ( ( @{ $query->{tokens} } ) == 0 ) {
-        return new Foswiki::Search::InfoCache( $session, '' );
-    }
-
-    my $webNames = $options->{web}       || '';
-    my $recurse  = $options->{'recurse'} || '';
-    my $isAdmin  = $session->{users}->isAdmin( $session->{user} );
-
-    my $searchAllFlag = ( $webNames =~ /(^|[\,\s])(all|on)([\,\s]|$)/i );
-    my @webs = Foswiki::Store::Interfaces::QueryAlgorithm::getListOfWebs(
-        $webNames, $recurse, $searchAllFlag );
-
-    my @resultCacheList;
-    foreach my $web (@webs) {
-
-        # can't process what ain't thar
-        next unless $session->webExists($web);
-
-        my $webObject = Foswiki::Meta->new( $session, $web );
-        my $thisWebNoSearchAll =
-          Foswiki::isTrue( $webObject->getPreference('NOSEARCHALL') );
-
-        # make sure we can report this web on an 'all' search
-        # DON'T filter out unless it's part of an 'all' search.
-        next
-          if ( $searchAllFlag
-            && !$isAdmin
-            && ( $thisWebNoSearchAll || $web =~ /^[\.\_]/ )
-            && $web ne $session->{webName} );
-
-        my $infoCache =
-          _webQuery( $query, $web, $inputTopicSet, $session, $options );
-        $infoCache->sortResults($options);
-        push( @resultCacheList, $infoCache );
-    }
-    my $resultset =
-      new Foswiki::Search::ResultSet( \@resultCacheList, $options->{groupby},
-        $options->{order}, Foswiki::isTrue( $options->{reverse} ) );
-
-    #TODO: $options should become redundant
-    $resultset->sortResults($options);
-    
-    #add permissions check
-    $resultset = Foswiki::Store::Interfaces::QueryAlgorithm::addACLFilter( $resultset, $options );
-    
-    #add paging if applicable.
-    return Foswiki::Store::Interfaces::QueryAlgorithm::addPager( $resultset, $options );
-}
 
 #ok, for initial validation, naively call the code with a web.
 sub _webQuery {
-    my ( $query, $web, $inputTopicSet, $session, $options ) = @_;
+    my ( $this, $query, $web, $inputTopicSet, $session, $options ) = @_;
     ASSERT( scalar( @{ $query->{tokens} } ) > 0 ) if DEBUG;
 
     # default scope is 'text'
@@ -454,7 +397,7 @@ HERE
 __DATA__
 # Plugin for Foswiki - The Free and Open Source Wiki, http://foswiki.org/
 #
-# Copyright 2010 - SvenDowideit@fosiki.com
+# Copyright 2010-2011 - SvenDowideit@fosiki.com
 #
 # MongoDBPlugin is # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
