@@ -165,7 +165,7 @@ This copyright information applies to the MongoDBPlugin:
 
 # Plugin for Foswiki - The Free and Open Source Wiki, http://foswiki.org/
 #
-# Copyright 2010 - SvenDowideit@fosiki.com
+# Copyright 2010-2011 - SvenDowideit@fosiki.com
 #
 # MongoDBPlugin is # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of

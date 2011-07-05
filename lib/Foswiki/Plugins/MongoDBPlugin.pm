@@ -117,46 +117,6 @@ sub completePageHandler {
 
 }
 
-#replaced by the listeners
-sub DISABLEDafterSaveHandler {
-    return
-      if ( $enableOnSaveUpdates != 1 )
-      ;    #disabled - they can make save's take too long
-
-    my ( $text, $topic, $web, $error, $meta ) = @_;
-
-    #print STDERR "afterSaveHandler ( text, $topic, $web, error )\n";
-    _updateTopic( $web, $topic, $meta );
-
-    return;
-}
-
-#mmmm
-sub DISABLED_afterRenameHandler {
-    return
-      if ( $enableOnSaveUpdates != 1 )
-      ;    #disabled - they can make save's take too long
-
-    my ( $oldWeb, $oldTopic, $oldAttachment, $newWeb, $newTopic,
-        $newAttachment ) = @_;
-
-    print STDERR
-"afterRenameHandler: ( $oldWeb, $oldTopic, $oldAttachment, $newWeb, $newTopic,
-        $newAttachment )\n" if DEBUG;
-
-    #eturn getMongoDB()->rename();
-}
-
-sub DISABLED_afterAttachmentSaveHandler {
-    return
-      if ( $enableOnSaveUpdates != 1 )
-      ;    #disabled - they can make save's take too long
-
-    my ( $attrHashRef, $topic, $web ) = @_;
-
-    return getMongoDB()->updateAttachment();
-}
-
 ################################################################################################################
 sub getMongoDB {
     if ( not defined( $Foswiki::Func::SESSION->{MongoDB} ) ) {
@@ -259,11 +219,67 @@ sub _remove {
 
 }
 
+
+#this file based version of the ACL tester will be extracted for use in the core
+#and will be replaced with one that is in mongodb
+sub extractAndSaveBareACLS {
+    my $savedMeta = shift;
+    my $ACL = shift;
+    
+    my $web = $savedMeta->web;
+    my $topic = $savedMeta->topic;
+    
+    #I'm going to write it to file so i can see what is happening
+    my $workGroupArea = Foswiki::Func::getWorkArea('MongoDBPluginGroups');  #map hash to unexpeanded group definition list
+    my $workACLArea = Foswiki::Func::getWorkArea('MongoDBPluginACL_'.$ACL);      #map hash to topics (via mode...)
+    my $workTopicArea = Foswiki::Func::getWorkArea('MongoDBPluginTopics');  #map topic to hash (might be un-necessary? as we would like to look up the sparse matrix in which our user under test is mentioned, and only test those?)
+    
+    my $allow_list = $savedMeta->_getACL( $ACL );
+    
+    use Digest::MD5 qw(md5_hex);
+    if (defined($allow_list)) {
+        my $allow = join(',', sort(@{$allow_list}));
+        my $name = md5_hex($allow);
+        if (not -e "$workGroupArea/$name") {
+            open(my $file, '>', "$workGroupArea/$name");
+            print $file $allow;
+            close($file);
+        }
+        if (not -e "$workTopicArea/$web.$topic") {
+            open(my $file, '>', "$workTopicArea/$web.$topic");
+            print $file $name;
+            close($file);
+        }
+        if (not -e "$workACLArea/$name") {
+            mkdir("$workACLArea/$name");
+            if (not -e "$workACLArea/$name/$web.$topic") {
+                open(my $file, '>', "$workACLArea/$name/$web.$topic");
+                print $file $allow;
+                close($file);
+            }
+        }
+    }
+}
+
+
 sub _updateTopic {
     my $web       = shift;
     my $topic     = shift;
     my $savedMeta = shift;
     my $options = shift;
+    
+    #gather all the ALLOWTOPIC and DENYTOPIC values
+    {
+        extractAndSaveBareACLS($savedMeta, 'ALLOWTOPICVIEW');
+        extractAndSaveBareACLS($savedMeta, 'DENYTOPICVIEW');
+        extractAndSaveBareACLS($savedMeta, 'ALLOWTOPICCHANGE');
+        extractAndSaveBareACLS($savedMeta, 'DENYTOPICCHANGE');
+
+        extractAndSaveBareACLS($savedMeta, 'ALLOWWEBVIEW');
+        extractAndSaveBareACLS($savedMeta, 'DENYWEBVIEW');
+        extractAndSaveBareACLS($savedMeta, 'ALLOWWEBCHANGE');
+        extractAndSaveBareACLS($savedMeta, 'DENYWEBCHANGE');
+    }
 
     #print STDERR "-update($web, $topic)\n" if DEBUG;
     $savedMeta->getRev1Info('createdate');
