@@ -51,4 +51,4 @@ $Foswiki::cfg{MongoDBPlugin}{wtimeout} = 1000;
 $Foswiki::cfg{MONITOR}{'Foswiki::Plugins::MongoDBPlugin'} = 0;
 # **BOOLEAN**
 # enable hoisting
-$Foswiki::cfg{Plugins}{MongoDBPlugin}{ExperimentalCode} = 0;
+$Foswiki::cfg{Plugins}{MongoDBPlugin}{ExperimentalCode} = 1;

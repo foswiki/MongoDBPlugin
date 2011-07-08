@@ -24,7 +24,7 @@ To check on progress and bugs please visit Foswikitask:%TOPIC%.
 %TOPIC% registers some rest handlers which may be accessed via web browser:
    * %SCRIPTURL{rest}%/%TOPIC%/update?updateweb=%USERSWEB% (just the %USERSWEB% web)
    * %SCRIPTURL{rest}%/%TOPIC%/update?updateweb=all (all webs recursivly)
-   * %SCRIPTURL{rest}%/%TOPIC%/update?updateweb=Lauries;recurse=true (Lauries web and its subwebs recursivly)
+   * %SCRIPTURL{rest}%/%TOPIC%/update?updateweb=Lauries;recurse=on (Lauries web and its subwebs recursivly)
    * %SCRIPTURL{rest}%/%TOPIC%/updateDatabase (updates server-side javascript code stored in !MongoDB)
 
 #LoadCLI
@@ -44,18 +44,36 @@ sudo -u www-data nohup bin/./rest /MongoDBPlugin/update -updateweb all -recurse 
 
 You can keep an eye on the progress of the load by looking at the =nohup.out= file which will be created in =/path/to/foswiki= (with =tail -f nohup.out=, for example).
 
-Because every version of every topic is loaded, loading a large wiki can be __very slow__. On an installation using separate virtual machines for Foswiki and !MongoDB, with 205,000 topics - most of which only have 1 or 2 revisions, this process takes ~6 hours.
+Because every version of every topic is loaded, loading a large wiki can be __very slow__. On an installation using separate virtual machines for Foswiki and !MongoDB, with 205,000 topics - most of which only have 1 or 2 revisions, this process takes ~1-6 hours (depending on host equipment utilisation).
 
 ---++ Technical details
 
 ---+++ Caveats
    1 Sorting works for fields that are strings, but doesn't yet manage to autoconvert to numerical sorting if all fields happen to contain only numerical characters.
    2 Sorting _is_ different, Foswiki magically orders numerically if all the hits happen to be numeric, whereas Mongo treats strings as strings.
-   3 Your topics (as stored internally in the Meta obj) must be smaller than <del>4M</del> <ins>8M</ins>. %GREEN%TODO: Quantify BSON overhead%ENDCOLOR%
+   3 Your topics (as stored internally in the Meta obj) must be smaller than <del>4M</del> <ins>16M</ins> (!MongoDB 1.8).
    4 The schema is likely to change regularly, so when upgrading, re-importing will probably be necessary
    5 Works __only__ with foswik trunk - to be 1.2 or 2.0 - will _not_ work with foswiki 1.1
    6 The %SYSTEMWEB%.QuerySearch ==~= operator is currently not hoisted to a regex, so is un-necessarily slow (both with and without mongodb) - %GREEN%TODO: Check if this is still true%ENDCOLOR%
    7 Web order appears to not have been implemented in the general store? So Mongo has to do it somewhere (unit tests have wrong order)
+   1 Unsupported System.QuerySearch expressions:
+      * =IN= operator
+      * =versions= queries
+   1 Slow queries:
+      * Any query involving the ==~= (regex) or =~= (like) operators won't be much faster than grep. That's because such queries cannot be resolved using indexes (so it has to do a bruteforce scan).
+   1 Topic history and large !MongoDB database sizes - !MongoDB does a couple of things that make its storage requirements quite a lot more demanding than traditional =.txt= & =.txt,v= files:
+      * Each topic-document in !MongoDB contains an atomised (queryable) version of the topic and its metadata, but there is also a legacy =_raw_text= field which is a (utf8) character-for-character copy of what you'd see with =?raw=debug=. This is to support legacy scope="text" and regexes searches.
+      * More importantly, %TOPIC% also stores every _version_ of every topic without compression. As a point of comparison, TRIN Wiki's 2.5GB =data/= directory translates to ~12GB in !MongoDB.
+   1 Sizing and memory requirements:
+      * Despite having a ~12GB !MongoDB, the working set size (amount of physical RAM required) on TRIN Wiki is typically 2-3GB, so a 4GB VM (separate to the VM running Foswiki) does quite well. Use the [[http://www.mongodb.org/display/DOCS/mongostat][mongostat]] command for detailed performance profiling.
+   1 Manually hacked =.txt= files:
+      * Every time you modify a =.txt= file on the filesystem, you need to ask mongo to reload that web. TODO: make the rest handler update an individual topic, rather than the whole web.
+      * Deleting a =.txt,v= is NOT a reliable way of deleting history, and in fact can cause problems getting subsequent versions recognised, because %TOPIC% essentially still has a cache of the =.txt,v= in its database. So you have to drop the database of the web where you've deleted any =,v= files, and re-load. Dropping a database works like this (using the mongo shell): <verbatim class="bash"> show dbs
+ use foswiki__My__SubWeb
+ show collections // verify you're on a database that really exists. Yes, you can use a db that doesn't exist...
+ db.dropDatabase()</verbatim>
+   1 Stability problems with !MongoDB 1.8.0, 1.8.1 and possibly future 1.8.x versions:
+      * It seems !MongoDB 1.8.x's use of the Mozilla spidermonkey javascript engine (constrained to just 8MB memory), or perhaps %TOPIC%'s javascript code has a memory leak problem wich was causing the TRIN Wiki installation to behave erratically after 24-48hrs uptime. Restarting mongodb and apache each time seemd to solve the problem. This problem no longer occurs after switching to the development version of !MongoDB (1.9.x series) - see Foswikitask:Item10672, [[https://jira.mongodb.org/browse/SERVER-3131][SERVER-3131]], [[https://jira.mongodb.org/browse/SERVER-3016][SERVER-3016]] and [[https://jira.mongodb.org/browse/SERVER-3012][SERVER-3012]].
 
 ---+++ Metrics
 ---++++ HTTP reposnse header =X-Foswiki-Monitor-%TOPIC%-lastQueryTime=
@@ -79,6 +97,15 @@ Installing and configuring !MongoDB isn't too hard as far as database products g
    * In production, running !MongoDB on a different server can free up the Foswiki server to handle more requests
    * We don't quite have =slave_ok= working yet (this is where we distribute queries across a bunch of replicas), so don't expect any performance increase if you set up a replSet
    * Due to liberal usage of =db.eval= (executing javascript in !MongoDB) to resolve some parts of the %SYSTEMWEB%.QuerySearch language (for example, ref queries), sharding is definitely not supported
+
+---++ Installing the !MongoDB perl driver
+If your operating system does not have a package for it, a command such as <verbatim class="bash">sudo cpan MongoDB</verbatim> should work.
+
+If you use a Debian operating system, you can build yourself a deb for the !MongoDB perl driver (requires =dh-make-perl=):
+<verbatim class="bash">sudo apt-get install libany-moose-perl libmoose-perl libclass-method-modifiers-perl libdata-types-perl libdatetime-perl libfile-slurp-perl libjson-perl libjson-xs-perl libjson-any-perl libtest-exception-perl libtry-tiny-perl libboolean-perl 
+sudo apt-get install dh-make-perl
+sudo cpan2deb MongoDB 
+sudo dpkg -i libmongodb*</verbatim>
 
 ---++ Installation Instructions
 

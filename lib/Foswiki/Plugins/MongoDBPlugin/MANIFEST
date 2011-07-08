@@ -17,3 +17,4 @@ test/unit/HoistMongoDBsTests.pm 0644 Unit tests
 lib/Foswiki/Store/QueryAlgorithms/MongoDB.pm 0644 Perl module
 lib/Foswiki/Store/SearchAlgorithms/MongoDB.pm 0644 Perl module
 lib/Foswiki/Search/MongoDBInfoCache.pm 0644 Perl module
+lib/Foswiki/Configure/Checkers/Plugins/MongoDBPlugin/Enabled.pm 0644 Configure checker
