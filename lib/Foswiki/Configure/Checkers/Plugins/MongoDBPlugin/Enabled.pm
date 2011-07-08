@@ -27,8 +27,7 @@ example: <pre>{
 }</pre>
 MESSAGE
         }
-        if (
-            $Foswiki::cfg{Store}{QueryAlgorithm} ne
+        if ( $Foswiki::cfg{Store}{QueryAlgorithm} ne
             'Foswiki::Store::QueryAlgorithms::MongoDB' )
         {
             $e .= $this->WARN(<<'MESSAGE');
@@ -38,8 +37,7 @@ You need
  so that MongoDBPlugin will be used to handle searches and queries
 MESSAGE
         }
-        if (
-            $Foswiki::cfg{Store}{SearchAlgorithm} ne 
+        if ( $Foswiki::cfg{Store}{SearchAlgorithm} ne
             'Foswiki::Store::SearchAlgorithms::MongoDB' )
         {
             $e .= $this->WARN(<<'MESSAGE');
@@ -71,8 +69,7 @@ MESSAGE
 <code>Foswiki::Store::QueryAlgorithms::MongoDB</code> but MongoDBPlugin is disabled
 MESSAGE
         }
-        if (
-            $Foswiki::cfg{Store}{SearchAlgorithm} eq
+        if ( $Foswiki::cfg{Store}{SearchAlgorithm} eq
             'Foswiki::Store::SearchAlgorithms::MongoDB' )
         {
             $e .= $this->ERROR(<<'MESSAGE');
