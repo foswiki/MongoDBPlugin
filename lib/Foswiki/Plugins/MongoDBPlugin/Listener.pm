@@ -12,7 +12,9 @@ use constant MONITOR => 0;
 =begin TML
 
 ---+ package Foswiki::Plugins::MongoDBPlugin::Listener;
-push(@{$Foswiki::cfg{Store}{Listeners}}, 'Foswiki::Plugins::MongoDBPlugin::Listener');
+
+see F::P::MongoDBPlugin
+    $Foswiki::Plugins::SESSION->{store}->setListenerPriority('Foswiki::Plugins::MongoDBPlugin::Listener', 1);
 
 
 =cut
