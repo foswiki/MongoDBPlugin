@@ -338,6 +338,39 @@ sub _updateTopic {
     $meta->{'TOPICINFO'}->{version} = 1 if ($meta->{'TOPICINFO'}->{version} < 1);
 
     $meta->{_raw_text} = $savedMeta->getEmbeddedStoreForm();
+    
+    #force the prefs to be loaded.
+    $savedMeta->getPreference('ALLOWME');
+    my %ACLProfiles;
+    foreach my $mode ($savedMeta->{_preferences}->prefs()) {
+        next unless ($mode =~ /^(ALLOW|DENY)/);
+        #$meta->_updatefilecache( $savedMeta, $mode, 1 );
+        my $rawACL_list = $savedMeta->{_session}->access->_getACL( $savedMeta, $mode );
+#print STDERR "-- getACL($web, $topic) $mode ".($force?'FORCE':'noforce')." -> ".(defined($rawACL_list)?join(',', @$rawACL_list):'undef')."\n";    
+
+        if (defined($rawACL_list)) {
+            my $sortedACL_list = join(',', sort(@{$rawACL_list}));
+            use Digest::MD5 qw(md5_hex);
+            my $aclProfileHash = md5_hex($sortedACL_list);
+            $meta->{'_ACL'}->{$mode} = $sortedACL_list;
+            $meta->{'_ACLProfile'}->{$mode} = $aclProfileHash;
+            
+            $ACLProfiles{$aclProfileHash}{_id} = $aclProfileHash;
+            $ACLProfiles{$aclProfileHash}{list} = $sortedACL_list;
+            $ACLProfiles{$aclProfileHash}{$mode} = $sortedACL_list; #tells us which mode its for..
+        }
+    }
+    $meta->{'_ACLProfile_ALLOWTOPICVIEW'} = $meta->{'_ACLProfile'}->{'ALLOWTOPICVIEW'} || 'UNDEFINED';
+    $meta->{'_ACLProfile_DENYTOPICVIEW'} = $meta->{'_ACLProfile'}->{'DENYTOPICVIEW'} || 'UNDEFINED';
+    
+    #save the profiles used in this web, so that foreach search we do, we can pre-test for the user's ALLOW&DENY and go from there.
+    #TODO: drop this collection so we don't have old stuff in it
+    foreach my $profileHash (keys(%ACLProfiles)) {
+        #my $ret = getMongoDB()->update( $web, 'ACLProfiles', $profileHash, $ACLProfiles{$profileHash}, 0);
+        my $collection = getMongoDB()->_getCollection($web, 'ACLProfiles');
+        $collection->update({_id=>$profileHash}, $ACLProfiles{$profileHash}, {upsert=>1, safe=>1});
+        #$collection->update({_id=>$profileHash}, $ACLProfiles{$profileHash}, {upsert=>1, safe=>1});
+    }
 
     my $ret = getMongoDB()->update( $web, 'current', "$web.$topic", $meta, $options->{history_only} || 0);
     
@@ -345,6 +378,34 @@ sub _updateTopic {
     #TODO: clearly, I need to do a deep copy above :(
     delete $meta->{TOPICINFO}->{_authorWikiName};
 }
+
+#to be used by mongodbsearch to be able to add ACL to the query 
+#resultant query will be something like
+#and ((_ACLProfile.ALLOWTOPICVIEW: $notdefined OR _ACLProfile.ALLOWTOPICVIEW: $in(userIsIn)) AND (_ACLProfile.DENYTOPICVIEW: $notdefined OR _ACLProfile.DENYTOPICVIEW: $NOTin(userIsIn)))
+#and then have to work out how to mix in the web ACL's - but those are a constant (for each query)...
+##SADLY> if I where to change what I write to the DB so that rather than ALLOWTOPICVIEW == undefined means there is no value, but instead I wrote ALLOWTOPICVIEW: 'UNDEF', then the query would be simpler:
+### ((_ACLProfile.ALLOWTOPICVIEW: $in(userIsIn, UNDEF)) AND (_ACLProfile.DENYTOPICVIEW: $NOTin(userIsIn)))
+### this is not worth doing for the other ACL's, as they're not used implicitly for searches.... so i'm better off making an ACLSEarchProfiles field extra..
+sub getACLProfilesFor {
+    my $cUID = shift;
+    my $web = shift;
+    
+    my %userIsIn;
+     
+    #my $collection = getMongoDB()->_getCollection($web, 'ACLProfiles');
+    my $cursor = getMongoDB()->query( $web, 'ACLProfiles', {}, {} );
+    while (my $obj = $cursor->next) {
+        #{_id=>, list=>, ALLOWTOPICVIEW=> DENYTOPICVIEW=>}
+        foreach my $mode qw/ALLOWTOPICVIEW DENYTOPICVIEW/ {
+            if (defined($obj->{$mode})) {
+                $userIsIn{$obj->{_id}} = 1 if ($Foswiki::Func::SESSION->{users}->isInUserList( $cUID, $obj->{list} ));
+            }
+        }
+    }
+    my @list = keys(%userIsIn);
+    return \@list;
+}
+
 
 #restHandler used to update the javascript saved in MongoDB
 sub _updateDatabase {
