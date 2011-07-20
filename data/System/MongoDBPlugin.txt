@@ -24,6 +24,7 @@ To check on progress and bugs please visit Foswikitask:%TOPIC%.
 %TOPIC% registers some rest handlers which may be accessed via web browser:
    * %SCRIPTURL{rest}%/%TOPIC%/update?updateweb=%USERSWEB% (just the %USERSWEB% web)
    * %SCRIPTURL{rest}%/%TOPIC%/update?updateweb=all (all webs recursivly)
+   * %SCRIPTURL{rest}%/%TOPIC%/update?updateweb=all;revision=off (all webs recursivly, but only import the last revision of each topic)
    * %SCRIPTURL{rest}%/%TOPIC%/update?updateweb=Lauries;recurse=on (Lauries web and its subwebs recursivly)
    * %SCRIPTURL{rest}%/%TOPIC%/updateDatabase (updates server-side javascript code stored in !MongoDB)
 

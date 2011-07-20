@@ -30,7 +30,14 @@ use strict;
 use Foswiki::Func    ();    # The plugins API
 use Foswiki::Plugins ();    # For the API version
 use Data::Dumper;
+use Digest::MD5 qw(md5_hex);
 use Assert;
+
+
+  # Track every object including where they're created
+  use Devel::Leak::Object qw{ GLOBAL_bless };
+  $Devel::Leak::Object::TRACKSOURCELINES = 1;
+  
 
 our $VERSION = '$Rev: 5771 $';
 our $RELEASE = '1.1.1';
@@ -141,6 +148,7 @@ sub _update {
     my $webParam = $query->param('updateweb') || 'Sandbox';
     my $recurse =
       Foswiki::Func::isTrue( $query->param('recurse'), ( $webParam eq 'all' ) );
+    my $importTopicRevisions = Foswiki::Func::isTrue( $query->param('revision'), 1);
 
     my @webNames;
     if ($recurse) {
@@ -154,13 +162,15 @@ sub _update {
 
     my $result = "\n importing: \n";
     foreach my $web (@webNames) {
-        $result .= updateWebCache($web);
+        $result .= updateWebCache($web, $importTopicRevisions);
     }
     return $result . "\n\n";
 }
 
 sub updateWebCache {
     my $web = shift;
+    my $importTopicRevisions = shift;
+    $importTopicRevisions = 1 unless (defined($importTopicRevisions));
 
     my $result = '';
     
@@ -177,26 +187,34 @@ sub updateWebCache {
         print STDERR "start web: $web ($#topicList)\n";
 
         my $count = 0;
+        my $rev_count=0;
         foreach my $topic (@topicList) {
               my  ( $meta, $text ) = Foswiki::Func::readTopic( $web, $topic );
 
             #top revision
             _updateTopic( $web, $topic, $meta, {history_only => 0} );
             
-            #TODO: if $rev isn't == 1, then need to go thhrough the history and load that too.
-            my $rev = $meta->getRevisionInfo()->{version};
-            while (--$rev > 0) {
-                ( $meta, $text ) = Foswiki::Func::readTopic( $web, $topic, $rev );
-                #add a new entry into the versions collection too
-                _updateTopic( $web, $topic, $meta, {history_only=>1} );
+            if ($importTopicRevisions) {
+                #TODO: if $rev isn't == 1, then need to go thhrough the history and load that too.
+                my $rev = $meta->getRevisionInfo()->{version};
+                while (--$rev > 0) {
+                    $rev_count++;
+                    ( $meta, $text ) = Foswiki::Func::readTopic( $web, $topic, $rev );
+                    #add a new entry into the versions collection too
+                    _updateTopic( $web, $topic, $meta, {history_only=>1} );
+                    #make sure we're chatty enough so apache doesn't timeout
+                    print STDERR "imported r$rev of $web.$topic\n" if ( ( $rev_count % 50 ) == 0 );
+                }
             }
-
+            
+            $meta->finish();
+            undef $meta;
 
             $count++;
             print STDERR "imported $count\n" if ( ( $count % 1000 ) == 0 );
         }
-        print STDERR "imported $count\n";
-        $result .= $web . ': ' . $count . "\n";
+        print STDERR "imported $count.$rev_count\n";
+        $result .= $web . ': ' . $count . '.'. $rev_count . "\n";
         
 $session->{store}->setListenerPriority('Foswiki::Plugins::MongoDBPlugin::Listener', 1);
 
@@ -350,7 +368,6 @@ sub _updateTopic {
 
         if (defined($rawACL_list)) {
             my $sortedACL_list = join(',', sort(@{$rawACL_list}));
-            use Digest::MD5 qw(md5_hex);
             my $aclProfileHash = md5_hex($sortedACL_list);
             $meta->{'_ACL'}->{$mode} = $sortedACL_list;
             $meta->{'_ACLProfile'}->{$mode} = $aclProfileHash;
