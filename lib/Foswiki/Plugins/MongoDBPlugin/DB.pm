@@ -125,6 +125,12 @@ sub query {
 sub update {
     my $self           = shift;
     my $web            = shift;
+    
+    if (not $self->databaseNameSafeToUse($web)) {
+        print STDERR "ERROR: sorry, $web cannot be cached to MongoDB as there is another web with the same spelling, but different case already cached\n";
+        return;
+    }
+    
     my $collectionName = shift;
     my $address        = shift;
     my $hash           = shift;
@@ -310,6 +316,11 @@ sub updateSystemJS {
     my $functionname = shift;
     my $sourcecode   = shift;
 
+    if (not $self->databaseNameSafeToUse($web)) {
+        print STDERR "ERROR: sorry, $web cannot be cached to MongoDB as there is another web with the same spelling, but different case already cached\n";
+        return;
+    }
+    
     my $collection = $self->_getCollection( $web, 'system.js' );
 
     use MongoDB::Code;
@@ -349,6 +360,22 @@ sub databaseExists {
         return 1 if ( $name eq $db_name );
     }
     return;
+}
+
+#MongoDB appears to fail when same spelling different case us used for database/collection names
+sub databaseNameSafeToUse {
+    my $self = shift;
+    my $web  = shift;
+
+    my $name = $self->getDatabaseName($web);
+
+    my $connection = $self->_connect();
+    my @dbs        = $connection->database_names;
+    foreach my $db_name (@dbs) {
+        return 1 if ( $name eq $db_name );
+        return if ( lc($name) eq lc($db_name) );
+    }
+    return 1;
 }
 
 sub _getDatabase {

@@ -187,6 +187,9 @@ sub loadTopic {
         not $Foswiki::cfg{Store}{Listeners}
         {'Foswiki::Plugins::MongoDBPlugin::Listener'} );
 
+    #fail faster.
+    return unless (Foswiki::Plugins::MongoDBPlugin::getMongoDB->databaseExists($_[1]->{_web}));
+
     if (
         ( defined( $_[2] ) ) and    #topic versioning in mongodb
         (

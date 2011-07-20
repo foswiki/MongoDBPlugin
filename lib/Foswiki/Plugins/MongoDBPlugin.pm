@@ -185,6 +185,11 @@ sub updateWebCache {
 
     my $query   = Foswiki::Func::getCgiQuery();
     my $session = $Foswiki::Plugins::SESSION;
+    
+    if (not getMongoDB()->databaseNameSafeToUse($web)) {
+        print STDERR "ERROR: sorry, $web cannot be cached to MongoDB as there is another web with the same spelling, but different case already cached\n";
+        return "ERROR: sorry, $web cannot be cached to MongoDB as there is another web with the same spelling, but different case already cached\n";
+    }
 
 #we need to deactivate any listeners :/ () at least stop the loadTopic one from triggering
     $session->{store}
