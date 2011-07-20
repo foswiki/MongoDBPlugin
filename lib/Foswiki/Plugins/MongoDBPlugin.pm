@@ -169,6 +169,8 @@ sub _update {
 
     my $result = "\n importing: \n";
     foreach my $web (@webNames) {
+        $web =~ s/\/$//;
+        $web =~ s/^\///;
         $result .= updateWebCache( $web, $importTopicRevisions );
 
         #Devel::Leak::Object::status();
