@@ -34,26 +34,28 @@ sub new {
     $this->{_defaultWeb}    = $defaultWeb;
     $this->{_SEARCHoptions} = $options;
     $this->{_cursor}        = $cursor;
-    
+
     return $this;
 }
 
 sub numberOfTopics {
     my $this = shift;
 
-    return $this->{cachedCount} if (defined($this->{cachedCount}));
-    #count(1) takes into account the skip and limit settings
-    #which is _not_ what we want.. (as the count is used to get the total number of available pages.
-    my $count = 0;#$this->{_cursor}->count();
-    #TODO: find out if th
-    if (($count == 0) and $this->{_cursor}->has_next()) {
-	#print STDERR "ERROR: cursor count == $count (real_count = ".$this->{_cursor}->{real_count}."), but cursor->has_next is true\n";
-        #work around a bug in MongoDB
-        #while ($this->{_cursor}->has_next()) {
-        #    $this->{_cursor}->next();
-        #    $count++;
-        #}
-        #$this->{_cursor}->reset();
+    return $this->{cachedCount} if ( defined( $this->{cachedCount} ) );
+
+#count(1) takes into account the skip and limit settings
+#which is _not_ what we want.. (as the count is used to get the total number of available pages.
+    my $count = 0;    #$this->{_cursor}->count();
+                      #TODO: find out if th
+    if ( ( $count == 0 ) and $this->{_cursor}->has_next() ) {
+
+#print STDERR "ERROR: cursor count == $count (real_count = ".$this->{_cursor}->{real_count}."), but cursor->has_next is true\n";
+#work around a bug in MongoDB
+#while ($this->{_cursor}->has_next()) {
+#    $this->{_cursor}->next();
+#    $count++;
+#}
+#$this->{_cursor}->reset();
         $count = $this->{_cursor}->{real_count};
     }
     $this->{cachedCount} = $count;
@@ -62,30 +64,43 @@ sub numberOfTopics {
 
 sub hasNext {
     my $this = shift;
-    $this->numberOfTopics()  if (not defined($this->{cachedCount}));    #TODO: sadly, the count is wrong once we start iterating, as it returns number remaining
+    $this->numberOfTopics()
+      if ( not defined( $this->{cachedCount} ) )
+      ; #TODO: sadly, the count is wrong once we start iterating, as it returns number remaining
     return $this->{_cursor}->has_next;
 }
+
 sub NOskip {
-    #this is a nop - as the paging must be done much earlier. (this will soooo stuff up the count)
+
+#this is a nop - as the paging must be done much earlier. (this will soooo stuff up the count)
     my $self = shift;
 
 }
 
-
 sub next {
-    my $this = shift;
-    my $obj  = $this->{_cursor}->next;
+    my $this    = shift;
+    my $obj     = $this->{_cursor}->next;
     my $session = $this->{_session};
-    
-    if (not ($this->{_cursor}->{noCache})) {
-        if (not $session->search->metacache->hasCached( $obj->{_web}, $obj->{_topic})) {
-            my $meta = new Foswiki::Plugins::MongoDBPlugin::Meta($session, $obj->{_web}, $obj->{_topic}, $obj);
-    #print STDERR "===== MongoDBInfoCache store in metacache (".$meta->web." , ".$meta->topic.", version)\n";
-            $session->search->metacache->addMeta( $meta->web, $meta->topic, $meta );
+
+    if ( not( $this->{_cursor}->{noCache} ) ) {
+        if (
+            not $session->search->metacache->hasCached(
+                $obj->{_web}, $obj->{_topic}
+            )
+          )
+        {
+            my $meta =
+              new Foswiki::Plugins::MongoDBPlugin::Meta( $session, $obj->{_web},
+                $obj->{_topic}, $obj );
+
+#print STDERR "===== MongoDBInfoCache store in metacache (".$meta->web." , ".$meta->topic.", version)\n";
+            $session->search->metacache->addMeta( $meta->web, $meta->topic,
+                $meta );
         }
     }
-#print STDERR "next => $obj->{_web}.'.'.$obj->{_topic}\n";
-    return $obj->{_web}.'.'.$obj->{_topic};
+
+    #print STDERR "next => $obj->{_web}.'.'.$obj->{_topic}\n";
+    return $obj->{_web} . '.' . $obj->{_topic};
 }
 sub reset { return 0; }
 sub all   { die 'not implemented'; }
@@ -125,7 +140,7 @@ IMPLEMENTME
 sub sortResults {
     my ( $infoCache, $web, $params ) = @_;
     my $session = $infoCache->{_session};
-return; #########################NOP
+    return;    #########################NOP
     my $sortOrder = $params->{order} || '';
     my $revSort   = Foswiki::isTrue( $params->{reverse} );
     my $date      = $params->{date} || '';

@@ -21,6 +21,7 @@
 package Foswiki::Plugins::MongoDBPlugin;
 
 BEGIN {
+
     #print STDERR ">>><<<****** starting MongoDBPlugin..\n";
 }
 
@@ -33,11 +34,9 @@ use Data::Dumper;
 use Digest::MD5 qw(md5_hex);
 use Assert;
 
-
-  # Track every object including where they're created
-  use Devel::Leak::Object qw{ GLOBAL_bless };
-  $Devel::Leak::Object::TRACKSOURCELINES = 1;
-  
+# Track every object including where they're created
+#use Devel::Leak::Object qw{ GLOBAL_bless };
+#$Devel::Leak::Object::TRACKSOURCELINES = 1;
 
 our $VERSION = '$Rev: 5771 $';
 our $RELEASE = '1.1.1';
@@ -66,7 +65,7 @@ sub initPlugin {
 
     $enableOnSaveUpdates =
       $Foswiki::cfg{Plugins}{$pluginName}{EnableOnSaveUpdates} || 0;
-      
+
     $Foswiki::Func::SESSION->{MongoDB}->{lastQueryTime} = ();
 
     #SMELL: ew
@@ -93,11 +92,11 @@ If it returns a non-null error string, the plugin will be disabled.
 
 sub earlyInitPlugin {
     ## Foswiki 2.0 Store Listener now used all the time
-    $Foswiki::Plugins::SESSION->{store}->setListenerPriority('Foswiki::Plugins::MongoDBPlugin::Listener', 1);
+    $Foswiki::Plugins::SESSION->{store}
+      ->setListenerPriority( 'Foswiki::Plugins::MongoDBPlugin::Listener', 1 );
 
     return undef;
 }
-
 
 =begin TML
 
@@ -128,14 +127,21 @@ sub completePageHandler {
 sub getMongoDB {
     if ( not defined( $Foswiki::Func::SESSION->{MongoDB} ) ) {
         require Foswiki::Plugins::MongoDBPlugin::DB;
-        
+
         #need to remove undes username and pwd
-        delete $Foswiki::cfg{MongoDBPlugin}{username} if (defined($Foswiki::cfg{MongoDBPlugin}{username}) and $Foswiki::cfg{MongoDBPlugin}{username} eq '');
-        delete $Foswiki::cfg{MongoDBPlugin}{password} if (defined($Foswiki::cfg{MongoDBPlugin}{password}) and $Foswiki::cfg{MongoDBPlugin}{password} eq '');
-        delete $Foswiki::cfg{MongoDBPlugin}{database} if (defined($Foswiki::cfg{MongoDBPlugin}{database}) and $Foswiki::cfg{MongoDBPlugin}{database} eq '');
-        delete $Foswiki::cfg{MongoDBPlugin}{port};  #deprecated
-        
-        my $mongoDB = new Foswiki::Plugins::MongoDBPlugin::DB({cfg => $Foswiki::cfg{MongoDBPlugin}} );
+        delete $Foswiki::cfg{MongoDBPlugin}{username}
+          if ( defined( $Foswiki::cfg{MongoDBPlugin}{username} )
+            and $Foswiki::cfg{MongoDBPlugin}{username} eq '' );
+        delete $Foswiki::cfg{MongoDBPlugin}{password}
+          if ( defined( $Foswiki::cfg{MongoDBPlugin}{password} )
+            and $Foswiki::cfg{MongoDBPlugin}{password} eq '' );
+        delete $Foswiki::cfg{MongoDBPlugin}{database}
+          if ( defined( $Foswiki::cfg{MongoDBPlugin}{database} )
+            and $Foswiki::cfg{MongoDBPlugin}{database} eq '' );
+        delete $Foswiki::cfg{MongoDBPlugin}{port};    #deprecated
+
+        my $mongoDB = new Foswiki::Plugins::MongoDBPlugin::DB(
+            { cfg => $Foswiki::cfg{MongoDBPlugin} } );
     }
     return $Foswiki::Func::SESSION->{MongoDB};
 }
@@ -148,7 +154,8 @@ sub _update {
     my $webParam = $query->param('updateweb') || 'Sandbox';
     my $recurse =
       Foswiki::Func::isTrue( $query->param('recurse'), ( $webParam eq 'all' ) );
-    my $importTopicRevisions = Foswiki::Func::isTrue( $query->param('revision'), 1);
+    my $importTopicRevisions =
+      Foswiki::Func::isTrue( $query->param('revision'), 1 );
 
     my @webNames;
     if ($recurse) {
@@ -162,89 +169,95 @@ sub _update {
 
     my $result = "\n importing: \n";
     foreach my $web (@webNames) {
-        $result .= updateWebCache($web, $importTopicRevisions);
+        $result .= updateWebCache( $web, $importTopicRevisions );
+
+        #Devel::Leak::Object::status();
     }
     return $result . "\n\n";
 }
 
 sub updateWebCache {
-    my $web = shift;
+    my $web                  = shift;
     my $importTopicRevisions = shift;
-    $importTopicRevisions = 1 unless (defined($importTopicRevisions));
+    $importTopicRevisions = 1 unless ( defined($importTopicRevisions) );
 
     my $result = '';
-    
+
     my $query   = Foswiki::Func::getCgiQuery();
     my $session = $Foswiki::Plugins::SESSION;
 
 #we need to deactivate any listeners :/ () at least stop the loadTopic one from triggering
-    $session->{store}->setListenerPriority('Foswiki::Plugins::MongoDBPlugin::Listener', 0);
+    $session->{store}
+      ->setListenerPriority( 'Foswiki::Plugins::MongoDBPlugin::Listener', 0 );
 
-        #lets make sure we have the javascript we'll rely on later
-        _updateDatabase( $session, $web, $query );
+    #lets make sure we have the javascript we'll rely on later
+    _updateDatabase( $session, $web, $query );
 
-        my @topicList = Foswiki::Func::getTopicList($web);
-        print STDERR "start web: $web ($#topicList)\n";
+    my @topicList = Foswiki::Func::getTopicList($web);
+    print STDERR "start web: $web ($#topicList)\n";
 
-        my $count = 0;
-        my $rev_count=0;
-        foreach my $topic (@topicList) {
-              my  ( $meta, $text ) = Foswiki::Func::readTopic( $web, $topic );
+    my $count     = 0;
+    my $rev_count = 0;
+    foreach my $topic (@topicList) {
+        my ( $meta, $text ) = Foswiki::Func::readTopic( $web, $topic );
 
-            #top revision
-            _updateTopic( $web, $topic, $meta, {history_only => 0} );
-            
-            if ($importTopicRevisions) {
-                #TODO: if $rev isn't == 1, then need to go thhrough the history and load that too.
-                my $rev = $meta->getRevisionInfo()->{version};
-                while (--$rev > 0) {
-                    $rev_count++;
-                    ( $meta, $text ) = Foswiki::Func::readTopic( $web, $topic, $rev );
-                    #add a new entry into the versions collection too
-                    _updateTopic( $web, $topic, $meta, {history_only=>1} );
-                    #make sure we're chatty enough so apache doesn't timeout
-                    print STDERR "imported r$rev of $web.$topic\n" if ( ( $rev_count % 50 ) == 0 );
-                }
+        #top revision
+        _updateTopic( $web, $topic, $meta, { history_only => 0 } );
+
+        if ($importTopicRevisions) {
+
+#TODO: if $rev isn't == 1, then need to go thhrough the history and load that too.
+            my $rev = $meta->getRevisionInfo()->{version};
+            while ( --$rev > 0 ) {
+                $rev_count++;
+                ( $meta, $text ) =
+                  Foswiki::Func::readTopic( $web, $topic, $rev );
+
+                #add a new entry into the versions collection too
+                _updateTopic( $web, $topic, $meta, { history_only => 1 } );
+
+                #make sure we're chatty enough so apache doesn't timeout
+                print STDERR "imported r$rev of $web.$topic\n"
+                  if ( ( $rev_count % 50 ) == 0 );
             }
-            
-            $meta->finish();
-            undef $meta;
-
-            $count++;
-            print STDERR "imported $count\n" if ( ( $count % 1000 ) == 0 );
         }
-        print STDERR "imported $count.$rev_count\n";
-        $result .= $web . ': ' . $count . '.'. $rev_count . "\n";
-        
-$session->{store}->setListenerPriority('Foswiki::Plugins::MongoDBPlugin::Listener', 1);
 
-      return $result;
+        $meta->finish();
+        undef $meta;
+
+        $count++;
+        print STDERR "imported $count\n" if ( ( $count % 1000 ) == 0 );
+    }
+    print STDERR "imported $count.$rev_count\n";
+    $result .= $web . ': ' . $count . '.' . $rev_count . "\n";
+
+    $session->{store}
+      ->setListenerPriority( 'Foswiki::Plugins::MongoDBPlugin::Listener', 1 );
+
+    return $result;
 }
 
-
 sub _remove {
-    my $web   = shift;
-    my $topic = shift;
+    my $web        = shift;
+    my $topic      = shift;
     my $attachment = shift;
 
-    my $query = { };
+    my $query = {};
     $query->{'_topic'} = $topic if ( defined($topic) );
 
     #attachment not implemented
-    return if (defined($attachment));
+    return if ( defined($attachment) );
 
     my $ret = getMongoDB()->remove( $web, 'current', $query );
 
 }
 
-
-
 sub _updateTopic {
     my $web       = shift;
     my $topic     = shift;
     my $savedMeta = shift;
-    my $options = shift;
-    
+    my $options   = shift;
+
     #print STDERR "-update($web, $topic)\n" if DEBUG;
     $savedMeta->getRev1Info('createdate');
 
@@ -255,8 +268,8 @@ sub _updateTopic {
 
     foreach my $key ( keys(%$savedMeta) ) {
 
-#        print STDERR "------------------ importing $key - "
-#          . ref( $savedMeta->{$key} ) . "\n";
+        #        print STDERR "------------------ importing $key - "
+        #          . ref( $savedMeta->{$key} ) . "\n";
         next if ( $key eq '_session' );
 
 #not totally sure if there's a benefit to using / not the _indices
@@ -311,12 +324,17 @@ sub _updateTopic {
 #print STDERR "\n######################################################## BOOOOOOOOM\n";
                     if ( $key eq '_getRev1Info' ) {
                         $key = 'CREATEINFO';
-                        $meta->{'CREATEINFO'} = $savedMeta->{_getRev1Info}->{rev1info};
+                        $meta->{'CREATEINFO'} =
+                          $savedMeta->{_getRev1Info}->{rev1info};
+
                         #lets numericafy them
-                        $meta->{'CREATEINFO'}->{version} = int($meta->{'CREATEINFO'}->{version});
-                        $meta->{'CREATEINFO'}->{date} = int($meta->{'CREATEINFO'}->{date});
-                        #use Data::Dumper;
-                        #print STDERR "$topic: ".(defined($savedMeta->{'TOPICINFO'}[0]->{version})?($savedMeta->{'TOPICINFO'}[0]->{version}):'undef')." ".Dumper($meta->{'CREATEINFO'})."\n";
+                        $meta->{'CREATEINFO'}->{version} =
+                          int( $meta->{'CREATEINFO'}->{version} );
+                        $meta->{'CREATEINFO'}->{date} =
+                          int( $meta->{'CREATEINFO'}->{date} );
+
+#use Data::Dumper;
+#print STDERR "$topic: ".(defined($savedMeta->{'TOPICINFO'}[0]->{version})?($savedMeta->{'TOPICINFO'}[0]->{version}):'undef')." ".Dumper($meta->{'CREATEINFO'})."\n";
                     }
 
                     next;
@@ -334,69 +352,89 @@ sub _updateTopic {
 # to support sort=editby => 'TOPICINFO._authorWikiName',
                     $meta->{'TOPICINFO'}->{_authorWikiName} =
                       Foswiki::Func::getWikiName( $meta->{$key}->{author} );
-                      
-                    #Item10611: Paul found that the date, rev and version TOPICINFO is sometimes a string and other times a number
-                    #rectify to always a string atm
-                    $meta->{'TOPICINFO'}->{version} = int($meta->{'TOPICINFO'}->{version});
-                    $meta->{'TOPICINFO'}->{date} = int($meta->{'TOPICINFO'}->{date});
-                    $meta->{'TOPICINFO'}->{rev} = int($meta->{'TOPICINFO'}->{rev});
+
+#Item10611: Paul found that the date, rev and version TOPICINFO is sometimes a string and other times a number
+#rectify to always a string atm
+                    $meta->{'TOPICINFO'}->{version} =
+                      int( $meta->{'TOPICINFO'}->{version} );
+                    $meta->{'TOPICINFO'}->{date} =
+                      int( $meta->{'TOPICINFO'}->{date} );
+                    $meta->{'TOPICINFO'}->{rev} =
+                      int( $meta->{'TOPICINFO'}->{rev} );
                 }
             }
         }
     }
+
     #workaround for Item10675 - a not-foswiki .txt file
-    if (not defined($meta->{'TOPICINFO'})) {
-                    $meta->{'TOPICINFO'}->{version} = 1;
-                    $meta->{'TOPICINFO'}->{date} = 0;
-                    $meta->{'TOPICINFO'}->{rev} = 1;
-                    $meta->{'TOPICINFO'}->{author} = 'BaseUserMapping_999';
-                    $meta->{'TOPICINFO'}->{_authorWikiName} = 'UnknownUser';
+    if ( not defined( $meta->{'TOPICINFO'} ) ) {
+        $meta->{'TOPICINFO'}->{version}         = 1;
+        $meta->{'TOPICINFO'}->{date}            = 0;
+        $meta->{'TOPICINFO'}->{rev}             = 1;
+        $meta->{'TOPICINFO'}->{author}          = 'BaseUserMapping_999';
+        $meta->{'TOPICINFO'}->{_authorWikiName} = 'UnknownUser';
     }
-    $meta->{'TOPICINFO'}->{rev} = 1 if ($meta->{'TOPICINFO'}->{rev} < 1);
-    $meta->{'TOPICINFO'}->{version} = 1 if ($meta->{'TOPICINFO'}->{version} < 1);
+    $meta->{'TOPICINFO'}->{rev} = 1 if ( $meta->{'TOPICINFO'}->{rev} < 1 );
+    $meta->{'TOPICINFO'}->{version} = 1
+      if ( $meta->{'TOPICINFO'}->{version} < 1 );
 
     $meta->{_raw_text} = $savedMeta->getEmbeddedStoreForm();
-    
+
     #force the prefs to be loaded.
     $savedMeta->getPreference('ALLOWME');
     my %ACLProfiles;
-    foreach my $mode ($savedMeta->{_preferences}->prefs()) {
-        next unless ($mode =~ /^(ALLOW|DENY)/);
-        #$meta->_updatefilecache( $savedMeta, $mode, 1 );
-        my $rawACL_list = $savedMeta->{_session}->access->_getACL( $savedMeta, $mode );
-#print STDERR "-- getACL($web, $topic) $mode ".($force?'FORCE':'noforce')." -> ".(defined($rawACL_list)?join(',', @$rawACL_list):'undef')."\n";    
+    foreach my $mode ( $savedMeta->{_preferences}->prefs() ) {
+        next unless ( $mode =~ /^(ALLOW|DENY)/ );
 
-        if (defined($rawACL_list)) {
-            my $sortedACL_list = join(',', sort(@{$rawACL_list}));
+        #$meta->_updatefilecache( $savedMeta, $mode, 1 );
+        my $rawACL_list =
+          $savedMeta->{_session}->access->_getACL( $savedMeta, $mode );
+
+#print STDERR "-- getACL($web, $topic) $mode ".($force?'FORCE':'noforce')." -> ".(defined($rawACL_list)?join(',', @$rawACL_list):'undef')."\n";
+
+        if ( defined($rawACL_list) ) {
+            my $sortedACL_list = join( ',', sort( @{$rawACL_list} ) );
             my $aclProfileHash = md5_hex($sortedACL_list);
-            $meta->{'_ACL'}->{$mode} = $sortedACL_list;
+            $meta->{'_ACL'}->{$mode}        = $sortedACL_list;
             $meta->{'_ACLProfile'}->{$mode} = $aclProfileHash;
-            
-            $ACLProfiles{$aclProfileHash}{_id} = $aclProfileHash;
+
+            $ACLProfiles{$aclProfileHash}{_id}  = $aclProfileHash;
             $ACLProfiles{$aclProfileHash}{list} = $sortedACL_list;
-            $ACLProfiles{$aclProfileHash}{$mode} = $sortedACL_list; #tells us which mode its for..
+            $ACLProfiles{$aclProfileHash}{$mode} =
+              $sortedACL_list;    #tells us which mode its for..
         }
     }
-    $meta->{'_ACLProfile_ALLOWTOPICVIEW'} = $meta->{'_ACLProfile'}->{'ALLOWTOPICVIEW'} || 'UNDEFINED';
-    $meta->{'_ACLProfile_DENYTOPICVIEW'} = $meta->{'_ACLProfile'}->{'DENYTOPICVIEW'} || 'UNDEFINED';
-    
-    #save the profiles used in this web, so that foreach search we do, we can pre-test for the user's ALLOW&DENY and go from there.
-    #TODO: drop this collection so we don't have old stuff in it
-    foreach my $profileHash (keys(%ACLProfiles)) {
-        #my $ret = getMongoDB()->update( $web, 'ACLProfiles', $profileHash, $ACLProfiles{$profileHash}, 0);
-        my $collection = getMongoDB()->_getCollection($web, 'ACLProfiles');
-        $collection->update({_id=>$profileHash}, $ACLProfiles{$profileHash}, {upsert=>1, safe=>1});
-        #$collection->update({_id=>$profileHash}, $ACLProfiles{$profileHash}, {upsert=>1, safe=>1});
+    $meta->{'_ACLProfile_ALLOWTOPICVIEW'} =
+      $meta->{'_ACLProfile'}->{'ALLOWTOPICVIEW'} || 'UNDEFINED';
+    $meta->{'_ACLProfile_DENYTOPICVIEW'} =
+      $meta->{'_ACLProfile'}->{'DENYTOPICVIEW'} || 'UNDEFINED';
+
+#save the profiles used in this web, so that foreach search we do, we can pre-test for the user's ALLOW&DENY and go from there.
+#TODO: drop this collection so we don't have old stuff in it
+    foreach my $profileHash ( keys(%ACLProfiles) ) {
+
+#my $ret = getMongoDB()->update( $web, 'ACLProfiles', $profileHash, $ACLProfiles{$profileHash}, 0);
+        my $collection = getMongoDB()->_getCollection( $web, 'ACLProfiles' );
+        $collection->update(
+            { _id => $profileHash },
+            $ACLProfiles{$profileHash},
+            { upsert => 1, safe => 1 }
+        );
+
+#$collection->update({_id=>$profileHash}, $ACLProfiles{$profileHash}, {upsert=>1, safe=>1});
     }
 
-    my $ret = getMongoDB()->update( $web, 'current', "$web.$topic", $meta, $options->{history_only} || 0);
-    
+    my $ret =
+      getMongoDB()
+      ->update( $web, 'current', "$web.$topic", $meta,
+        $options->{history_only} || 0 );
+
     #need to clean up meta obj
     #TODO: clearly, I need to do a deep copy above :(
     delete $meta->{TOPICINFO}->{_authorWikiName};
 }
 
-#to be used by mongodbsearch to be able to add ACL to the query 
+#to be used by mongodbsearch to be able to add ACL to the query
 #resultant query will be something like
 #and ((_ACLProfile.ALLOWTOPICVIEW: $notdefined OR _ACLProfile.ALLOWTOPICVIEW: $in(userIsIn)) AND (_ACLProfile.DENYTOPICVIEW: $notdefined OR _ACLProfile.DENYTOPICVIEW: $NOTin(userIsIn)))
 #and then have to work out how to mix in the web ACL's - but those are a constant (for each query)...
@@ -405,24 +443,26 @@ sub _updateTopic {
 ### this is not worth doing for the other ACL's, as they're not used implicitly for searches.... so i'm better off making an ACLSEarchProfiles field extra..
 sub getACLProfilesFor {
     my $cUID = shift;
-    my $web = shift;
-    
+    my $web  = shift;
+
     my %userIsIn;
-     
+
     #my $collection = getMongoDB()->_getCollection($web, 'ACLProfiles');
     my $cursor = getMongoDB()->query( $web, 'ACLProfiles', {}, {} );
-    while (my $obj = $cursor->next) {
+    while ( my $obj = $cursor->next ) {
+
         #{_id=>, list=>, ALLOWTOPICVIEW=> DENYTOPICVIEW=>}
         foreach my $mode qw/ALLOWTOPICVIEW DENYTOPICVIEW/ {
-            if (defined($obj->{$mode})) {
-                $userIsIn{$obj->{_id}} = 1 if ($Foswiki::Func::SESSION->{users}->isInUserList( $cUID, $obj->{list} ));
+            if ( defined( $obj->{$mode} ) ) {
+                $userIsIn{ $obj->{_id} } = 1
+                  if ( $Foswiki::Func::SESSION->{users}
+                    ->isInUserList( $cUID, $obj->{list} ) );
             }
         }
     }
     my @list = keys(%userIsIn);
     return \@list;
 }
-
 
 #restHandler used to update the javascript saved in MongoDB
 sub _updateDatabase {
@@ -504,15 +544,15 @@ sub _MONGODB {
  #    # For example, %EXAMPLETAG{'hamburger' sideorder="onions"}%
  #    # $params->{_DEFAULT} will be 'hamburger'
  #    # $params->{sideorder} will be 'onions'
- 
- my $webToShow = $params->{_DEFAULT} || 'Sandbox';
+
+    my $webToShow = $params->{_DEFAULT} || 'Sandbox';
 
     return getMongoDB()->_MONGODB(
         {
-            web => $webToShow,#'Lauries/GlossaryData',
+            web => $webToShow,    #'Lauries/GlossaryData',
 
             #SMELL: ok, so i'm passing all sorts of stuff
-            %$params    #over-ride the defaults
+            %$params              #over-ride the defaults
         }
     );
 }
