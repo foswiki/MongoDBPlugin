@@ -295,20 +295,21 @@ sub _webQuery {
     }
         
     if (not $session->{users}->isAdmin( $session->{user} )) {
-        ASSERT($session == $Foswiki::Func::SESSION) if DEBUG;
-        ASSERT(defined($Foswiki::Func::SESSION->{users}) )if DEBUG;
         #add ACL filter
         my $userIsIn = Foswiki::Plugins::MongoDBPlugin::getACLProfilesFor($session->{user}, $web, $session);
         ### ((_ACLProfile_ALLOWTOPICVIEW: $in(userIsIn, UNDEF)) AND (_ACLProfile.DENYTOPICVIEW: $NOTin(userIsIn)))
         #TODO: this is incorrect, it needs to also have the logic for the web default (and be inverted if the web DENYs the user..
-        if ($session->access->haveAccess('VIEW', $session->{user}, $web)) {
-            #TODO: potential BUG - if user is in both allow and deny, the algo chooses allow
-            $mongoQuery->{_ACLProfile_ALLOWTOPICVIEW} = {'$in' => [@$userIsIn, 'UNDEFINED']};
-            $mongoQuery->{_ACLProfile_DENYTOPICVIEW} = {'$nin' => $userIsIn};
-        } else {
-            #user is already denied, so we only get view access _if_ the user is specifically ALLOWed
-            $mongoQuery->{_ACLProfile_ALLOWTOPICVIEW} = {'$in' => [@$userIsIn]};
-        }
+ 	    if ($session->access->haveAccess('VIEW', $session->{user}, $web)) { 
+	 	        #TODO: potential BUG - if user is in both allow and deny, the algo chooses allow 
+	 	        #$mongoQuery->{_ACLProfile_ALLOWTOPICVIEW} = {'$in' => [@$userIsIn, 'UNDEFINED']}; 
+	 	        #$mongoQuery->{_ACLProfile_DENYTOPICVIEW} = {'$nin' => $userIsIn}; 
+	 	        $ixhQuery->Push( '_ACLProfile_ALLOWTOPICVIEW' => {'$in' => [@$userIsIn, 'UNDEFINED']} ); 
+	 	        $ixhQuery->Push( '{_ACLProfile_DENYTOPICVIEW}' => {'$nin' => $userIsIn} ); 
+	 	    } else { 
+	 	        #user is already denied, so we only get view access _if_ the user is specifically ALLOWed 
+	 	        #$mongoQuery->{_ACLProfile_ALLOWTOPICVIEW} = {'$in' => [@$userIsIn]}; 
+	 	        $ixhQuery->Push( '_ACLProfile_ALLOWTOPICVIEW' => {'$in' => $userIsIn} ); 
+	 	    } 
     }
     
     #limit, skip, sort_by

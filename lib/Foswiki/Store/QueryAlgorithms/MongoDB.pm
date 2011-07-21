@@ -150,8 +150,6 @@ sub _webQuery {
         ASSERT( not( defined( $mongoQuery->{ERROR} ) ) ) if DEBUG;
         
         if (not $session->{users}->isAdmin( $session->{user} )) {
-            ASSERT($session == $Foswiki::Func::SESSION) if DEBUG;
-            ASSERT(defined($Foswiki::Func::SESSION->{users}) )if DEBUG;
             #add ACL filter
             my $userIsIn = Foswiki::Plugins::MongoDBPlugin::getACLProfilesFor($session->{user}, $web, $session);
             ### ((_ACLProfile_ALLOWTOPICVIEW: $in(userIsIn, UNDEF)) AND (_ACLProfile.DENYTOPICVIEW: $NOTin(userIsIn)))
