@@ -100,7 +100,7 @@ sub query {
     my $cursor = $collection->query( $ixhQuery, $queryAttrs );
 #TODO: this is to make sure we're getting the cursor->count before anyone uses the cursor.
     my $count = $long_count;
-    if ( $count > 100 ) {
+    if (($collectionName eq 'current') and ( $count > 100 )) {
         $cursor->{noCache} = 1;
         $cursor = $cursor->fields( { _web => 1, _topic => 1 } );
     }
@@ -346,7 +346,7 @@ sub updateSystemJS {
     );
     
     #update our webmap.
-    my $collection = $self->_getCollection( 'webs', 'map' );
+    $collection = $self->_getCollection( 'webs', 'map' );
     $collection->save(
         {
             _id   => $web,
@@ -417,12 +417,12 @@ sub _getCollection {
     my $web            = shift;
     my $collectionName = shift;
     
-    return $self->{collections}{$web} if (defined($self->{collections}{$web}));
+    return $self->{collections}{$web}{$collectionName} if (defined($self->{collections}{$web}{$collectionName}));
 
     my $db = $self->_getDatabase($web);
-    $self->{collections}{$web} = $db->get_collection($collectionName);
+    $self->{collections}{$web}{$collectionName} = $db->get_collection($collectionName);
     
-    return $self->{collections}{$web};
+    return $self->{collections}{$web}{$collectionName};
 }
 
 sub _connect {

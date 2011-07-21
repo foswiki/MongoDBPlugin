@@ -460,23 +460,29 @@ sub _updateTopic {
 sub getACLProfilesFor {
     my $cUID = shift;
     my $web  = shift;
+    my $session = shift || $Foswiki::Func::SESSION;
 
     my %userIsIn;
 
     #my $collection = getMongoDB()->_getCollection($web, 'ACLProfiles');
-    my $cursor = getMongoDB()->query( $web, 'ACLProfiles', {}, {} );
+    my $cursor = getMongoDB()->query( $web, 'ACLProfiles', {} );
     while ( my $obj = $cursor->next ) {
-
         #{_id=>, list=>, ALLOWTOPICVIEW=> DENYTOPICVIEW=>}
         foreach my $mode qw/ALLOWTOPICVIEW DENYTOPICVIEW/ {
             if ( defined( $obj->{$mode} ) ) {
-                $userIsIn{ $obj->{_id} } = 1
-                  if ( $Foswiki::Func::SESSION->{users}
-                    ->isInUserList( $cUID, $obj->{list} ) );
+                  if ( $session->{users}->isInUserList( $cUID, [$obj->{list}] ) ) {
+                        $userIsIn{ $obj->{_id} } = 1;
+                        #print STDERR "$cUID is in ".$obj->{list}."\n";
+                    } else {
+                        #print STDERR "$cUID is not in ".$obj->{list}."\n";
+                    }
             }
         }
     }
     my @list = keys(%userIsIn);
+    
+    #print STDERR "---- getACLProfilesFor($cUID, $web) ".join(',',@list)."\n";
+    
     return \@list;
 }
 
