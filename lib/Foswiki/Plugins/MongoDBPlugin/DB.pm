@@ -29,6 +29,8 @@ use Data::Dumper;
 use Time::HiRes ();
 use Tie::IxHash ();
 use Foswiki::Func;
+use Digest::MD5 qw(md5_hex);
+
 
 #lets declare it ok to run queries on slaves.
 #http://search.cpan.org/~kristina/MongoDB-0.42/lib/MongoDB/Cursor.pm#slave_okay
@@ -56,19 +58,26 @@ sub query {
     my $collectionName = shift;
     my $ixhQuery       = shift;
     my $queryAttrs     = shift || {};
-
-    #remove all the history versions from the result.
-    if ( ref($ixhQuery) eq 'Tie::IxHash' ) {
-        $ixhQuery->Unshift( '_history' => { '$exists' => 0 } );
+    
+    if (not $self->databaseNameSafeToUse($web)) {
+        print STDERR "ERROR: sorry, $web cannot be cached to MongoDB as there is another web with the same spelling, but different case already cached\n";
+        return;
     }
-    else {
-        $ixhQuery->{_history} = { '$exists' => 0 };
+
+    if ($collectionName eq 'current') {
+        #remove all the history versions from the result.
+        if ( ref($ixhQuery) eq 'Tie::IxHash' ) {
+            $ixhQuery->Unshift( '_history' => { '$exists' => 0 } );
+        }
+        else {
+            $ixhQuery->{_history} = { '$exists' => 0 };
+        }
     }
 
     my $startTime = [Time::HiRes::gettimeofday];
 
-    my $collection = $self->_getCollection( $web, 'current' );
-    print STDERR "searching mongo : "
+    my $collection = $self->_getCollection( $web, $collectionName);
+    print STDERR "searching mongo ($web -> ".$self->getDatabaseName($web).". $collectionName) : "
       . Dumper($ixhQuery) . " , "
       . Dumper($queryAttrs) . "\n"
       if MONITOR;
@@ -77,15 +86,18 @@ sub query {
 #print STDERR "----------------------------------------------------------------------------------\n" if DEBUG;
     my $db = $self->_getDatabase($web);
 
-    #$db->run_command({"profile" => 2});
+    $db->run_command({"profile" => 2});
 
-#use Devel::Peek;
-#Dump($db->run_command({"count" => 'current', "query" => $ixhQuery}));
-#print STDERR "----------------------------------------------------------------------------------\n";
     my $long_count =
-      $db->run_command( { "count" => 'current', "query" => $ixhQuery } );
-    my $cursor = $collection->query( $ixhQuery, $queryAttrs );
+      $db->run_command( { "count" => $collectionName, "query" => $ixhQuery } );
+#use Devel::Peek;
+#Dump($long_count);
+#print STDERR "----------------------------------------------------------------------------------\n";
+#print STDERR Dumper($long_count)."\n";
+#print STDERR "----------------------------------------------------------------------------------\n";
+#die $long_count if ($long_count =~ /assert/);
 
+    my $cursor = $collection->query( $ixhQuery, $queryAttrs );
 #TODO: this is to make sure we're getting the cursor->count before anyone uses the cursor.
     my $count = $long_count;
     if ( $count > 100 ) {
@@ -332,12 +344,24 @@ sub updateSystemJS {
             value => $code
         }
     );
+    
+    #update our webmap.
+    my $collection = $self->_getCollection( 'webs', 'map' );
+    $collection->save(
+        {
+            _id   => $web,
+            hash => $self->getDatabaseName($web)
+        }
+    );    
 }
 
 #######################################################
 sub getDatabaseName {
     my $self = shift;
     my $web  = shift;
+    
+    return $web if ($web eq 'webs');
+    return 'web_'.md5_hex($web);
 
     #using webname as database name, so we need to sanitise
     #replace / with __ and pre-pend foswiki__ ?
@@ -392,10 +416,13 @@ sub _getCollection {
     my $self           = shift;
     my $web            = shift;
     my $collectionName = shift;
+    
+    return $self->{collections}{$web} if (defined($self->{collections}{$web}));
 
     my $db = $self->_getDatabase($web);
-
-    return $db->get_collection($collectionName);
+    $self->{collections}{$web} = $db->get_collection($collectionName);
+    
+    return $self->{collections}{$web};
 }
 
 sub _connect {

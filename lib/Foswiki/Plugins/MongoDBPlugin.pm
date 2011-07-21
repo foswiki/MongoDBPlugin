@@ -156,6 +156,8 @@ sub _update {
       Foswiki::Func::isTrue( $query->param('recurse'), ( $webParam eq 'all' ) );
     my $importTopicRevisions =
       Foswiki::Func::isTrue( $query->param('revision'), 1 );
+    my $fork =
+      Foswiki::Func::isTrue( $query->param('fork'), 0 );
 
     my @webNames;
     if ($recurse) {
@@ -171,7 +173,14 @@ sub _update {
     foreach my $web (@webNames) {
         $web =~ s/\/$//;
         $web =~ s/^\///;
-        $result .= updateWebCache( $web, $importTopicRevisions );
+        if ($fork) {
+            my @topicList = Foswiki::Func::getTopicList($web);
+            print STDERR "FORKING a new /MongoDBPlugin/update for $web ($#topicList) -revision=$importTopicRevisions\n";
+            my $cmd = "time ./rest /MongoDBPlugin/update -updateweb=$web  -revision=$importTopicRevisions -recurse=0";
+            print STDERR `$cmd 2>&1`;
+        } else {
+            $result .= updateWebCache( $web, $importTopicRevisions );
+        }
 
         #Devel::Leak::Object::status();
     }
@@ -201,7 +210,7 @@ sub updateWebCache {
     _updateDatabase( $session, $web, $query );
 
     my @topicList = Foswiki::Func::getTopicList($web);
-    print STDERR "start web: $web ($#topicList)\n";
+    print STDERR "start web: $web ($#topicList) -> ".getMongoDB()->getDatabaseName($web)."\n";
 
     my $count     = 0;
     my $rev_count = 0;

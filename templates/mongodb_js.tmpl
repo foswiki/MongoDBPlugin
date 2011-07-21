@@ -60,6 +60,11 @@
     return [web, topic];
 }%TMPL:END%
 %TMPL:DEF{foswiki_getDatabaseName_js}%function(web) {
+    
+    var current = db.getSisterDB('webs').getCollection('map');
+    var map = current.findOne({'_id':web});
+    return map.hash;
+    
     web = web.replace(/\//, '__');
     web = web.replace(/\./, '__');
     return 'foswiki__'+web;
