@@ -88,7 +88,8 @@ sub search {
 
     my %elements;
 
-    push( @{ $elements{_web} }, $web );
+    #web is selected by choosing the right DB - so lets not duiplicate
+    #push( @{ $elements{_web} }, $web );
 
     #dont' add a search for all..
     if ( $searchString ne '.*' ) {
@@ -160,7 +161,7 @@ sub _webQuery {
         $ixhQuery->Push( '_topic' => { '$not' => $excludeTopicsRegex } );
     }
 
-    $ixhQuery->Push( '_web' => $web );
+    #$ixhQuery->Push( '_web' => $web );
 
     my $casesensitive =
       defined( $options->{casesensitive} ) ? $options->{casesensitive} : 0;
@@ -180,7 +181,10 @@ sub _webQuery {
         #TODO: make a few more unit tests with ^ in them
         #(adding 'm' to the options isn't it
         $token =~ s/\^%META/%META/g;
-
+        
+        #turns out that the escaping of pipe is also off
+        $token =~ s/\\\|/\\\\\|/g;
+        
         # scope can be 'topic' (default), 'text' or "all"
         # scope='topic', e.g. Perl search on topic name:
         if ( $options->{'scope'} ne 'text' ) {

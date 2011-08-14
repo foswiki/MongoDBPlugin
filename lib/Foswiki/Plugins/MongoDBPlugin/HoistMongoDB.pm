@@ -952,9 +952,11 @@ sub hoistMongoDB {
         };
     }
 
-    my $rhs = quotemeta( $node->{hoisted1} );
-    $rhs =~ s/\\\././g;
-    $rhs =~ s/\\\*/*/g;
+    #I _think_ we should not be escaping here - see FormDefTests
+    #my $rhs = quotemeta( $node->{hoisted1} );
+    #$rhs =~ s/\\\././g;
+    #$rhs =~ s/\\\*/*/g;
+    my $rhs = $node->{hoisted1};
 
     #marginal speedup, but still every straw
     return {} if ( $rhs eq '.*' );
