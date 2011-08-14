@@ -1001,7 +1001,7 @@ sub test_hoist_longhandField_value {
     my $this        = shift;
 #see QueryTests::verify_meta_squabs_MongoDBQuery
     my $s           = "fields[name='number'].value";
-
+#TODO: argh! this actually should test that there is a value and that its non-undef/null?
 
     $this->do_Assert( $s,
         {
@@ -1048,7 +1048,22 @@ sub BROKENtest_hoist_PrefPlusAccessor {
         }
         );
 }
+sub BROKENtest_hoist_PrefPlusAccessor2 {
+    my $this        = shift;
+    my $s           = "preferences[name = 'Red'].value = 12";
 
+
+    $this->do_Assert( $s,
+        {
+                     'PREFERENCE.__RAW_ARRAY' => {
+                                        '$elemMatch' => {
+                                                          'value' => '12',
+                                                          'name' => 'Red'
+                                                        }
+                                      }
+        }
+        );
+}
 
 #this is basically a SEARCH with both the topic= and excludetopic= set
 sub test_hoistTopicNameIncludeANDNOExclude {
@@ -1635,6 +1650,7 @@ sub test_hoist_ref_TOPICINFO_longhand_plus {
         }
     );
 }
+
 sub test_hoist_CREATEINFO_longhand {
     my $this = shift;
     my $s = "META:CREATEINFO.date > 12346787";

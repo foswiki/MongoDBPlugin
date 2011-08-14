@@ -224,10 +224,10 @@ sub loadTopic {
     $_[1]->reload();    #get the latest version
     $_[1]->{_latestIsLoaded} = 1;
     if ( $_[1]->topic =~ /Form$/ ) {
-        use Foswiki::Form;
-        bless( $_[1], 'Foswiki::Form' );
+#        use Foswiki::Form;
+#        bless( $_[1], 'Foswiki::Form' );
 
-        $session->{forms}->{ $_[1]->web . '.' . $_[1]->topic } = $_[1];
+#        $session->{forms}->{ $_[1]->web . '.' . $_[1]->topic } = $_[1];
         print STDERR "------ init Form obj\n" if MONITOR;
     }
 
