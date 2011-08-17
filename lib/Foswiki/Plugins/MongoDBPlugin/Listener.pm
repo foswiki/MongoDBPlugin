@@ -220,17 +220,20 @@ sub loadTopic {
     }
 
     #rebless into a mighter version of Meta
+    #TODO: none of this horrid monkeying should be needed
+    #the proper fix will be to separate (de)serialization from meta and store, so they can be mixin/aspect/something
+    my $metaClass = ref($_[1]);
     bless( $_[1], 'Foswiki::Plugins::MongoDBPlugin::Meta' );
     $_[1]->reload();    #get the latest version
     $_[1]->{_latestIsLoaded} = 1;
-    if ( $_[1]->topic =~ /Form$/ ) {
-#        use Foswiki::Form;
-#        bless( $_[1], 'Foswiki::Form' );
+    if ( $metaClass ne 'Foswiki::Meta' ) {
+        #return us to what we were..
+        bless( $_[1], $metaClass );
 
-#        $session->{forms}->{ $_[1]->web . '.' . $_[1]->topic } = $_[1];
-        print STDERR "------ init Form obj\n" if MONITOR;
+        print STDERR "------ rebless to $metaClass\n" if MONITOR;
     }
 
+    #cache the metaObj
     $session->search->metacache->addMeta( $_[1]->web, $_[1]->topic, $_[1] );
     
     print STDERR "===== loadTopic("
