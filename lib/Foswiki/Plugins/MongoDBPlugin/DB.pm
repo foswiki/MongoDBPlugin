@@ -196,6 +196,11 @@ sub update {
         { 'CREATEINFO.date' => 1 },
         { name              => 'CREATEINFO.date' }
     );
+    $self->ensureIndex(
+        $collection,
+        { 'address' => 1 },
+        { name              => 'address' }
+    );
 
 #TODO: maybe should use the auto indexed '_id' (or maybe we can use this as a tuid - unique foreach rev of each topic..)
 #then again, atm, its totally random, so may be good for sharding.
