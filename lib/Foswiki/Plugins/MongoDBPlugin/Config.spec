@@ -28,7 +28,6 @@ $Foswiki::cfg{MongoDBPlugin}{timeout} = 20000;
 # If this is true, the driver will attempt to find a master given the list of hosts. 
 $Foswiki::cfg{MongoDBPlugin}{find_master} = 0;
 
-
 # **NUMBER EXPERT**
 # The default number of mongod slaves to replicate a change to before reporting success for all operations on this collection.
 $Foswiki::cfg{MongoDBPlugin}{w} = 1;
@@ -36,6 +35,12 @@ $Foswiki::cfg{MongoDBPlugin}{w} = 1;
 # The number of milliseconds an operation should wait for w slaves to replicate it.
 $Foswiki::cfg{MongoDBPlugin}{wtimeout} = 1000;
 
+# **SELECT 0,1,2 EXPERT**
+# Mongo includes a profiling tool to analyze the performance of database operations.
+#    0 - off,
+#    1 - log slow operations (by default, >100ms is considered slow), 
+#    2 - log all operations
+$Foswiki::cfg{MongoDBPlugin}{ProfilingLevel} = 0;
 
 # **STRING 30**
 # username

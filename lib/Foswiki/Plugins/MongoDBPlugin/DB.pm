@@ -87,7 +87,10 @@ sub query {
 #print STDERR "----------------------------------------------------------------------------------\n" if DEBUG;
     my $db = $self->_getDatabase($web);
 
-    $db->run_command({"profile" => 2});
+    if (       exists $Foswiki::cfg{MongoDBPlugin}{ProfilingLevel}
+          and defined $Foswiki::cfg{MongoDBPlugin}{ProfilingLevel}) {
+        $db->run_command({'profile' => $Foswiki::cfg{MongoDBPlugin}{ProfilingLevel}});
+    }
 
     my $long_count =
       $db->run_command( { "count" => $collectionName, "query" => $ixhQuery } );
