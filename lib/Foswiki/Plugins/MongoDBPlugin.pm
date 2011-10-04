@@ -177,6 +177,8 @@ sub _update {
             my @topicList = Foswiki::Func::getTopicList($web);
             print STDERR "FORKING a new /MongoDBPlugin/update for $web ($#topicList) -revision=$importTopicRevisions\n";
             my $cmd = "time ./rest /MongoDBPlugin/update -updateweb=$web  -revision=$importTopicRevisions -recurse=0";
+            $cmd =~ /^(.*$)/;
+            $cmd = $1;
             print STDERR `$cmd 2>&1`;
         } else {
             $result .= updateWebCache( $web, $importTopicRevisions );

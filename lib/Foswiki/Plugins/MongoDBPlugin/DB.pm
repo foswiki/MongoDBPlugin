@@ -40,6 +40,7 @@ $MongoDB::Cursor::slave_okay = 1;
 #use constant MONITOR => $Foswiki::cfg{MONITOR}{'Foswiki::Plugins::MongoDBPlugin'} || 0;
 use constant MONITOR       => 0;
 use constant MONITOR_INDEX => 0;
+my $MAX_NUM_INDEXES = 56;
 
 sub new {
     my $class  = shift;
@@ -291,9 +292,9 @@ sub ensureIndex {
             return;
         }
     }
-    if ( scalar( @{ $self->{mongoDBIndexes} } ) >= 40 ) {
+    if ( scalar( @{ $self->{mongoDBIndexes} } ) >= $MAX_NUM_INDEXES ) {
         print STDERR
-"*******************ouch. MongoDB can only have 40 indexes per collection : "
+"*******************ouch. MongoDB can only have $MAX_NUM_INDEXES indexes per collection : "
           . $options->{name} . "\n"
           if MONITOR_INDEX;
         return;
