@@ -40,7 +40,7 @@ $Foswiki::cfg{MongoDBPlugin}{wtimeout} = 1000;
 #    0 - off,
 #    1 - log slow operations (by default, >100ms is considered slow), 
 #    2 - log all operations
-$Foswiki::cfg{MongoDBPlugin}{ProfilingLevel} = 0;
+$Foswiki::cfg{Plugins}{MongoDBPlugin}{ProfilingLevel} = 0;
 
 # **STRING 30**
 # username

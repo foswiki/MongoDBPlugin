@@ -87,9 +87,9 @@ sub query {
 #print STDERR "----------------------------------------------------------------------------------\n" if DEBUG;
     my $db = $self->_getDatabase($web);
 
-    if (       exists $Foswiki::cfg{MongoDBPlugin}{ProfilingLevel}
-          and defined $Foswiki::cfg{MongoDBPlugin}{ProfilingLevel}) {
-        $db->run_command({'profile' => $Foswiki::cfg{MongoDBPlugin}{ProfilingLevel}});
+    if (       exists $Foswiki::cfg{Plugins}{MongoDBPlugin}{ProfilingLevel}
+          and defined $Foswiki::cfg{Plugins}{MongoDBPlugin}{ProfilingLevel}) {
+        $db->run_command({'profile' => $Foswiki::cfg{Plugins}{MongoDBPlugin}{ProfilingLevel}});
     }
 
     my $long_count =
