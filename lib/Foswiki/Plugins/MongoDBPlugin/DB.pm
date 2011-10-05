@@ -22,13 +22,15 @@ package Foswiki::Plugins::MongoDBPlugin::DB;
 
 # Always use strict to enforce variable scoping
 use strict;
-use MongoDB;
-use MongoDB::Cursor;
+use warnings;
+
+use MongoDB();
+use MongoDB::Cursor();
 use Assert;
 use Data::Dumper;
 use Time::HiRes ();
 use Tie::IxHash ();
-use Foswiki::Func;
+use Foswiki::Func();
 use Digest::MD5 qw(md5_hex);
 
 #lets declare it ok to run queries on slaves.
@@ -46,7 +48,7 @@ sub new {
     my $params = shift;
 
     my $self =
-      bless( { %$params, session => $Foswiki::Func::SESSION }, $class );
+      bless( { %{$params}, session => $Foswiki::Func::SESSION }, $class );
 
     $Foswiki::Func::SESSION->{MongoDB} = $self;
     return $self;
@@ -242,10 +244,11 @@ sub update {
     #print STDERR "making new entry ".$hash->{address}."\n";
     $collection->update(
         { address  => $hash->{address} },
-        { address  => $hash->{address}, %$hash },
+        { address  => $hash->{address}, %{$hash} },
         { 'upsert' => 1 }
     );
 
+    return;
 }
 
 #BUGGER. compound indexes won't help with large queries
@@ -316,6 +319,8 @@ sub ensureIndex {
     #TODO: consider doing these in a batch at the end of a request, or?
     $collection->ensure_index( $indexRef, $options );
     undef $self->{mongoDBIndexes};    #clear the cache :/
+
+    return;
 }
 
 sub remove {
@@ -324,7 +329,7 @@ sub remove {
     my $collectionName = shift;
     my $mongoDbQuery   = shift;
 
-    if ( scalar( keys(%$mongoDbQuery) ) == 0 ) {
+    if ( scalar( keys( %{$mongoDbQuery} ) ) == 0 ) {
 
         #remove web - so drop database.
         print STDERR "...........Dropping $web\n" if MONITOR;
@@ -334,10 +339,12 @@ sub remove {
     else {
         my $collection = $self->_getCollection( $web, $collectionName );
         print STDERR "...........remove "
-          . join( ',', keys(%$mongoDbQuery) ) . "\n"
+          . join( ',', keys( %{$mongoDbQuery} ) ) . "\n"
           if MONITOR;
         $collection->remove($mongoDbQuery);
     }
+
+    return;
 }
 
 sub updateSystemJS {
@@ -372,6 +379,8 @@ sub updateSystemJS {
             hash => $self->getDatabaseName($web)
         }
     );
+
+    return;
 }
 
 #######################################################
