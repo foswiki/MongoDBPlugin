@@ -393,11 +393,11 @@ sub getDatabaseName {
 
     #using webname as database name, so we need to sanitise
     #replace / with __ and pre-pend foswiki__ ?
-    $web =~ s/\//__/g;
+    #$web =~ s/\//__/g;
 
     #remove the 'dots' too.
-    $web =~ s/\./__/g;
-    return 'foswiki__' . $web;
+    #$web =~ s/\./__/g;
+    #return 'foswiki__' . $web;
 }
 
 sub databaseExists {
