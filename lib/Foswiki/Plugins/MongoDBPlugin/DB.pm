@@ -48,7 +48,7 @@ sub new {
     my $params = shift;
 
     my $self =
-      bless( { %{$params}, session => $Foswiki::Func::SESSION }, $class );
+      bless( { session => $Foswiki::Func::SESSION, %{$params} }, $class );
 
     $Foswiki::Func::SESSION->{MongoDB} = $self;
     return $self;
