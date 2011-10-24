@@ -7,7 +7,7 @@ use Foswiki::Search                       ();
 use Foswiki::Func                         ();
 use Assert;
 
-use constant MONITOR => 0;
+use constant MONITOR => 1;
 
 =begin TML
 
@@ -252,6 +252,12 @@ sub getRevisionHistory {
     my $meta = shift;
     my $attachment = shift;
     
+#allow the MongoDBPlugin to disable the listener when running a web update resthandler
+    return
+      if (
+        not $Foswiki::cfg{Store}{Listeners}
+        {'Foswiki::Plugins::MongoDBPlugin::Listener'} );
+
     return if (defined($attachment));
     
     my $session =
@@ -282,6 +288,48 @@ use Foswiki::Iterator::NumberRangeIterator;
     }
 
     return undef;
+}
+
+# SMELL: Store::VC::Store->getVersionInfo doesn't use $rev or $attachment
+sub getVersionInfo {
+    my( $this, $topicObject, $rev, $attachment ) = @_;
+    my $info;
+
+#allow the MongoDBPlugin to disable the listener when running a web update resthandler
+    return
+      if (
+        not $Foswiki::cfg{Store}{Listeners}
+        {'Foswiki::Plugins::MongoDBPlugin::Listener'} );
+
+    #TODO: naughty, but we seem to get called before Foswiki::Func::SESSION is set up :(
+    my $session = $meta->{_session}; 
+
+    if (not defined($attachment)) {
+        if (defined $this->{_loadedRev} and defined $topicObject->{_loadedRev} and $this->{_loadedRev} == $topicObject->{_loadedRev}) {
+            $info = $topicObject->{'TOPICINFO'};
+        } else {
+            # SMELL: this seems a bit ... circular
+            my ($tempObject) = Foswiki::Func::readTopic($topicObject->web(), $topicObject->topic(), $rev);
+            $info = $tempObject->{'TOPICINFO'};
+        }
+
+        if (defined $info) {
+            ASSERT(ref($info) eq 'ARRAY' and scalar(@{$info}) == 1) if DEBUG;
+            $info = $info->[0];
+            ASSERT( ref($info) eq 'HASH') if DEBUG;
+            ASSERT(scalar(keys %{$info})) if DEBUG;
+            $info->{date} = 0 unless defined $info->{date};
+            $info->{version} = 1 unless defined $info->{version};
+            $info->{comment} = '' unless defined $info->{comment};
+            $info->{author} ||= $Foswiki::Users::BaseUserMapping::UNKNOWN_USER_CUID;
+        }
+    }
+    if (MONITOR) {
+        require Data::Dumper;
+        print STDERR "MongoDBPlugin::getVersionInfo() GOT: " . Data::Dumper->Dump([$info]);
+    }
+
+    return $info;
 }
 
 1;
