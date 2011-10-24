@@ -163,6 +163,7 @@ NOTE: atm, this will only get called if the Store says yes, this meta item exist
 =cut
 
 sub loadTopic {
+
     #    my $self    = shift;
     #    my $_[1]    = shift;
     #    my $_[2] = shift;
@@ -188,7 +189,12 @@ sub loadTopic {
         {'Foswiki::Plugins::MongoDBPlugin::Listener'} );
 
     #fail faster.
-    return unless (Foswiki::Plugins::MongoDBPlugin::getMongoDB->databaseExists($_[1]->{_web}));
+    return
+      unless (
+        Foswiki::Plugins::MongoDBPlugin::getMongoDB->databaseExists(
+            $_[1]->{_web}
+        )
+      );
 
     if (
         ( defined( $_[2] ) ) and    #topic versioning in mongodb
@@ -199,16 +205,17 @@ sub loadTopic {
       )
     {
         print STDERR "============ listener request for $_[2]\n" if MONITOR;
+
         #return;
-        #query the versions collection - via  MongoDBPlugin::Meta 
+        #query the versions collection - via  MongoDBPlugin::Meta
         #rebless into a mighter version of Meta
         bless( $_[1], 'Foswiki::Plugins::MongoDBPlugin::Meta' );
-        $_[1]->reload($_[2]);    #get the requested version
+        $_[1]->reload( $_[2] );    #get the requested version
         return ( $_[1]->getLoadedRev(), 1 );
     }
 
     if ( $session->search->metacache->hasCached( $_[1]->web, $_[1]->topic ) ) {
-        return;                     #bugger, infinite loop time
+        return;                    #bugger, infinite loop time
         print STDERR "===== metacache hasCached("
           . $_[1]->web . " , "
           . $_[1]->topic
@@ -219,14 +226,15 @@ sub loadTopic {
         return ( $_[1]->getLoadedRev(), 1 );
     }
 
-    #rebless into a mighter version of Meta
-    #TODO: none of this horrid monkeying should be needed
-    #the proper fix will be to separate (de)serialization from meta and store, so they can be mixin/aspect/something
-    my $metaClass = ref($_[1]);
+#rebless into a mighter version of Meta
+#TODO: none of this horrid monkeying should be needed
+#the proper fix will be to separate (de)serialization from meta and store, so they can be mixin/aspect/something
+    my $metaClass = ref( $_[1] );
     bless( $_[1], 'Foswiki::Plugins::MongoDBPlugin::Meta' );
     $_[1]->reload();    #get the latest version
     $_[1]->{_latestIsLoaded} = 1;
     if ( $metaClass ne 'Foswiki::Meta' ) {
+
         #return us to what we were..
         bless( $_[1], $metaClass );
 
@@ -235,7 +243,7 @@ sub loadTopic {
 
     #cache the metaObj
     $session->search->metacache->addMeta( $_[1]->web, $_[1]->topic, $_[1] );
-    
+
     print STDERR "===== loadTopic("
       . $_[1]->web . " , "
       . $_[1]->topic
@@ -248,29 +256,28 @@ sub loadTopic {
 }
 
 sub getRevisionHistory {
-    my $this = shift;
-    my $meta = shift;
+    my $this       = shift;
+    my $meta       = shift;
     my $attachment = shift;
-    
+
 #allow the MongoDBPlugin to disable the listener when running a web update resthandler
     return
       if (
         not $Foswiki::cfg{Store}{Listeners}
         {'Foswiki::Plugins::MongoDBPlugin::Listener'} );
 
-    return if (defined($attachment));
-    
-    my $session =
-      $meta
+    return if ( defined($attachment) );
+
+    my $session = $meta
       ->{_session}; #TODO: naughty, but we seem to get called before Foswiki::Func::SESSION is set up :(
 
-    if ((not defined($attachment)) and ($this->{_latestIsLoaded})) {
+    if ( ( not defined($attachment) ) and ( $this->{_latestIsLoaded} ) ) {
+
         #why poke around in revision history (slow) if we 'have the latest'
-use Foswiki::Iterator::NumberRangeIterator;
-        return new Foswiki::Iterator::NumberRangeIterator( $this->{_loadedRev}, 1 );
+        use Foswiki::Iterator::NumberRangeIterator;
+        return new Foswiki::Iterator::NumberRangeIterator( $this->{_loadedRev},
+            1 );
     }
-    
-    
 
     if ( $session->search->metacache->hasCached( $meta->web, $meta->topic ) ) {
         print STDERR "===== metacache hasCached("
@@ -280,10 +287,12 @@ use Foswiki::Iterator::NumberRangeIterator;
           if MONITOR;
         $meta =
           $session->search->metacache->getMeta( $meta->web, $meta->topic );
-        if ((not defined($attachment)) and ($meta->{_latestIsLoaded})) {
+        if ( ( not defined($attachment) ) and ( $meta->{_latestIsLoaded} ) ) {
+
             #why poke around in revision history (slow) if we 'have the latest'
-    use Foswiki::Iterator::NumberRangeIterator;
-            return new Foswiki::Iterator::NumberRangeIterator( $meta->{_loadedRev}, 1 );
+            use Foswiki::Iterator::NumberRangeIterator;
+            return new Foswiki::Iterator::NumberRangeIterator(
+                $meta->{_loadedRev}, 1 );
         }
     }
 
@@ -292,7 +301,7 @@ use Foswiki::Iterator::NumberRangeIterator;
 
 # SMELL: Store::VC::Store->getVersionInfo doesn't use $rev or $attachment
 sub getVersionInfo {
-    my( $this, $topicObject, $rev, $attachment ) = @_;
+    my ( $this, $topicObject, $rev, $attachment ) = @_;
     my $info;
 
 #allow the MongoDBPlugin to disable the listener when running a web update resthandler
@@ -301,32 +310,42 @@ sub getVersionInfo {
         not $Foswiki::cfg{Store}{Listeners}
         {'Foswiki::Plugins::MongoDBPlugin::Listener'} );
 
-    #TODO: naughty, but we seem to get called before Foswiki::Func::SESSION is set up :(
-    my $session = $meta->{_session}; 
+#TODO: naughty, but we seem to get called before Foswiki::Func::SESSION is set up :(
+    my $session = $meta->{_session};
 
-    if (not defined($attachment)) {
-        if (defined $this->{_loadedRev} and defined $topicObject->{_loadedRev} and $this->{_loadedRev} == $topicObject->{_loadedRev}) {
+    if ( not defined($attachment) ) {
+        if (    defined $this->{_loadedRev}
+            and defined $topicObject->{_loadedRev}
+            and $this->{_loadedRev} == $topicObject->{_loadedRev} )
+        {
             $info = $topicObject->{'TOPICINFO'};
-        } else {
+        }
+        else {
+
             # SMELL: this seems a bit ... circular
-            my ($tempObject) = Foswiki::Func::readTopic($topicObject->web(), $topicObject->topic(), $rev);
+            my ($tempObject) =
+              Foswiki::Func::readTopic( $topicObject->web(),
+                $topicObject->topic(), $rev );
             $info = $tempObject->{'TOPICINFO'};
         }
 
-        if (defined $info) {
-            ASSERT(ref($info) eq 'ARRAY' and scalar(@{$info}) == 1) if DEBUG;
+        if ( defined $info ) {
+            ASSERT( ref($info) eq 'ARRAY' and scalar( @{$info} ) == 1 )
+              if DEBUG;
             $info = $info->[0];
-            ASSERT( ref($info) eq 'HASH') if DEBUG;
-            ASSERT(scalar(keys %{$info})) if DEBUG;
-            $info->{date} = 0 unless defined $info->{date};
-            $info->{version} = 1 unless defined $info->{version};
+            ASSERT( ref($info) eq 'HASH' ) if DEBUG;
+            ASSERT( scalar( keys %{$info} ) ) if DEBUG;
+            $info->{date}    = 0  unless defined $info->{date};
+            $info->{version} = 1  unless defined $info->{version};
             $info->{comment} = '' unless defined $info->{comment};
-            $info->{author} ||= $Foswiki::Users::BaseUserMapping::UNKNOWN_USER_CUID;
+            $info->{author} ||=
+              $Foswiki::Users::BaseUserMapping::UNKNOWN_USER_CUID;
         }
     }
     if (MONITOR) {
         require Data::Dumper;
-        print STDERR "MongoDBPlugin::getVersionInfo() GOT: " . Data::Dumper->Dump([$info]);
+        print STDERR "MongoDBPlugin::getVersionInfo() GOT: "
+          . Data::Dumper->Dump( [$info] );
     }
 
     return $info;
