@@ -392,18 +392,24 @@ sub updateSystemJS {
 sub _primeDatabaseNames {
     my $self = shift;
 
-    if (not (ref($self->{dbsbywebname}) and scalar(keys %{$self->{dbsbywebname}}))) {
+    if (
+        not( ref( $self->{dbsbywebname} )
+            and scalar( keys %{ $self->{dbsbywebname} } ) )
+      )
+    {
         my $collection = $self->_getCollection( 'webs', 'map' );
-        my $cursor = $collection->find( { 'hash' => { '$exists' => boolean::true}});
+        my $cursor =
+          $collection->find( { 'hash' => { '$exists' => boolean::true } } );
 
-        while ($cursor->has_next()) {
+        while ( $cursor->has_next() ) {
             my $document = $cursor->next();
 
-            $self->{dbsbywebname}{$document->{'_id'}} = $document->{'hash'};
+            $self->{dbsbywebname}{ $document->{'_id'} } = $document->{'hash'};
         }
         if (MONITOR) {
             require Data::Dumper;
-            print STDERR "Primed database names: " . Data::Dumper->Dump([$self->{dbsbywebname}]);
+            print STDERR "Primed database names: "
+              . Data::Dumper->Dump( [ $self->{dbsbywebname} ] );
         }
     }
 
@@ -416,13 +422,15 @@ sub getDatabaseName {
     my $web  = shift;
     my $name;
 
-    if ($web eq 'webs') {
+    if ( $web eq 'webs' ) {
         $name = $web;
-    } else {
+    }
+    else {
         $self->_primeDatabaseNames();
-        if (exists $self->{dbsbywebname}{$web}) {
+        if ( exists $self->{dbsbywebname}{$web} ) {
             $name = $self->{dbsbywebname}{$web};
-        } else {
+        }
+        else {
             $name = 'web_' . md5_hex($web);
         }
     }
@@ -436,7 +444,7 @@ sub databaseExists {
 
     $self->_primeDatabaseNames();
 
-    return (exists $self->{dbsbywebname}{$web});
+    return ( exists $self->{dbsbywebname}{$web} );
 }
 
 #MongoDB appears to fail when same spelling different case us used for database/collection names
@@ -444,14 +452,14 @@ sub databaseNameSafeToUse {
     my $self = shift;
     my $web  = shift;
 
-#    my $name = $self->getDatabaseName($web);
-#
-#    my $connection = $self->_connect();
-#    my @dbs        = $connection->database_names;
-#    foreach my $db_name (@dbs) {
-#        return 1 if ( $name eq $db_name );
-#        return if ( lc($name) eq lc($db_name) );
-#    }
+    #    my $name = $self->getDatabaseName($web);
+    #
+    #    my $connection = $self->_connect();
+    #    my @dbs        = $connection->database_names;
+    #    foreach my $db_name (@dbs) {
+    #        return 1 if ( $name eq $db_name );
+    #        return if ( lc($name) eq lc($db_name) );
+    #    }
     return 1;
 }
 
