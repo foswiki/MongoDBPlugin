@@ -32,6 +32,7 @@ use Time::HiRes ();
 use Tie::IxHash ();
 use Foswiki::Func();
 use Digest::MD5 qw(md5_hex);
+use boolean();
 
 #lets declare it ok to run queries on slaves.
 #http://search.cpan.org/~kristina/MongoDB-0.42/lib/MongoDB/Cursor.pm#slave_okay
@@ -335,6 +336,8 @@ sub remove {
         print STDERR "...........Dropping $web\n" if MONITOR;
         my $db = $self->_getDatabase($web);
         $db->drop();
+        $self->_primeDatabaseNames();
+        delete $self->{dbsbywebname}{$web};
     }
     else {
         my $collection = $self->_getCollection( $web, $collectionName );
@@ -352,6 +355,7 @@ sub updateSystemJS {
     my $web          = shift;
     my $functionname = shift;
     my $sourcecode   = shift;
+    my $dbname       = $self->getDatabaseName($web);
 
     if ( not $self->databaseNameSafeToUse($web) ) {
         print STDERR
@@ -372,13 +376,36 @@ sub updateSystemJS {
     );
 
     #update our webmap.
+    $self->_primeDatabaseNames();
+    $self->{dbsbywebname}{$web} = $dbname;
     $collection = $self->_getCollection( 'webs', 'map' );
     $collection->save(
         {
             _id  => $web,
-            hash => $self->getDatabaseName($web)
+            hash => $dbname
         }
     );
+
+    return;
+}
+
+sub _primeDatabaseNames {
+    my $self = shift;
+
+    if (not (ref($self->{dbsbywebname}) and scalar(keys %{$self->{dbsbywebname}}))) {
+        my $collection = $self->_getCollection( 'webs', 'map' );
+        my $cursor = $collection->find( { 'hash' => { '$exists' => boolean::true}});
+
+        while ($cursor->has_next()) {
+            my $document = $cursor->next();
+
+            $self->{dbsbywebname}{$document->{'_id'}} = $document->{'hash'};
+        }
+        if (MONITOR) {
+            require Data::Dumper;
+            print STDERR "Primed database names: " . Data::Dumper->Dump([$self->{dbsbywebname}]);
+        }
+    }
 
     return;
 }
@@ -387,31 +414,29 @@ sub updateSystemJS {
 sub getDatabaseName {
     my $self = shift;
     my $web  = shift;
+    my $name;
 
-    return $web if ( $web eq 'webs' );
-    return 'web_' . md5_hex($web);
+    if ($web eq 'webs') {
+        $name = $web;
+    } else {
+        $self->_primeDatabaseNames();
+        if (exists $self->{dbsbywebname}{$web}) {
+            $name = $self->{dbsbywebname}{$web};
+        } else {
+            $name = 'web_' . md5_hex($web);
+        }
+    }
 
-    #using webname as database name, so we need to sanitise
-    #replace / with __ and pre-pend foswiki__ ?
-    #$web =~ s/\//__/g;
-
-    #remove the 'dots' too.
-    #$web =~ s/\./__/g;
-    #return 'foswiki__' . $web;
+    return $name;
 }
 
 sub databaseExists {
     my $self = shift;
     my $web  = shift;
 
-    my $name = $self->getDatabaseName($web);
+    $self->_primeDatabaseNames();
 
-    my $connection = $self->_connect();
-    my @dbs        = $connection->database_names;
-    foreach my $db_name (@dbs) {
-        return 1 if ( $name eq $db_name );
-    }
-    return;
+    return (exists $self->{dbsbywebname}{$web});
 }
 
 #MongoDB appears to fail when same spelling different case us used for database/collection names
@@ -419,14 +444,14 @@ sub databaseNameSafeToUse {
     my $self = shift;
     my $web  = shift;
 
-    my $name = $self->getDatabaseName($web);
-
-    my $connection = $self->_connect();
-    my @dbs        = $connection->database_names;
-    foreach my $db_name (@dbs) {
-        return 1 if ( $name eq $db_name );
-        return if ( lc($name) eq lc($db_name) );
-    }
+#    my $name = $self->getDatabaseName($web);
+#
+#    my $connection = $self->_connect();
+#    my @dbs        = $connection->database_names;
+#    foreach my $db_name (@dbs) {
+#        return 1 if ( $name eq $db_name );
+#        return if ( lc($name) eq lc($db_name) );
+#    }
     return 1;
 }
 
