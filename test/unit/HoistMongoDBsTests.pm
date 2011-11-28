@@ -15,6 +15,7 @@ use constant MONITOR => 0;
 
 #list of operators we can output
 my @MongoOperators = qw/$or $not $nin $in/;
+
 #list of all Query ops
 #TODO: build this from code?
 my @QueryOps = qw/== != > < =~ ~/;
@@ -22,15 +23,14 @@ my @QueryOps = qw/== != > < =~ ~/;
 #TODO: use the above to test operator coverage - fail until we have full coverage.
 #TODO: test must run _last_
 
-
 sub do_Assert {
-    my $this                 = shift;
-    my $s                = shift;
-    my $expectedMongoDBQuery = shift;
+    my $this                           = shift;
+    my $s                              = shift;
+    my $expectedMongoDBQuery           = shift;
     my $expectedSimplifiedMongoDBQuery = shift;
-    
+
     print STDERR "SEARCH: $s\n" if MONITOR;
-    
+
     #non-simplfied query
     my $queryParser = new Foswiki::Query::Parser();
     my $query       = $queryParser->parse($s);
@@ -44,51 +44,62 @@ sub do_Assert {
     print STDERR "\n -> /", Dumper($mongoDBQuery), "/\n" if MONITOR;
 
     $this->assert_deep_equals( $expectedMongoDBQuery, $mongoDBQuery );
-    
-   #try out converttoJavascript
-   print STDERR "\nconvertToJavascript: \n".Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::convertToJavascript($mongoDBQuery)."\n" if MONITOR;
-   
-   $this->do_SimplifiedAssert($s, $expectedSimplifiedMongoDBQuery || $expectedMongoDBQuery);
+
+    #try out converttoJavascript
+    print STDERR "\nconvertToJavascript: \n"
+      . Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::convertToJavascript(
+        $mongoDBQuery)
+      . "\n"
+      if MONITOR;
+
+    $this->do_SimplifiedAssert( $s,
+        $expectedSimplifiedMongoDBQuery || $expectedMongoDBQuery );
 }
 
 sub do_SimplifiedAssert {
     my $this                 = shift;
-    my $s                = shift;
+    my $s                    = shift;
     my $expectedMongoDBQuery = shift;
-    
+
     print STDERR "SEARCH: $s\n" if MONITOR;
-    
+
     #non-simplfied query
     my $queryParser = new Foswiki::Query::Parser();
     my $query       = $queryParser->parse($s);
 
-    print STDERR "HoistS ",$query->stringify()."\n" if MONITOR;
-    print STDERR "HoistS ", Dumper($query) if MONITOR;
+    print STDERR "HoistS ", $query->stringify() . "\n" if MONITOR;
+    print STDERR "HoistS ", Dumper($query)             if MONITOR;
 
-    print STDERR "StringHoistS ",$query->stringify()."\n" if MONITOR;
-    my $context = Foswiki::Meta->new( $this->{session}, $this->{session}->{webName} );
+    print STDERR "StringHoistS ", $query->stringify() . "\n" if MONITOR;
+    my $context =
+      Foswiki::Meta->new( $this->{session}, $this->{session}->{webName} );
     $query->simplify( tom => $context, data => $context );
-    print STDERR "PosterHoistS ",$query->stringify()."\n" if MONITOR;
-    
-#    if  ( $query->evaluatesToConstant() ) {
-    if (1==2){
+    print STDERR "PosterHoistS ", $query->stringify() . "\n" if MONITOR;
+
+    #    if  ( $query->evaluatesToConstant() ) {
+    if ( 1 == 2 ) {
+
         #not an interesting hoist.
         #should test for true/false..
         print STDERR "simplified to a constant..\n";
+
         #not sure howto test this atm
-    } else {
-            print STDERR "SimplifiedHoistS ", Dumper($query) if MONITOR;
+    }
+    else {
+        print STDERR "SimplifiedHoistS ", Dumper($query) if MONITOR;
 
-            my $mongoDBQuery =
-              Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
+        my $mongoDBQuery =
+          Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::hoist($query);
 
-            print STDERR "\nsimplified ->  ", Dumper($mongoDBQuery), "/\n" if MONITOR;
-            print STDERR "\nexpected ->  ", Dumper($expectedMongoDBQuery), "/\n" if MONITOR;
-            $this->assert_deep_equals( $expectedMongoDBQuery, $mongoDBQuery );
+        print STDERR "\nsimplified ->  ", Dumper($mongoDBQuery), "/\n"
+          if MONITOR;
+        print STDERR "\nexpected ->  ", Dumper($expectedMongoDBQuery), "/\n"
+          if MONITOR;
+        $this->assert_deep_equals( $expectedMongoDBQuery, $mongoDBQuery );
     }
 
-   #try out converttoJavascript
-   #print STDERR "\nconvertToJavascript: \n".Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::convertToJavascript($mongoDBQuery)."\n" if MONITOR;
+#try out converttoJavascript
+#print STDERR "\nconvertToJavascript: \n".Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::convertToJavascript($mongoDBQuery)."\n" if MONITOR;
 }
 
 sub set_up {
@@ -169,32 +180,30 @@ sub set_up {
 }
 
 sub test_hoistSimple {
-    my $this        = shift;
-    my $s           = "number=99";
-    $this->do_Assert( $s,  { 'FIELD.number.value' => '99' } );
+    my $this = shift;
+    my $s    = "number=99";
+    $this->do_Assert( $s, { 'FIELD.number.value' => '99' } );
 }
 
 sub test_hoistSimple_OP_Like {
-    my $this        = shift;
-    my $s           = "String~'.*rin.*'";
+    my $this = shift;
+    my $s    = "String~'.*rin.*'";
 
-    $this->do_Assert( $s, 
+    $this->do_Assert( $s,
         { 'FIELD.String.value' => qr/(?-xism:\..*rin\..*)/ } );
 }
 
 sub test_hoistSimple2 {
-    my $this        = shift;
-    my $s           = "99=number";
-
+    my $this = shift;
+    my $s    = "99=number";
 
 #TODO: should really reverse these, but it is harder with strings - (i think the lhs in  'web.topic'/something is a string..
-    $this->do_Assert( $s,  { '99' => 'FIELD.number.value' } );
+    $this->do_Assert( $s, { '99' => 'FIELD.number.value' } );
 }
 
 sub test_hoistOR {
-    my $this        = shift;
-    my $s           = "number=12 or string='bana'";
-
+    my $this = shift;
+    my $s    = "number=12 or string='bana'";
 
     $this->do_Assert(
         $s,
@@ -208,9 +217,8 @@ sub test_hoistOR {
 }
 
 sub test_hoistOROR {
-    my $this        = shift;
-    my $s           = "number=12 or string='bana' or string = 'apple'";
-
+    my $this = shift;
+    my $s    = "number=12 or string='bana' or string = 'apple'";
 
     $this->do_Assert(
         $s,
@@ -226,8 +234,8 @@ sub test_hoistOROR {
 }
 
 sub test_hoistBraceOROR {
-    my $this        = shift;
-    my $s           = "(number=12 or string='bana' or string = 'apple')";
+    my $this = shift;
+    my $s    = "(number=12 or string='bana' or string = 'apple')";
 
     $this->do_Assert(
         $s,
@@ -246,7 +254,6 @@ sub test_hoistANDBraceOROR {
     my $s =
       "(number=12 or string='bana' or string = 'apple') AND (something=12)";
 
-
     $this->do_Assert(
         $s,
 
@@ -261,18 +268,14 @@ sub test_hoistANDBraceOROR {
     );
 }
 
-
 sub test_hoistBraceANDBrace_OPTIMISE {
     my $this = shift;
     my $s    = "(TargetRelease = 'minor') AND (TargetRelease = 'minor')";
 
-
     $this->do_Assert(
         $s,
 
-        {
-            'FIELD.TargetRelease.value' => 'minor' 
-        }
+        { 'FIELD.TargetRelease.value' => 'minor' }
     );
 }
 
@@ -281,33 +284,23 @@ sub test_hoistBraceANDBrace {
     my $this = shift;
     my $s    = "(TargetRelease != 'minor') AND (TargetRelease != 'major')";
 
-
     $this->do_Assert(
         $s,
 
-        {
-          'FIELD.TargetRelease.value' => {
-                                           '$nin' => [
-                                                       'minor',
-                                                       'major'
-                                                     ]
-                                         }
-        }
+        { 'FIELD.TargetRelease.value' => { '$nin' => [ 'minor', 'major' ] } }
     );
 }
 
 sub test_hoistBrace {
-    my $this        = shift;
-    my $s           = "(number=12)";
-
+    my $this = shift;
+    my $s    = "(number=12)";
 
     $this->do_Assert( $s, { 'FIELD.number.value' => '12' } );
 }
 
 sub test_hoistAND {
-    my $this        = shift;
-    my $s           = "number=12 and string='bana'";
-
+    my $this = shift;
+    my $s    = "number=12 and string='bana'";
 
     $this->do_Assert(
         $s,
@@ -320,9 +313,8 @@ sub test_hoistAND {
 }
 
 sub test_hoistANDAND {
-    my $this        = shift;
-    my $s           = "number=12 and string='bana' and something='nothing'";
-
+    my $this = shift;
+    my $s    = "number=12 and string='bana' and something='nothing'";
 
     $this->do_Assert(
         $s,
@@ -336,98 +328,84 @@ sub test_hoistANDAND {
 }
 
 sub test_hoistSimpleFieldDOT {
-    my $this        = shift;
-    my $s           = "FIELD.number.bana = 12";
-
+    my $this = shift;
+    my $s    = "FIELD.number.bana = 12";
 
     #TODO: there's and assumption that the bit before the . is the form-name
     $this->do_Assert( $s, { 'FIELD.bana.value' => '12' } );
 }
-sub test_hoistMETAFieldDOT {
-    my $this        = shift;
-    my $s           = "META:FIELD.number.bana = 12";
 
+sub test_hoistMETAFieldDOT {
+    my $this = shift;
+    my $s    = "META:FIELD.number.bana = 12";
 
     #TODO: there's and assumption that the bit before the . is the form-name
     $this->do_Assert( $s, { 'FIELD.bana.value' => '12' } );
 }
 
 sub test_hoistSimpleDOT {
-    my $this        = shift;
-    my $s           = "number.bana = 12";
-
+    my $this = shift;
+    my $s    = "number.bana = 12";
 
     #TODO: there's and assumption that the bit before the . is the form-name
     $this->do_Assert( $s, { 'FIELD.bana.value' => '12' } );
 }
-sub test_hoistSimpleField {
-    my $this        = shift;
-    my $s           = "number = 12";
 
+sub test_hoistSimpleField {
+    my $this = shift;
+    my $s    = "number = 12";
 
     #TODO: there's and assumption that the bit before the . is the form-name
     $this->do_Assert( $s, { 'FIELD.number.value' => '12' } );
 }
 
 sub test_hoistGT {
-    my $this        = shift;
-    my $s           = "number>12";
+    my $this = shift;
+    my $s    = "number>12";
 
-
-    $this->do_Assert( $s,
-        { 'FIELD.number.value' => { '$gt' => '12' } } );
+    $this->do_Assert( $s, { 'FIELD.number.value' => { '$gt' => '12' } } );
 }
 
 sub test_hoistGTE {
-    my $this        = shift;
-    my $s           = "number>=12";
+    my $this = shift;
+    my $s    = "number>=12";
 
-
-    $this->do_Assert( $s,
-        { 'FIELD.number.value' => { '$gte' => '12' } } );
+    $this->do_Assert( $s, { 'FIELD.number.value' => { '$gte' => '12' } } );
 }
 
 sub test_hoistLT {
-    my $this        = shift;
-    my $s           = "number<12";
+    my $this = shift;
+    my $s    = "number<12";
 
-
-    $this->do_Assert( $s,
-        { 'FIELD.number.value' => { '$lt' => '12' } } );
+    $this->do_Assert( $s, { 'FIELD.number.value' => { '$lt' => '12' } } );
 }
 
 sub test_hoistLTE {
-    my $this        = shift;
-    my $s           = "number<=12";
+    my $this = shift;
+    my $s    = "number<=12";
 
-
-    $this->do_Assert( $s,
-        { 'FIELD.number.value' => { '$lte' => '12' } } );
+    $this->do_Assert( $s, { 'FIELD.number.value' => { '$lte' => '12' } } );
 }
 
 sub test_hoistEQ {
-    my $this        = shift;
-    my $s           = "number=12";
-
+    my $this = shift;
+    my $s    = "number=12";
 
     $this->do_Assert( $s, { 'FIELD.number.value' => '12' } );
 }
 
 sub test_hoistNE {
-    my $this        = shift;
-    my $s           = "number!=12";
+    my $this = shift;
+    my $s    = "number!=12";
 
-
-    $this->do_Assert( $s,
-        { 'FIELD.number.value' => { '$ne' => '12' } } );
+    $this->do_Assert( $s, { 'FIELD.number.value' => { '$ne' => '12' } } );
 }
 
 sub test_hoistNOT_EQ {
-    my $this        = shift;
-    my $s           = "not(number=12)";
+    my $this = shift;
+    my $s    = "not(number=12)";
 
-    $this->do_Assert( $s,
-        { 'FIELD.number.value' => { '$ne' => '12' } } );
+    $this->do_Assert( $s, { 'FIELD.number.value' => { '$ne' => '12' } } );
 }
 
 sub test_hoistCompound {
@@ -454,7 +432,6 @@ sub test_hoistCompound2 {
     my $s =
 "(moved.by='AlbertCamus' OR moved.by ~ '*bert*') AND number=99 AND string='String'";
 
-
     $this->do_Assert(
         $s,
 
@@ -470,42 +447,36 @@ sub test_hoistCompound2 {
 }
 
 sub test_hoistAlias {
-    my $this        = shift;
-    my $s           = "info.date=12345";
-
+    my $this = shift;
+    my $s    = "info.date=12345";
 
     $this->do_Assert( $s, { 'TOPICINFO.date' => '12345' } );
 }
 
 sub test_hoistFormField {
-    my $this        = shift;
-    my $s           = "TestForm.number=99";
-
+    my $this = shift;
+    my $s    = "TestForm.number=99";
 
     $this->do_Assert( $s, { 'FIELD.number.value' => '99' } );
 }
 
 sub test_hoistText {
-    my $this        = shift;
-    my $s           = "text ~ '*Green*'";
+    my $this = shift;
+    my $s    = "text ~ '*Green*'";
 
-    $this->do_Assert( $s,
-        { '_text' => qr/(?-xism:.*Green.*)/ } );
+    $this->do_Assert( $s, { '_text' => qr/(?-xism:.*Green.*)/ } );
 }
 
 sub test_hoistName {
-    my $this        = shift;
-    my $s           = "name ~ 'Web*'";
+    my $this = shift;
+    my $s    = "name ~ 'Web*'";
 
-
-    $this->do_Assert( $s,
-        { '_topic' => qr/(?-xism:Web.*)/ } );
+    $this->do_Assert( $s, { '_topic' => qr/(?-xism:Web.*)/ } );
 }
 
 sub test_hoistName2 {
-    my $this        = shift;
-    my $s           = "name ~ 'Web*' OR name ~ 'A*' OR name = 'Banana'";
-
+    my $this = shift;
+    my $s    = "name ~ 'Web*' OR name ~ 'A*' OR name = 'Banana'";
 
     $this->do_Assert(
         $s,
@@ -521,574 +492,499 @@ sub test_hoistName2 {
 }
 
 sub test_hoistOP_Match {
-    my $this        = shift;
-    my $s           = "text =~ '.*Green.*'";
+    my $this = shift;
+    my $s    = "text =~ '.*Green.*'";
 
-
-    $this->do_Assert( $s,
-        { '_text' => qr/(?-xism:.*Green.*)/ } );
+    $this->do_Assert( $s, { '_text' => qr/(?-xism:.*Green.*)/ } );
 }
-
 
 sub test_hoistOP_Where {
-    my $this        = shift;
-    my $s           = "preferences[name='SVEN']";
-
+    my $this = shift;
+    my $s    = "preferences[name='SVEN']";
 
 # db.current.find({ 'PREFERENCE.__RAW_ARRAY' : { '$elemMatch' : {'name' : 'SVEN' }}})
 
-    $this->do_Assert( $s,
-        { 'PREFERENCE.__RAW_ARRAY' => { '$elemMatch' => {'name' => 'SVEN' }}}
-        );
+    $this->do_Assert(
+        $s,
+        {
+            'PREFERENCE.__RAW_ARRAY' => { '$elemMatch' => { 'name' => 'SVEN' } }
+        }
+    );
 }
+
 #
 sub test_hoistOP_Where1 {
-    my $this        = shift;
-    my $s           = "fields[value='FrequentlyAskedQuestion']";
-
+    my $this = shift;
+    my $s    = "fields[value='FrequentlyAskedQuestion']";
 
 # db.current.find({ 'PREFERENCE.__RAW_ARRAY' : { '$elemMatch' : {'name' : 'SVEN' }}})
 
-    $this->do_Assert( $s,
+    $this->do_Assert(
+        $s,
         {
-          'FIELD.__RAW_ARRAY' => {
-                                                    '$elemMatch' => {
-                                                                      'value' => 'FrequentlyAskedQuestion'
-                                                                    }
-                                                  }
-                                              }
-        );
+            'FIELD.__RAW_ARRAY' =>
+              { '$elemMatch' => { 'value' => 'FrequentlyAskedQuestion' } }
+        }
+    );
 }
+
 sub test_hoistOP_Where2 {
-    my $this        = shift;
-    my $s           = "META:FIELD[value='FrequentlyAskedQuestion']";
-
+    my $this = shift;
+    my $s    = "META:FIELD[value='FrequentlyAskedQuestion']";
 
 # db.current.find({ 'PREFERENCE.__RAW_ARRAY' : { '$elemMatch' : {'name' : 'SVEN' }}})
 
-    $this->do_Assert( $s,
+    $this->do_Assert(
+        $s,
         {
-          'FIELD.__RAW_ARRAY' => {
-                                                    '$elemMatch' => {
-                                                                      'value' => 'FrequentlyAskedQuestion'
-                                                                    }
-                                                  }
-                                              }
-        );
+            'FIELD.__RAW_ARRAY' =>
+              { '$elemMatch' => { 'value' => 'FrequentlyAskedQuestion' } }
+        }
+    );
 }
+
 sub test_hoistOP_Where3 {
-    my $this        = shift;
-    my $s           = "META:FIELD[name='TopicClassification' AND value='FrequentlyAskedQuestion']";
-
+    my $this = shift;
+    my $s =
+"META:FIELD[name='TopicClassification' AND value='FrequentlyAskedQuestion']";
 
 # db.current.find({ 'PREFERENCE.__RAW_ARRAY' : { '$elemMatch' : {'name' : 'SVEN' }}})
 
-    $this->do_Assert( $s,
-    {
-          'FIELD.__RAW_ARRAY' => {
-                                   '$elemMatch' => {
-                                                     'value' => 'FrequentlyAskedQuestion',
-                                                     'name' => 'TopicClassification'
-                                                   }
-                                 }
+    $this->do_Assert(
+        $s,
+        {
+            'FIELD.__RAW_ARRAY' => {
+                '$elemMatch' => {
+                    'value' => 'FrequentlyAskedQuestion',
+                    'name'  => 'TopicClassification'
+                }
+            }
         }
-        );
+    );
 }
+
 sub test_hoistOP_Where4 {
-    my $this        = shift;
-    my $s           = "META:FIELD[name='TopicClassification'][value='FrequentlyAskedQuestion']";
-
+    my $this = shift;
+    my $s =
+      "META:FIELD[name='TopicClassification'][value='FrequentlyAskedQuestion']";
 
 # db.current.find({ 'PREFERENCE.__RAW_ARRAY' : { '$elemMatch' : {'name' : 'SVEN' }}})
 
-    $this->do_Assert( $s,
-    {
-          'FIELD.__RAW_ARRAY' => {
-                                   '$elemMatch' => {
-                                                     'value' => 'FrequentlyAskedQuestion',
-                                                     'name' => 'TopicClassification'
-                                                   }
-                                 }
+    $this->do_Assert(
+        $s,
+        {
+            'FIELD.__RAW_ARRAY' => {
+                '$elemMatch' => {
+                    'value' => 'FrequentlyAskedQuestion',
+                    'name'  => 'TopicClassification'
+                }
+            }
         }
-        );
+    );
 }
+
 #i think this is meaninless, but i'm not sure.
 sub test_hoistOP_preferencesDotName {
-    my $this        = shift;
-    my $s           = "preferences.name='BLAH'";
+    my $this = shift;
+    my $s    = "preferences.name='BLAH'";
 
-
-    $this->do_Assert( $s,
-        {  'PREFERENCE.name' => 'BLAH' } );
+    $this->do_Assert( $s, { 'PREFERENCE.name' => 'BLAH' } );
 }
 
 sub test_hoistORANDOR {
-    my $this        = shift;
-    my $s           = "(number=14 OR number=12) and (string='apple' OR string='bana')";
-
+    my $this = shift;
+    my $s    = "(number=14 OR number=12) and (string='apple' OR string='bana')";
 
     $this->do_Assert(
         $s,
 
-{
-          'FIELD.number.value' => {
-                                    '$in' => [
-                                               '14',
-                                               '12'
-                                             ]
-                                  },
-          'FIELD.string.value' => {
-                                    '$in' => [
-                                               'apple',
-                                               'bana'
-                                             ]
-                                  }
+        {
+            'FIELD.number.value' => { '$in' => [ '14',    '12' ] },
+            'FIELD.string.value' => { '$in' => [ 'apple', 'bana' ] }
         }
     );
 }
 
 sub test_hoistLcRHSName {
-    my $this        = shift;
-    my $s           = "name = lc('WebHome')";
+    my $this = shift;
+    my $s    = "name = lc('WebHome')";
 
-
-    $this->do_Assert( $s,
-        {
-            '$where' => "this._topic == foswiki_toLowerCase('WebHome')"
-        },
-        {
-              '_topic' => 'webhome'
-        }
-        );
+    $this->do_Assert(
+        $s,
+        { '$where' => "this._topic == foswiki_toLowerCase('WebHome')" },
+        { '_topic' => 'webhome' }
+    );
 }
 
-
 sub test_hoistLcLHSField {
-    my $this        = shift;
-    my $s           = "lc(Subject) = 'WebHome'";
+    my $this = shift;
+    my $s    = "lc(Subject) = 'WebHome'";
 
-
-    $this->do_Assert( $s,
+    $this->do_Assert(
+        $s,
         {
-            '$where' => "foswiki_toLowerCase(foswiki_getField(this, 'FIELD.Subject.value')) == 'WebHome'"
+            '$where' =>
+"foswiki_toLowerCase(foswiki_getField(this, 'FIELD.Subject.value')) == 'WebHome'"
         }
-        );
+    );
 }
 
 sub test_hoistLcLHSName {
-    my $this        = shift;
-    my $s           = "lc(name) = 'WebHome'";
-
+    my $this = shift;
+    my $s    = "lc(name) = 'WebHome'";
 
     $this->do_Assert( $s,
-        {
-            '$where' => "foswiki_toLowerCase(this._topic) == 'WebHome'"
-        }
-        );
+        { '$where' => "foswiki_toLowerCase(this._topic) == 'WebHome'" } );
 }
 
 sub DISABLEtest_hoistLcRHSLikeName {
+
 #TODO: this requires the hoister to notice that its a constant and that it can pre-evaluate it
-    my $this        = shift;
-    my $s           = "name ~ lc('Web*')";
+    my $this = shift;
+    my $s    = "name ~ lc('Web*')";
 
-
-    $this->do_Assert( $s,
-        { '_topic' => qr/(?-xism:web.*)/ } );
+    $this->do_Assert( $s, { '_topic' => qr/(?-xism:web.*)/ } );
 }
 
-
 sub test_hoistLcLHSLikeName {
-    my $this        = shift;
-    my $s           = "lc(name) ~ 'Web*'";
-
+    my $this = shift;
+    my $s    = "lc(name) ~ 'Web*'";
 
     $this->do_Assert( $s,
-        {
-            '$where' => "( /^Web.*\$/.test(foswiki_toLowerCase(this._topic)) )"
-        }
-        );
+        { '$where' => "( /^Web.*\$/.test(foswiki_toLowerCase(this._topic)) )" }
+    );
 }
 
 sub test_hoistLengthLHSName {
-    my $this        = shift;
-    my $s           = "length(name) = 12";
+    my $this = shift;
+    my $s    = "length(name) = 12";
 
-
-    $this->do_Assert( $s,
-        {
-            '$where' => "foswiki_length(this._topic) == 12"
-        }
-        );
+    $this->do_Assert( $s, { '$where' => "foswiki_length(this._topic) == 12" } );
 }
+
 sub test_hoistLengthLHSString {
-    my $this        = shift;
-    my $s           = "length('something') = 9";
+    my $this = shift;
+    my $s    = "length('something') = 9";
 
-
-    $this->do_Assert( $s,
-        {
-            '$where' => "foswiki_length('something') == 9"
-        },
-        {
-        }
-        );
+    $this->do_Assert( $s, { '$where' => "foswiki_length('something') == 9" },
+        {} );
 }
+
 sub test_hoistLengthLHSString_false {
-    my $this        = shift;
-    my $s           = "length('FALSEsomething') = 9";
+    my $this = shift;
+    my $s    = "length('FALSEsomething') = 9";
 
-
-    $this->do_Assert( $s,
-        {
-            '$where' => "foswiki_length('FALSEsomething') == 9"
-        },
-        {
-            '1' => '0'
-        }
-        );
+    $this->do_Assert(
+        $s,
+        { '$where' => "foswiki_length('FALSEsomething') == 9" },
+        { '1'      => '0' }
+    );
 }
 
 sub test_hoistLengthLHSNameGT {
-    my $this        = shift;
-    my $s           = "length(name) < 12";
+    my $this = shift;
+    my $s    = "length(name) < 12";
 
-
-    $this->do_Assert( $s,
-        {
-            '$where' => "foswiki_length(this._topic) < 12"
-        }
-        );
+    $this->do_Assert( $s, { '$where' => "foswiki_length(this._topic) < 12" } );
 }
 
 sub test_hoist_d2n_value {
-    my $this        = shift;
-    my $s           = "d2n noatime";
+    my $this = shift;
+    my $s    = "d2n noatime";
 
-
-    $this->do_Assert( $s,
+    $this->do_Assert(
+        $s,
         {
-          '$where' => "foswiki_d2n(foswiki_getField(this, 'FIELD.noatime.value'))"
+            '$where' =>
+              "foswiki_d2n(foswiki_getField(this, 'FIELD.noatime.value'))"
         }
-        );
+    );
 }
 
 sub test_hoist_d2n_valueAND {
-    my $this        = shift;
-    my $s           = "d2n(noatime) and topic='WebHome'";
+    my $this = shift;
+    my $s    = "d2n(noatime) and topic='WebHome'";
 
-
-    $this->do_Assert( $s,
+    $this->do_Assert(
+        $s,
         {
-#TODO: need to figure out how to not make both into js
-          '$where' => " ( (foswiki_d2n(foswiki_getField(this, 'FIELD.noatime.value'))) )  && foswiki_getField(this, 'FIELD.topic.value') == 'WebHome'"
-#          '$where' => 'foswiki_d2n(this.FIELD.noatime.value)',
-#          'FIELD.topic.value' => 'WebHome'
+
+            #TODO: need to figure out how to not make both into js
+            '$where' =>
+" ( (foswiki_d2n(foswiki_getField(this, 'FIELD.noatime.value'))) )  && foswiki_getField(this, 'FIELD.topic.value') == 'WebHome'"
+
+              #          '$where' => 'foswiki_d2n(this.FIELD.noatime.value)',
+              #          'FIELD.topic.value' => 'WebHome'
         }
-        );
+    );
 }
 
 sub test_hoist_d2n {
-    my $this        = shift;
-    my $s           = "d2n(name) < d2n('1998-11-23')";
+    my $this = shift;
+    my $s    = "d2n(name) < d2n('1998-11-23')";
 
-
-    $this->do_Assert( $s,
-        {
-           '$where' => "foswiki_d2n(this._topic) < foswiki_d2n('1998-11-23')"
-        },
-        {
-           '$where' => "foswiki_d2n(this._topic) < 911743200"
-        }
-        );
+    $this->do_Assert(
+        $s,
+        { '$where' => "foswiki_d2n(this._topic) < foswiki_d2n('1998-11-23')" },
+        { '$where' => "foswiki_d2n(this._topic) < 911743200" }
+    );
 }
-
 
 sub test_hoist_Item10323_1 {
-    my $this        = shift;
-    my $s           = "lc(TermGroup)=~'bio'";
+    my $this = shift;
+    my $s    = "lc(TermGroup)=~'bio'";
 
-
-    $this->do_Assert( $s,
+    $this->do_Assert(
+        $s,
         {
-               '$where' => "( /bio/.test(foswiki_toLowerCase(foswiki_getField(this, 'FIELD.TermGroup.value'))) )"
+            '$where' =>
+"( /bio/.test(foswiki_toLowerCase(foswiki_getField(this, 'FIELD.TermGroup.value'))) )"
         }
-        );
+    );
 }
+
 sub test_hoist_Item10323_2 {
-    my $this        = shift;
-    my $s           = "lc(TermGroup)=~lc('bio')";
+    my $this = shift;
+    my $s    = "lc(TermGroup)=~lc('bio')";
 
-
-    $this->do_Assert( $s,
+    $this->do_Assert(
+        $s,
         {
+
 #           '$where' => " (Regex('bio'.toLowerCase(), '').test(this.FIELD.TermGroup.value.toLowerCase())) "
 #find a special case
             'FIELD.TermGroup.value' => qr/(?i-xsm:.*bio.*)/i
         },
         {
-                      '$where' => '( /bio/.test(foswiki_toLowerCase(foswiki_getField(this, \'FIELD.TermGroup.value\'))) )'
+            '$where' =>
+'( /bio/.test(foswiki_toLowerCase(foswiki_getField(this, \'FIELD.TermGroup.value\'))) )'
         }
 
-        );
+    );
 }
 
 sub test_hoist_Item10323_2_not {
-    my $this        = shift;
-    my $s           = "not(lc(TermGroup)=~lc('bio'))";
+    my $this = shift;
+    my $s    = "not(lc(TermGroup)=~lc('bio'))";
 
-
-    $this->do_Assert( $s,
+    $this->do_Assert(
+        $s,
         {
+
 #          '$where' => "! (  ( (Regex('bio'.toLowerCase(), '').test(this.FIELD.TermGroup.value.toLowerCase())) )  ) "
-          'FIELD.TermGroup.value' => {
-                                       '$not' => qr/(?i-xsm:bio)/
-                                     }
+            'FIELD.TermGroup.value' => { '$not' => qr/(?i-xsm:bio)/ }
 
         },
         {
-                      '$where' => '! ( /bio/.test(foswiki_toLowerCase(foswiki_getField(this, \'FIELD.TermGroup.value\'))) )'
+            '$where' =>
+'! ( /bio/.test(foswiki_toLowerCase(foswiki_getField(this, \'FIELD.TermGroup.value\'))) )'
         }
-        );
+    );
 }
 
 sub test_hoist_Item10323 {
-    my $this        = shift;
-    my $s           = "form.name~'*TermForm' AND lc(Namespace)=~lc('ant') AND lc(TermGroup)=~lc('bio')";
+    my $this = shift;
+    my $s =
+"form.name~'*TermForm' AND lc(Namespace)=~lc('ant') AND lc(TermGroup)=~lc('bio')";
 
-
-    $this->do_Assert( $s,
+    $this->do_Assert(
+        $s,
         {
-          'FORM.name' => qr/(?-xism:^.*TermForm$)/,
+            'FORM.name' => qr/(?-xism:^.*TermForm$)/,
+
 #          '$where' => ' ( (Regex(\'ant\'.toLowerCase(), \'\').test(this.FIELD.Namespace.value.toLowerCase())) )  &&  ( (Regex(\'bio\'.toLowerCase(), \'\').test(this.FIELD.TermGroup.value.toLowerCase())) ) '
-          'FIELD.TermGroup.value' => qr/(?i-xsm:bio)/,
-          'FIELD.Namespace.value' => qr/(?i-xsm:ant)/
+            'FIELD.TermGroup.value' => qr/(?i-xsm:bio)/,
+            'FIELD.Namespace.value' => qr/(?i-xsm:ant)/
         },
         {
+
             #TODO: why is this js?
-                 '$where' => ' ( ( (( /^.*TermForm$/.test(foswiki_getField(this, \'FORM.name\')) )) )  &&  (( /ant/.test(foswiki_toLowerCase(foswiki_getField(this, \'FIELD.Namespace.value\'))) )) )  &&  (( /bio/.test(foswiki_toLowerCase(foswiki_getField(this, \'FIELD.TermGroup.value\'))) )) ' 
+            '$where' =>
+' ( ( (( /^.*TermForm$/.test(foswiki_getField(this, \'FORM.name\')) )) )  &&  (( /ant/.test(foswiki_toLowerCase(foswiki_getField(this, \'FIELD.Namespace.value\'))) )) )  &&  (( /bio/.test(foswiki_toLowerCase(foswiki_getField(this, \'FIELD.TermGroup.value\'))) )) '
         }
-        );
+    );
 }
 
 sub test_hoist_maths {
-    my $this        = shift;
-    my $s           = "(12-Namespace)<(24*60*60-5) AND (TermGroup DIV 12)>(WebScale*42.8)";
+    my $this = shift;
+    my $s =
+      "(12-Namespace)<(24*60*60-5) AND (TermGroup DIV 12)>(WebScale*42.8)";
 
-
-    $this->do_Assert( $s,
+    $this->do_Assert(
+        $s,
         {
-           '$where' =>  " ( ((12)-(foswiki_getField(this, 'FIELD.Namespace.value')) < (((24)*(60))*(60))-(5)) )  &&  ((foswiki_getField(this, 'FIELD.TermGroup.value'))/(12) > (foswiki_getField(this, 'FIELD.WebScale.value'))*(42.8)) "
+            '$where' =>
+" ( ((12)-(foswiki_getField(this, 'FIELD.Namespace.value')) < (((24)*(60))*(60))-(5)) )  &&  ((foswiki_getField(this, 'FIELD.TermGroup.value'))/(12) > (foswiki_getField(this, 'FIELD.WebScale.value'))*(42.8)) "
         },
         {
-           '$where' =>  " ( ((12)-(foswiki_getField(this, 'FIELD.Namespace.value')) < 86395) )  &&  ((foswiki_getField(this, 'FIELD.TermGroup.value'))/(12) > (foswiki_getField(this, 'FIELD.WebScale.value'))*(42.8)) "
-        }        );
-}
-sub test_hoist_concat {
-    my $this        = shift;
-    my $s           = "'asd' + 'qwe' = 'asdqwe'";
-
-
-    $this->do_Assert( $s,
-        {
-           '$where' => '(\'asd\')+(\'qwe\') == \'asdqwe\''
-        },
-        {
+            '$where' =>
+" ( ((12)-(foswiki_getField(this, 'FIELD.Namespace.value')) < 86395) )  &&  ((foswiki_getField(this, 'FIELD.TermGroup.value'))/(12) > (foswiki_getField(this, 'FIELD.WebScale.value'))*(42.8)) "
         }
-        );
+    );
 }
+
+sub test_hoist_concat {
+    my $this = shift;
+    my $s    = "'asd' + 'qwe' = 'asdqwe'";
+
+    $this->do_Assert( $s, { '$where' => '(\'asd\')+(\'qwe\') == \'asdqwe\'' },
+        {} );
+}
+
 #this one is a nasty perler-ism
 sub test_hoist_concat2 {
-    my $this        = shift;
-    my $s           = "'2' + '3' = '5'";
+    my $this = shift;
+    my $s    = "'2' + '3' = '5'";
 
-
-    $this->do_Assert( $s,
-        {
-           '$where' => '(2)+(3) == 5'
-        },
-        {}
-        );
+    $this->do_Assert( $s, { '$where' => '(2)+(3) == 5' }, {} );
 }
+
 sub test_hoist_concat3 {
-    my $this        = shift;
-    my $s           = "2 + 3 = 5";
+    my $this = shift;
+    my $s    = "2 + 3 = 5";
 
-
-    $this->do_Assert( $s,
-        {
-           '$where' => '(2)+(3) == 5'
-        },
-        {}
-        );
+    $this->do_Assert( $s, { '$where' => '(2)+(3) == 5' }, {} );
 }
+
 sub test_hoist_concat_false {
-    my $this        = shift;
-    my $s           = "'FALSEasd' + 'qwe' = 'asdqwe'";
+    my $this = shift;
+    my $s    = "'FALSEasd' + 'qwe' = 'asdqwe'";
 
-
-    $this->do_Assert( $s,
-        {
-           '$where' => '(\'FALSEasd\')+(\'qwe\') == \'asdqwe\''
-        },
-        {
-            '1' => '0'
-        }
-        );
+    $this->do_Assert(
+        $s,
+        { '$where' => '(\'FALSEasd\')+(\'qwe\') == \'asdqwe\'' },
+        { '1'      => '0' }
+    );
 }
+
 #this one is a nasty perler-ism
 sub test_hoist_concat2_false {
-    my $this        = shift;
-    my $s           = "'9' + '3' = '5'";
+    my $this = shift;
+    my $s    = "'9' + '3' = '5'";
 
-
-    $this->do_Assert( $s,
-        {
-           '$where' => '(9)+(3) == 5'
-        },
-        {
-                        '1' => '0'
-        }
-        );
+    $this->do_Assert( $s, { '$where' => '(9)+(3) == 5' }, { '1' => '0' } );
 }
+
 sub test_hoist_concat3_false {
-    my $this        = shift;
-    my $s           = "9 + 3 = 5";
+    my $this = shift;
+    my $s    = "9 + 3 = 5";
 
-
-    $this->do_Assert( $s,
-        {
-           '$where' => '(9)+(3) == 5'
-        },
-        {            '1' => '0'
-        }
-        );
+    $this->do_Assert( $s, { '$where' => '(9)+(3) == 5' }, { '1' => '0' } );
 }
 
 sub UNTRUE_test_hoist_shorthandPref {
-    my $this        = shift;
-    my $s           = "Red=12";
+    my $this = shift;
+    my $s    = "Red=12";
 
-
-    $this->do_Assert( $s,
+    $this->do_Assert(
+        $s,
         {
-                     'PREFERENCE.__RAW_ARRAY' => {
-                                        '$elemMatch' => {
-                                                          'value' => '12',
-                                                          'name' => 'Red'
-                                                        }
-                                      }
+            'PREFERENCE.__RAW_ARRAY' => {
+                '$elemMatch' => {
+                    'value' => '12',
+                    'name'  => 'Red'
+                }
+            }
         }
-        );
+    );
 }
+
 sub test_hoist_longhandPref {
-    my $this        = shift;
-    my $s           = "preferences[value=12].Red";
+    my $this = shift;
+    my $s    = "preferences[value=12].Red";
 
-
-    $this->do_Assert( $s,
+    $this->do_Assert(
+        $s,
         {
-                     'PREFERENCE.__RAW_ARRAY' => {
-                                        '$elemMatch' => {
-                                                          'value' => '12',
-                                                          'name' => 'Red'
-                                                        }
-                                      }
+            'PREFERENCE.__RAW_ARRAY' => {
+                '$elemMatch' => {
+                    'value' => '12',
+                    'name'  => 'Red'
+                }
+            }
         }
-        );
+    );
 }
+
 sub test_hoist_longhandField_value {
-    my $this        = shift;
-#see QueryTests::verify_meta_squabs_MongoDBQuery
-    my $s           = "fields[name='number'].value";
+    my $this = shift;
+
+    #see QueryTests::verify_meta_squabs_MongoDBQuery
+    my $s = "fields[name='number'].value";
+
 #TODO: argh! this actually should test that there is a value and that its non-undef/null?
 
     $this->do_Assert( $s,
-        {
-                     'FIELD.__RAW_ARRAY' => {
-                                        '$elemMatch' => {
-                                                          'name' => 'number'
-                                                        }
-                                      }
-        }
-        );
+        { 'FIELD.__RAW_ARRAY' => { '$elemMatch' => { 'name' => 'number' } } } );
 }
 
-
 sub test_hoist_longhand2Pref {
-    my $this        = shift;
-    my $s           = "preferences[value=12 AND name='Red']";
+    my $this = shift;
+    my $s    = "preferences[value=12 AND name='Red']";
 
-
-    $this->do_Assert( $s,
+    $this->do_Assert(
+        $s,
         {
-                     'PREFERENCE.__RAW_ARRAY' => {
-                                        '$elemMatch' => {
-                                                          'value' => '12',
-                                                          'name' => 'Red'
-                                                        }
-                                      }
+            'PREFERENCE.__RAW_ARRAY' => {
+                '$elemMatch' => {
+                    'value' => '12',
+                    'name'  => 'Red'
+                }
+            }
         }
-        );
+    );
 }
 
 sub BROKENtest_hoist_PrefPlusAccessor {
-    my $this        = shift;
-    my $s           = "preferences[value=12].name = 'Red'";
+    my $this = shift;
+    my $s    = "preferences[value=12].name = 'Red'";
 
-
-    $this->do_Assert( $s,
+    $this->do_Assert(
+        $s,
         {
-                     'PREFERENCE.__RAW_ARRAY' => {
-                                        '$elemMatch' => {
-                                                          'value' => '12',
-                                                          'name' => 'Red'
-                                                        }
-                                      }
+            'PREFERENCE.__RAW_ARRAY' => {
+                '$elemMatch' => {
+                    'value' => '12',
+                    'name'  => 'Red'
+                }
+            }
         }
-        );
+    );
 }
+
 sub BROKENtest_hoist_PrefPlusAccessor2 {
-    my $this        = shift;
-    my $s           = "preferences[name = 'Red'].value = 12";
+    my $this = shift;
+    my $s    = "preferences[name = 'Red'].value = 12";
 
-
-    $this->do_Assert( $s,
+    $this->do_Assert(
+        $s,
         {
-                     'PREFERENCE.__RAW_ARRAY' => {
-                                        '$elemMatch' => {
-                                                          'value' => '12',
-                                                          'name' => 'Red'
-                                                        }
-                                      }
+            'PREFERENCE.__RAW_ARRAY' => {
+                '$elemMatch' => {
+                    'value' => '12',
+                    'name'  => 'Red'
+                }
+            }
         }
-        );
+    );
 }
 
 #this is basically a SEARCH with both the topic= and excludetopic= set
 sub test_hoistTopicNameIncludeANDNOExclude {
     my $this = shift;
-    my $s =
-      "name='Item' AND (something=12 or something=999 or something=123)";
-
+    my $s = "name='Item' AND (something=12 or something=999 or something=123)";
 
     $this->do_Assert(
         $s,
 
         {
-          '$or' => [
-                     {
-                       'FIELD.something.value' => '12'
-                     },
-                     {
-                       'FIELD.something.value' => '999'
-                     },
-                     {
-                       'FIELD.something.value' => '123'
-                     }
-                   ],
-          '_topic' => 'Item'
-            }
+            '$or' => [
+                { 'FIELD.something.value' => '12' },
+                { 'FIELD.something.value' => '999' },
+                { 'FIELD.something.value' => '123' }
+            ],
+            '_topic' => 'Item'
+        }
     );
 }
 
@@ -1097,24 +993,17 @@ sub test_hoistTopicNameNOIncludeANDExclude {
     my $s =
       "(NOT(name='Item')) AND (something=12 or something=999 or something=123)";
 
-
     $this->do_Assert(
         $s,
 
         {
-          '$or' => [
-                     {
-                       'FIELD.something.value' => '12'
-                     },
-                     {
-                       'FIELD.something.value' => '999'
-                     },
-                     {
-                       'FIELD.something.value' => '123'
-                     }
-                   ],
-          '_topic' => { '$ne'=>'Item' }
-            }
+            '$or' => [
+                { 'FIELD.something.value' => '12' },
+                { 'FIELD.something.value' => '999' },
+                { 'FIELD.something.value' => '123' }
+            ],
+            '_topic' => { '$ne' => 'Item' }
+        }
     );
 }
 
@@ -1123,184 +1012,156 @@ sub test_hoistTopicNameNOIncludeANDExclude2 {
     my $s =
       "((name!='Item')) AND (something=12 or something=999 or something=123)";
 
-
     $this->do_Assert(
         $s,
 
         {
-          '$or' => [
-                     {
-                       'FIELD.something.value' => '12'
-                     },
-                     {
-                       'FIELD.something.value' => '999'
-                     },
-                     {
-                       'FIELD.something.value' => '123'
-                     }
-                   ],
-          '_topic' => { '$ne'=>'Item' }
-            }
+            '$or' => [
+                { 'FIELD.something.value' => '12' },
+                { 'FIELD.something.value' => '999' },
+                { 'FIELD.something.value' => '123' }
+            ],
+            '_topic' => { '$ne' => 'Item' }
+        }
     );
 }
 
 sub test_hoistTopicNameIncludeANDExclude {
     my $this = shift;
     my $s =
-      "(name='Item' AND NOT name='ItemTemplate') AND (something=12 or something=999 or something=123)";
-
+"(name='Item' AND NOT name='ItemTemplate') AND (something=12 or something=999 or something=123)";
 
     $this->do_Assert(
         $s,
 
         {
-          '$or' => [
-                     {
-                       'FIELD.something.value' => '12'
-                     },
-                     {
-                       'FIELD.something.value' => '999'
-                     },
-                     {
-                       'FIELD.something.value' => '123'
-                     }
-                   ],
-#          '$where' => '! ( this._topic == \'ItemTemplate\' ) ',
-          '_topic' => {
-                        '$nin' => [
-                                    'ItemTemplate'
-                                  ],
-                        '$in' => [
-                                   'Item'
-                                 ]
-                      }
+            '$or' => [
+                { 'FIELD.something.value' => '12' },
+                { 'FIELD.something.value' => '999' },
+                { 'FIELD.something.value' => '123' }
+            ],
+
+            #          '$where' => '! ( this._topic == \'ItemTemplate\' ) ',
+            '_topic' => {
+                '$nin' => [ 'ItemTemplate' ],
+                '$in'  => [ 'Item' ]
             }
+        }
     );
 }
 
 sub test_hoistTopicNameIncludeRegANDExclude {
     my $this = shift;
     my $s =
-      "(name~'Item*' AND NOT name='ItemTemplate') AND (something=12 or something=999 or something=123)";
-
+"(name~'Item*' AND NOT name='ItemTemplate') AND (something=12 or something=999 or something=123)";
 
     $this->do_Assert(
         $s,
 
         {
-          '$or' => [
-                     {
-                       'FIELD.something.value' => '12'
-                     },
-                     {
-                       'FIELD.something.value' => '999'
-                     },
-                     {
-                       'FIELD.something.value' => '123'
-                     }
-                   ],
-#          '$where' => '! ( this._topic == \'ItemTemplate\' ) ',
-          '_topic' => {
-                        '$nin' => [
-                                    'ItemTemplate'
-                                  ],
-                        '$in' => [
-                                   qr/(?-xism:^Item.*$)/
-                                 ]
-                      }
+            '$or' => [
+                { 'FIELD.something.value' => '12' },
+                { 'FIELD.something.value' => '999' },
+                { 'FIELD.something.value' => '123' }
+            ],
+
+            #          '$where' => '! ( this._topic == \'ItemTemplate\' ) ',
+            '_topic' => {
+                '$nin' => [ 'ItemTemplate' ],
+                '$in'  => [ qr/(?-xism:^Item.*$)/ ]
             }
+        }
     );
 }
+
 sub test_hoistTopicNameIncludeRegANDExcludeReg {
     my $this = shift;
     my $s =
-      "(name~'Item*' AND NOT name~'*Template') AND (something=12 or something=999 or something=123)";
-
+"(name~'Item*' AND NOT name~'*Template') AND (something=12 or something=999 or something=123)";
 
     $this->do_Assert(
         $s,
 
         {
-          '$or' => [
-                     {
-                       'FIELD.something.value' => '12'
-                     },
-                     {
-                       'FIELD.something.value' => '999'
-                     },
-                     {
-                       'FIELD.something.value' => '123'
-                     }
-                   ],
-#          '$where' => '! ( ( /^.*Template$/.test(this._topic) ) ) ',
-          '_topic' => {
-                        '$nin' => [
-                                    qr/(?-xism:^.*Template$)/
-                                  ],
-                        '$in' => [
-                                   qr/(?-xism:^Item.*$)/
-                                 ]
-                      }
+            '$or' => [
+                { 'FIELD.something.value' => '12' },
+                { 'FIELD.something.value' => '999' },
+                { 'FIELD.something.value' => '123' }
+            ],
+
+           #          '$where' => '! ( ( /^.*Template$/.test(this._topic) ) ) ',
+            '_topic' => {
+                '$nin' => [ qr/(?-xism:^.*Template$)/ ],
+                '$in'  => [ qr/(?-xism:^Item.*$)/ ]
             }
+        }
     );
 }
 
 sub test_hoist_dateAndRelationship {
     my $this = shift;
-    my $s = "form.name~'*RelationshipForm' AND ( (NOW - info.date) < (60*60*24*7))";
-
+    my $s =
+      "form.name~'*RelationshipForm' AND ( (NOW - info.date) < (60*60*24*7))";
 
     $this->do_Assert(
         $s,
 
         {
+
 #TODO: this is caused by the delay_function at line 360 of the hoister ('why')
 #          'FORM.name' => qr/(?-xism:^.*RelationshipForm$)/,
 #          '$where' => "(foswiki_getField(this, 'FIELD.NOW.value'))-(foswiki_getField(this, 'TOPICINFO.date')) < (((60)*(60))*(24))*(7)"
-            '$where' => ' ( (( /^.*RelationshipForm$/.test(foswiki_getField(this, \'FORM.name\')) )) )  &&  ((foswiki_getField(this, \'FIELD.NOW.value\'))-(foswiki_getField(this, \'TOPICINFO.date\')) < (((60)*(60))*(24))*(7)) '
+            '$where' =>
+' ( (( /^.*RelationshipForm$/.test(foswiki_getField(this, \'FORM.name\')) )) )  &&  ((foswiki_getField(this, \'FIELD.NOW.value\'))-(foswiki_getField(this, \'TOPICINFO.date\')) < (((60)*(60))*(24))*(7)) '
         },
         {
-            '$where' => ' ( (( /^.*RelationshipForm$/.test(foswiki_getField(this, \'FORM.name\')) )) )  &&  ((foswiki_getField(this, \'FIELD.NOW.value\'))-(foswiki_getField(this, \'TOPICINFO.date\')) < 604800) '
+            '$where' =>
+' ( (( /^.*RelationshipForm$/.test(foswiki_getField(this, \'FORM.name\')) )) )  &&  ((foswiki_getField(this, \'FIELD.NOW.value\'))-(foswiki_getField(this, \'TOPICINFO.date\')) < 604800) '
         }
     );
 }
 
 sub test_hoist_MultiAnd {
     my $this = shift;
+
 #ignore that this could be optimised out - we're testing that the hoister manages to get the logic reasonalbe'
     my $s = "(name = 'fest' AND name = 'test' AND name = 'pest')";
 
-
     $this->do_Assert(
         $s,
 
         {
-          '$where' => ' (this._topic == \'test\')  && this._topic == \'pest\'',
-          '_topic' => 'fest'
+            '$where' =>
+              ' (this._topic == \'test\')  && this._topic == \'pest\'',
+            '_topic' => 'fest'
         }
     );
+
 #   $this->assert_equals(
-#            " ( (this._topic == 'test')  && this._topic == 'pest')  && this._topic == 'fest'", 
- #           Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::convertToJavascript($mongoDBQuery)
- #           );
+#            " ( (this._topic == 'test')  && this._topic == 'pest')  && this._topic == 'fest'",
+#           Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::convertToJavascript($mongoDBQuery)
+#           );
 }
 
 sub test_hoist_not_in {
+
 #this tests a number of things, including that the 'not' actually goes around all the inner logic
     my $this = shift;
-    my $s = "not(name = 'fest' AND name = 'test' AND name = 'pest')";
-
+    my $s    = "not(name = 'fest' AND name = 'test' AND name = 'pest')";
 
     $this->do_Assert(
         $s,
 
         {
-          '$where' => '! (  ( (this._topic == \'test\')  && this._topic == \'pest\')  && this._topic == \'fest\' ) '
+            '$where' =>
+'! (  ( (this._topic == \'test\')  && this._topic == \'pest\')  && this._topic == \'fest\' ) '
+
 #            '$where' => {
 #                '$ne' => " ( (this._topic == 'test')  && this._topic == 'pest')  && this._topic == 'fest'"
 #            }
         }
     );
+
 #   $this->assert_equals(
 #            '! (  ( (this._topic == \'test\')  && this._topic == \'pest\')  && this._topic == \'fest\' ) ',
 #            Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::convertToJavascript($mongoDBQuery)
@@ -1310,13 +1171,14 @@ sub test_hoist_not_in {
 sub test_hoist_not_in2 {
     my $this = shift;
     my $s = "not(name = 'fest') AND not(name = 'test') AND not(name = 'pest')";
-#    my $s = "name != 'fest' AND name != 'test' AND name != 'pest'";
 
+    #    my $s = "name != 'fest' AND name != 'test' AND name != 'pest'";
 
     $this->do_Assert(
         $s,
 
         {
+
 #          '$where' => ' ( (! ( this._topic == \'fest\' ) )  &&  (! ( this._topic == \'test\' ) ) )  &&  (! ( this._topic == \'pest\' ) ) '
 #OR
 #          '_topic' => {
@@ -1330,18 +1192,14 @@ sub test_hoist_not_in2 {
 #                      }
 #OR
 #TODO: the OP_and gets confused sometimes
-          '$where' => 'this._topic != \'pest\'',
-          '_topic' => {
-                        '$nin' => [
-                                    'fest',
-                                    'test'
-                                  ]
-                      }
+            '$where' => 'this._topic != \'pest\'',
+            '_topic' => { '$nin' => [ 'fest', 'test' ] }
 
         }
     );
-#   $this->assert_equals(
-##            " ( (this._topic ! == 'fest' || this._topic ! == 'test' || this._topic ! == 'pest' ) ) ", 
+
+    #   $this->assert_equals(
+##            " ( (this._topic ! == 'fest' || this._topic ! == 'test' || this._topic ! == 'pest' ) ) ",
 ##            " ( ( (! ( this._topic == \'fest\' ) )  &&  (! ( this._topic == \'test\' ) ) )  &&  (! ( this._topic == \'pest\' ) ) ) ",
 #            " (this._topic != 'pest')  && ! ( this._topic == 'fest' || this._topic == 'test' ) ",
 #            Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::convertToJavascript($mongoDBQuery)
@@ -1350,184 +1208,184 @@ sub test_hoist_not_in2 {
 
 sub test_hoist_ref {
     my $this = shift;
-    my $s = "'AnotherTopic'/number = 12";
-
+    my $s    = "'AnotherTopic'/number = 12";
 
     $this->do_Assert(
         $s,
 
         {
-          '$where' => "(foswiki_getField(foswiki_getRef(\'localhost\', foswiki_getDatabaseName(this._web), \'current\', this._web, 'AnotherTopic'), 'FIELD.number.value')) == 12"
+            '$where' =>
+"(foswiki_getField(foswiki_getRef(\'localhost\', foswiki_getDatabaseName(this._web), \'current\', this._web, 'AnotherTopic'), 'FIELD.number.value')) == 12"
         },
-        {
-            '1' => '0'
-        }
+        { '1' => '0' }
     );
 }
 
 sub test_hoist_ref2 {
     my $this = shift;
-    my $s = "Source/info.rev!=SourceRev";
-#    my $s = "form.name='TaxonProfile.Relationships.RelationshipForm' AND Source/info.rev!=SourceRev";
+    my $s    = "Source/info.rev!=SourceRev";
 
+#    my $s = "form.name='TaxonProfile.Relationships.RelationshipForm' AND Source/info.rev!=SourceRev";
 
     $this->do_Assert(
         $s,
 
         {
-          '$where' => '(foswiki_getField(foswiki_getRef(\'localhost\', foswiki_getDatabaseName(this._web), \'current\', this._web, foswiki_getField(this, \'FIELD.Source.value\')), \'TOPICINFO.rev\')) != foswiki_getField(this, \'FIELD.SourceRev.value\')'
+            '$where' =>
+'(foswiki_getField(foswiki_getRef(\'localhost\', foswiki_getDatabaseName(this._web), \'current\', this._web, foswiki_getField(this, \'FIELD.Source.value\')), \'TOPICINFO.rev\')) != foswiki_getField(this, \'FIELD.SourceRev.value\')'
 
         }
     );
 }
+
 sub test_hoist_ref3 {
     my $this = shift;
-    my $s = "SourceRev>Source/info.rev";
+    my $s    = "SourceRev>Source/info.rev";
+
 #    my $s = "form.name='TaxonProfile.Relationships.RelationshipForm' AND Source/info.rev!=SourceRev";
 
-
     $this->do_Assert(
         $s,
 
         {
-          '$where' => 'foswiki_getField(this, \'FIELD.SourceRev.value\') > (foswiki_getField(foswiki_getRef(\'localhost\', foswiki_getDatabaseName(this._web), \'current\', this._web, foswiki_getField(this, \'FIELD.Source.value\')), \'TOPICINFO.rev\'))'
+            '$where' =>
+'foswiki_getField(this, \'FIELD.SourceRev.value\') > (foswiki_getField(foswiki_getRef(\'localhost\', foswiki_getDatabaseName(this._web), \'current\', this._web, foswiki_getField(this, \'FIELD.Source.value\')), \'TOPICINFO.rev\'))'
         }
     );
 }
+
 sub test_hoist_ref4 {
     my $this = shift;
-    my $s = "form.name='TaxonProfile.Relationships.RelationshipForm' AND Source/info.rev!=SourceRev";
-
+    my $s =
+"form.name='TaxonProfile.Relationships.RelationshipForm' AND Source/info.rev!=SourceRev";
 
     $this->do_Assert(
         $s,
 
         {
-          '$where' => ' ( (foswiki_getField(this, \'FORM.name\') == \'TaxonProfile.Relationships.RelationshipForm\') )  &&  ((foswiki_getField(foswiki_getRef(\'localhost\', foswiki_getDatabaseName(this._web), \'current\', this._web, foswiki_getField(this, \'FIELD.Source.value\')), \'TOPICINFO.rev\')) != foswiki_getField(this, \'FIELD.SourceRev.value\')) '
+            '$where' =>
+' ( (foswiki_getField(this, \'FORM.name\') == \'TaxonProfile.Relationships.RelationshipForm\') )  &&  ((foswiki_getField(foswiki_getRef(\'localhost\', foswiki_getDatabaseName(this._web), \'current\', this._web, foswiki_getField(this, \'FIELD.Source.value\')), \'TOPICINFO.rev\')) != foswiki_getField(this, \'FIELD.SourceRev.value\')) '
         }
     );
 }
+
 sub test_hoist_ref4_or {
     my $this = shift;
-    my $s = "form.name='TaxonProfile.Relationships.RelationshipForm' OR Source/info.rev!=SourceRev";
-
+    my $s =
+"form.name='TaxonProfile.Relationships.RelationshipForm' OR Source/info.rev!=SourceRev";
 
     $this->do_Assert(
         $s,
 
         {
-          '$where' => ' ( foswiki_getField(this, \'FORM.name\') == \'TaxonProfile.Relationships.RelationshipForm\' || (foswiki_getField(foswiki_getRef(\'localhost\', foswiki_getDatabaseName(this._web), \'current\', this._web, foswiki_getField(this, \'FIELD.Source.value\')), \'TOPICINFO.rev\')) != foswiki_getField(this, \'FIELD.SourceRev.value\') ) '
+            '$where' =>
+' ( foswiki_getField(this, \'FORM.name\') == \'TaxonProfile.Relationships.RelationshipForm\' || (foswiki_getField(foswiki_getRef(\'localhost\', foswiki_getDatabaseName(this._web), \'current\', this._web, foswiki_getField(this, \'FIELD.Source.value\')), \'TOPICINFO.rev\')) != foswiki_getField(this, \'FIELD.SourceRev.value\') ) '
         }
     );
 }
+
 sub test_hoist_ref4_longhand {
     my $this = shift;
-    my $s = "META:FORM.name='TaxonProfile.Relationships.RelationshipForm' AND Source/META:TOPICINFO.rev!=SourceRev";
-
+    my $s =
+"META:FORM.name='TaxonProfile.Relationships.RelationshipForm' AND Source/META:TOPICINFO.rev!=SourceRev";
 
     $this->do_Assert(
         $s,
 
         {
-          '$where' => ' ( (foswiki_getField(this, \'FORM.name\') == \'TaxonProfile.Relationships.RelationshipForm\') )  &&  ((foswiki_getField(foswiki_getRef(\'localhost\', foswiki_getDatabaseName(this._web), \'current\', this._web, foswiki_getField(this, \'FIELD.Source.value\')), \'TOPICINFO.rev\')) != foswiki_getField(this, \'FIELD.SourceRev.value\')) '
+            '$where' =>
+' ( (foswiki_getField(this, \'FORM.name\') == \'TaxonProfile.Relationships.RelationshipForm\') )  &&  ((foswiki_getField(foswiki_getRef(\'localhost\', foswiki_getDatabaseName(this._web), \'current\', this._web, foswiki_getField(this, \'FIELD.Source.value\')), \'TOPICINFO.rev\')) != foswiki_getField(this, \'FIELD.SourceRev.value\')) '
         }
     );
 }
+
 sub test_hoist_parent {
     my $this = shift;
-    my $s = "parent.name='WebHome'";
-
+    my $s    = "parent.name='WebHome'";
 
     $this->do_Assert(
         $s,
 
-        {
-            'TOPICPARENT.name' => 'WebHome'
-        }
+        { 'TOPICPARENT.name' => 'WebHome' }
     );
 }
+
 sub test_hoist_parent_longhand {
     my $this = shift;
-    my $s = "META:TOPICPARENT.name='WebHome'";
-
+    my $s    = "META:TOPICPARENT.name='WebHome'";
 
     $this->do_Assert(
         $s,
 
-        {
-            'TOPICPARENT.name' => 'WebHome'
-        }
+        { 'TOPICPARENT.name' => 'WebHome' }
     );
 }
 
 sub test_hoist_Item10515 {
     my $this = shift;
-    my $s = "lc(Firstname)=lc('JOHN')";
-
+    my $s    = "lc(Firstname)=lc('JOHN')";
 
     $this->do_Assert(
         $s,
 
         {
-          '$where' => 'foswiki_toLowerCase(foswiki_getField(this, \'FIELD.Firstname.value\')) == foswiki_toLowerCase(\'JOHN\')'
+            '$where' =>
+'foswiki_toLowerCase(foswiki_getField(this, \'FIELD.Firstname.value\')) == foswiki_toLowerCase(\'JOHN\')'
         },
         {
-          '$where' => 'foswiki_toLowerCase(foswiki_getField(this, \'FIELD.Firstname.value\')) == \'john\''
+            '$where' =>
+'foswiki_toLowerCase(foswiki_getField(this, \'FIELD.Firstname.value\')) == \'john\''
         }
     );
 }
 
 sub test_hoist_false {
     my $this = shift;
-    my $s = "0";
-
+    my $s    = "0";
 
     $this->do_Assert(
         $s,
 
         {
-            #TODO: this is not really a true query in mongo, and just happens to return nothing :/
-            '1' => '0'
-        }
+
+#TODO: this is not really a true query in mongo, and just happens to return nothing :/
+            '1' => '0' }
     );
 }
+
 sub test_hoist_explicit_false {
     my $this = shift;
-    my $s = "'0'";
-
+    my $s    = "'0'";
 
     $this->do_Assert(
         $s,
 
         {
-            #TODO: this is not really a true query in mongo, and just happens to return nothing :/
-            '1' => '0'
-        }
+
+#TODO: this is not really a true query in mongo, and just happens to return nothing :/
+            '1' => '0' }
     );
 }
 
 sub test_hoist_true {
     my $this = shift;
-    my $s = "1";
-
+    my $s    = "1";
 
     $this->do_Assert(
         $s,
 
-        {
-        }
+        {}
     );
 }
+
 sub test_hoist_explicit_true {
     my $this = shift;
-    my $s = "'1'";
-
+    my $s    = "'1'";
 
     $this->do_Assert(
         $s,
 
-        {
-        }
+        {}
     );
 }
 
@@ -1535,87 +1393,75 @@ sub test_hoist_explicit_true {
 #Item10520: in Sven's reading of System.QuerySearch, this should return no results, as there is no field of the name 'TestForm'
 sub test_hoist_ImplicitFormNameBUG {
     my $this = shift;
-    my $s = "FormName";
+    my $s    = "FormName";
 
     $this->do_Assert(
         $s,
 
-        {
-          '$where' => 'foswiki_getField(this, \'FIELD.FormName.value\')'
-        }
+        { '$where' => 'foswiki_getField(this, \'FIELD.FormName.value\')' }
     );
 }
+
 #'%SEARCH{"TestForm[name=\'Field1\'].value=\'A Field\'"'
 #TODO: this is a horridly complex way to say "Field1.value='A Field'"
 #but needs to be supported for other Meta attrs too
 sub test_formQuery3 {
     my $this = shift;
-    my $s = "TestForm[name=\'Field1\'].value=\'A Field\'";
+    my $s    = "TestForm[name=\'Field1\'].value=\'A Field\'";
 
     $this->do_Assert(
         $s,
 
-        {
-          '$where' => 'foswiki_getField(this, \'FIELD.FormName.value\')'
-        }
+        { '$where' => 'foswiki_getField(this, \'FIELD.FormName.value\')' }
     );
-     
-}
 
+}
 
 #this is just to show that the above eg should be 'ok'
 sub test_hoist_ExplicitFormNameCompre {
     my $this = shift;
-    my $s = "FormName = 'qwe'";
+    my $s    = "FormName = 'qwe'";
 
     $this->do_Assert(
         $s,
 
-        {
-              'FIELD.FormName.value' => 'qwe'
-        }
+        { 'FIELD.FormName.value' => 'qwe' }
     );
 }
 
 sub test_hoist_ref_TOPICINFO_longhand {
     my $this = shift;
-    my $s = "'Main.WebHome'/META:TOPICINFO.date";
-
+    my $s    = "'Main.WebHome'/META:TOPICINFO.date";
 
     $this->do_Assert(
         $s,
         {
-            '$where' => '(foswiki_getField(foswiki_getRef(\'localhost\', foswiki_getDatabaseName(this._web), \'current\', this._web, \'Main.WebHome\'), \'TOPICINFO.date\'))'
+            '$where' =>
+'(foswiki_getField(foswiki_getRef(\'localhost\', foswiki_getDatabaseName(this._web), \'current\', this._web, \'Main.WebHome\'), \'TOPICINFO.date\'))'
         },
-        {
-        '$where' => 1231502400
-        }
+        { '$where' => 1231502400 }
     );
 }
+
 sub test_hoist_ref_TOPICINFO_longhand_plus_WEBHome {
     my $this = shift;
-    my $s = "(not (name = 'AnotherTopic' or name = 'WebHome' or name = 'BarnicalBob')) and 'Main.WebChanges'/META:TOPICINFO.date";
-
+    my $s =
+"(not (name = 'AnotherTopic' or name = 'WebHome' or name = 'BarnicalBob')) and 'Main.WebChanges'/META:TOPICINFO.date";
 
     $this->do_Assert(
         $s,
 
         {
-            '$where' => " ( ((! ( this._topic == 'AnotherTopic' || this._topic == 'WebHome' || this._topic == 'BarnicalBob' ) )) )  &&  ((foswiki_getField(foswiki_getRef('localhost', foswiki_getDatabaseName(this._web), 'current', this._web, 'Main.WebChanges'), 'TOPICINFO.date'))) "
+            '$where' =>
+" ( ((! ( this._topic == 'AnotherTopic' || this._topic == 'WebHome' || this._topic == 'BarnicalBob' ) )) )  &&  ((foswiki_getField(foswiki_getRef('localhost', foswiki_getDatabaseName(this._web), 'current', this._web, 'Main.WebChanges'), 'TOPICINFO.date'))) "
         },
         {
-          '$where' => 1231502400,
-          '$nor' => [
-                      {
-                        '_topic' => 'AnotherTopic'
-                      },
-                      {
-                        '_topic' => 'WebHome'
-                      },
-                      {
-                        '_topic' => 'BarnicalBob'
-                      }
-                    ]
+            '$where' => 1231502400,
+            '$nor'   => [
+                { '_topic' => 'AnotherTopic' },
+                { '_topic' => 'WebHome' },
+                { '_topic' => 'BarnicalBob' }
+              ]
 
         }
     );
@@ -1623,62 +1469,56 @@ sub test_hoist_ref_TOPICINFO_longhand_plus_WEBHome {
 
 sub test_hoist_ref_TOPICINFO_longhand_plus {
     my $this = shift;
-    my $s = "(not (name = 'AnotherTopic' or name = 'WebHome' or name = 'BarnicalBob')) and 'AnotherTopic'/META:TOPICINFO.date";
+    my $s =
+"(not (name = 'AnotherTopic' or name = 'WebHome' or name = 'BarnicalBob')) and 'AnotherTopic'/META:TOPICINFO.date";
 
     #just to make sure that this topic actually does not exist.
-    $this->assert(not Foswiki::Func::topicExists($this->{test_web}, 'AnotherTopic'));
+    $this->assert(
+        not Foswiki::Func::topicExists( $this->{test_web}, 'AnotherTopic' ) );
 
     $this->do_Assert(
         $s,
 
         {
-            '$where' => " ( ((! ( this._topic == 'AnotherTopic' || this._topic == 'WebHome' || this._topic == 'BarnicalBob' ) )) )  &&  ((foswiki_getField(foswiki_getRef('localhost', foswiki_getDatabaseName(this._web), 'current', this._web, 'AnotherTopic'), 'TOPICINFO.date'))) "
+            '$where' =>
+" ( ((! ( this._topic == 'AnotherTopic' || this._topic == 'WebHome' || this._topic == 'BarnicalBob' ) )) )  &&  ((foswiki_getField(foswiki_getRef('localhost', foswiki_getDatabaseName(this._web), 'current', this._web, 'AnotherTopic'), 'TOPICINFO.date'))) "
         },
         {
-          '1' => '0',   #our false
-          '$nor' => [
-                      {
-                        '_topic' => 'AnotherTopic'
-                      },
-                      {
-                        '_topic' => 'WebHome'
-                      },
-                      {
-                        '_topic' => 'BarnicalBob'
-                      }
-                    ]
+            '1'    => '0',    #our false
+            '$nor' => [
+                { '_topic' => 'AnotherTopic' },
+                { '_topic' => 'WebHome' },
+                { '_topic' => 'BarnicalBob' }
+            ]
         }
     );
 }
 
 sub test_hoist_CREATEINFO_longhand {
     my $this = shift;
-    my $s = "META:CREATEINFO.date > 12346787";
-
+    my $s    = "META:CREATEINFO.date > 12346787";
 
     $this->do_Assert(
         $s,
 
-        {
-            'CREATEINFO.date' => {'$gt' => 12346787 }
-        }
+        { 'CREATEINFO.date' => { '$gt' => 12346787 } }
     );
 }
 
 sub test_hoist_ref_CREATEINFO_longhand {
     my $this = shift;
-    my $s = "'AnotherTopic'/META:CREATEINFO.date";
-
+    my $s    = "'AnotherTopic'/META:CREATEINFO.date";
 
     $this->do_Assert(
         $s,
 
         {
-            '$where' => '(foswiki_getField(foswiki_getRef(\'localhost\', foswiki_getDatabaseName(this._web), \'current\', this._web, \'AnotherTopic\'), \'CREATEINFO.date\'))'
+            '$where' =>
+'(foswiki_getField(foswiki_getRef(\'localhost\', foswiki_getDatabaseName(this._web), \'current\', this._web, \'AnotherTopic\'), \'CREATEINFO.date\'))'
         },
+
         #that topic does not exist, so we're false.
-        { '$where' => '0'
-        }
+        { '$where' => '0' }
     );
 }
 

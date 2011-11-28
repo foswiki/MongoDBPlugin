@@ -34,29 +34,32 @@ use constant MONITOR_DETAIL => 0;
 
 sub hoist {
     my ( $node, $indent ) = @_;
-    
+
     #yes, the simplifier will send an undef parse tree for a query="'1'"
     #ASSERT(defined($node)) if DEBUG;
 
-    print STDERR "HoistMongoDB::hoist from: ", (defined($node)?$node->stringify():'undef'), "\n"
-    #print STDERR "HoistMongoDB::hoist from: ", Dumper($node), "\n"
+    print STDERR "HoistMongoDB::hoist from: ",
+      ( defined($node) ? $node->stringify() : 'undef' ), "\n"
+
+      #print STDERR "HoistMongoDB::hoist from: ", Dumper($node), "\n"
       if MONITOR
           or MONITOR_DETAIL;
 
-    if (not defined($node) or ref( $node->{op} ) eq '') {
-        return {} if (not defined($node)) ; #undef == true?
-        return {} if (not defined($node->{params}[0])) ; #undef == true?
-        return {} if ("$node->{params}[0]" eq '1') ;
-        return {'1' => '0'} if ("$node->{params}[0]" eq '0') ;
+    if ( not defined($node) or ref( $node->{op} ) eq '' ) {
+        return {} if ( not defined($node) );                   #undef == true?
+        return {} if ( not defined( $node->{params}[0] ) );    #undef == true?
+        return {} if ( "$node->{params}[0]" eq '1' );
+        return { '1' => '0' } if ( "$node->{params}[0]" eq '0' );
+
         #print STDERR "r($node->{params}[0])".Data::Dumper($node)."\n";
         #too naive - a SEARCH{"FieldName" gets tripped up by isTrue :(
         #TODO: mmm, maybe use the op-type?
-#        if (Foswiki::Func::isTrue($node->{params}[0])) {
-#            return {};
-#        } else {
-#            #TODO: or return false, or undef?
-#            return {'1' => '0'};
-#        }
+        #        if (Foswiki::Func::isTrue($node->{params}[0])) {
+        #            return {};
+        #        } else {
+        #            #TODO: or return false, or undef?
+        #            return {'1' => '0'};
+        #        }
     }
 
 #TODO: use IxHash to keep the hash order - _some_ parts of queries are order sensitive
@@ -84,6 +87,7 @@ sub hoist {
 
     if ( ref($mongoDBQuery) eq '' ) {
         return { '$where' => convertToJavascript($mongoDBQuery) };
+
         #node simplified() to hell?
         return { '$where' => $mongoDBQuery };
 
@@ -113,7 +117,8 @@ sub hoist {
 #one reason for doing it here, after we've made the mongo queries, is that later, they may implement it and we can remove the kludge
         kludge($mongoDBQuery);
     }
-    $mongoDBQuery->{'$where'} = "".$mongoDBQuery->{'$where'} if (defined($mongoDBQuery->{'$where'}));
+    $mongoDBQuery->{'$where'} = "" . $mongoDBQuery->{'$where'}
+      if ( defined( $mongoDBQuery->{'$where'} ) );
 
     return $mongoDBQuery;
 }
@@ -475,7 +480,7 @@ my %js_func_map = (
 
 sub convertFunction {
     my ( $value, $key ) = @_;
-    
+
     if (   ( $key eq '#lc' )
         or ( $key eq '#uc' )
         or ( $key eq '#length' )
@@ -502,10 +507,10 @@ sub convertFunction {
         my $ref =
 'foswiki_getRef(\'localhost\', foswiki_getDatabaseName(this._web), \'current\', this._web, '
           . convertStringToJS( $$value[0] ) . ')';
-          
-        ASSERT($addr =~ /this/) if DEBUG
-          
-        $addr =~ s/this/$ref/;
+
+        ASSERT( $addr =~ /this/ ) if DEBUG
+
+              $addr =~ s/this/$ref/;
         return $addr;
     }
     if (   ( $key eq '#div' )
@@ -543,7 +548,7 @@ sub convertStringToJS {
     return convertToJavascript($string) if ( ref($string) eq 'HASH' );
 
     #foswiki special constants: undefined, now.. ?
-    return $string if ($string eq 'null');
+    return $string if ( $string eq 'null' );
 
     return $string if ( $string =~ /^'.*'^/ );
 
@@ -582,9 +587,10 @@ sub convertStringToJS {
 sub convertToJavascript {
     my $node      = shift;
     my $statement = '';
-    
-    if (ref($node) eq '') {
-        #support annoying incomplete, non-boolean queries like SEARCH{"FieldName"
+
+    if ( ref($node) eq '' ) {
+
+       #support annoying incomplete, non-boolean queries like SEARCH{"FieldName"
         return convertStringToJS($node);
     }
 
@@ -764,7 +770,7 @@ sub convertToJavascript {
         }
     }
     print STDERR "----returning $statement\n" if MONITOR;
-    $statement = "$statement";  #make sure we're a string at this point
+    $statement = "$statement";    #make sure we're a string at this point
     return $statement;
 }
 
@@ -861,22 +867,24 @@ use Assert;
 sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
-    
-    #print STDERR "OP_eq: $node => ".Dumper($node)."\n" if Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::MONITOR;
-    
+
+#print STDERR "OP_eq: $node => ".Dumper($node)."\n" if Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::MONITOR;
+
     ASSERT( ref($node) eq 'Foswiki::Query::Node' );
     ASSERT( ref( $node->{hoisted0} ) eq '' );
 
     #ASSERT(ref($node->{hoisted1}) eq '');
 
     ASSERT( $node->{op}->{name} eq '=' ) if DEBUG;
-    
-    #TODO: i think there are other cases that will pop up as 'needs js'
-    #TODO: see above, where we should 'optimise' so that if there is a constant on the lhs, and a meta feild on the rhs, that we swap..
+
+#TODO: i think there are other cases that will pop up as 'needs js'
+#TODO: see above, where we should 'optimise' so that if there is a constant on the lhs, and a meta feild on the rhs, that we swap..
     if (
-        ($node->{hoisted0} eq 'null') or 
-        ($node->{hoisted1} eq 'null')       #TODO: need to find the mongoquery way to test for undefined.
-       ) {
+        ( $node->{hoisted0} eq 'null' )
+        or ( $node->{hoisted1} eq 'null'
+        )    #TODO: need to find the mongoquery way to test for undefined.
+      )
+    {
         return {
             '$where' =>
               Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::convertToJavascript(
@@ -884,7 +892,7 @@ sub hoistMongoDB {
               )
         };
     }
-    
+
     return { $node->{hoisted0} => $node->{hoisted1} };
 }
 
@@ -915,7 +923,7 @@ sub hoistMongoDB {
     my $rhs = quotemeta( $node->{hoisted1} );
     $rhs =~ s/\\\?/./g;
     $rhs =~ s/\\\*/.*/g;
-    
+
     if ( defined( $node->{insensitive} ) ) {
         $rhs = qr/^$rhs$/im;
     }
@@ -983,11 +991,11 @@ use Assert;
 
 #mongo specific aliases
 our %aliases = (
-    name => '_topic',
-    web  => '_web',
-    text => '_text',
+    name      => '_topic',
+    web       => '_web',
+    text      => '_text',
     undefined => 'null',
-    now => time()
+    now       => time()
 );
 
 sub mapAlias {
@@ -1071,17 +1079,18 @@ sub hoistMongoDB {
         else {
             $lhs = $node->{params}[0]->{params}[0];
         }
-        
-#the $node->simplify() makes a non-node mess of the parse tree
-#lets see if its a hash, and the rhs is a key..
-if (ref( $lhs ) eq 'HASH') {
-    return $lhs->{$rhs} if (defined($lhs->{$rhs}));
-    return {'1'=>'0'};   #dereferencing an undef is FALSE.. (ie 'NonExistantTopic'/info.date == {}.date
-}
+
+        #the $node->simplify() makes a non-node mess of the parse tree
+        #lets see if its a hash, and the rhs is a key..
+        if ( ref($lhs) eq 'HASH' ) {
+            return $lhs->{$rhs} if ( defined( $lhs->{$rhs} ) );
+            return { '1' => '0'
+            }; #dereferencing an undef is FALSE.. (ie 'NonExistantTopic'/info.date == {}.date
+        }
 
         print STDERR "-------------------------------- hoist OP_dot("
-          . ref( $lhs ) . ", "
-          . ref( $rhs ) . ", "
+          . ref($lhs) . ", "
+          . ref($rhs) . ", "
           . ref( $node->{op} ) . ", "
           . Data::Dumper::Dumper($node) . ")\n"
           if Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::MONITOR;
@@ -1402,23 +1411,26 @@ sub hoistMongoDB {
     ASSERT( ref($node) eq 'Foswiki::Query::Node' );
 
     my $mongoQuery;
-    
+
     my @elements;
     my $i = 0;
-    while (defined($node->{'hoisted'.$i})) {
-        my $elem = $node->{'hoisted'.$i};
-        if (ref($elem) eq '') {
-            push(@elements, {'$where' => $elem});
-        } elsif (defined($elem->{'$or'})) {
+    while ( defined( $node->{ 'hoisted' . $i } ) ) {
+        my $elem = $node->{ 'hoisted' . $i };
+        if ( ref($elem) eq '' ) {
+            push( @elements, { '$where' => $elem } );
+        }
+        elsif ( defined( $elem->{'$or'} ) ) {
+
             #this might be un-necessary in the new nary node world
             my $ors = $elem->{'$or'};
-            push(@elements, @$ors);
-        } else {
-            push(@elements, $elem);
+            push( @elements, @$ors );
+        }
+        else {
+            push( @elements, $elem );
         }
         $i++;
     }
-    return {'$or' => \@elements};
+    return { '$or' => \@elements };
 }
 
 package Foswiki::Query::OP_not;

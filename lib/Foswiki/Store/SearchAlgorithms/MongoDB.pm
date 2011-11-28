@@ -24,8 +24,9 @@ BEGIN {
     $Foswiki::cfg{Plugins}{MongoDBPlugin}{Enabled}             = 1;
     $Foswiki::cfg{Plugins}{MongoDBPlugin}{EnableOnSaveUpdates} = 1;
     print STDERR "****** starting MongoDBPlugin..\n" if MONITOR;
-    
-    $Foswiki::Plugins::SESSION->{store}->setListenerPriority('Foswiki::Plugins::MongoDBPlugin::Listener', 1);
+
+    $Foswiki::Plugins::SESSION->{store}
+      ->setListenerPriority( 'Foswiki::Plugins::MongoDBPlugin::Listener', 1 );
 
 }
 
@@ -181,10 +182,10 @@ sub _webQuery {
         #TODO: make a few more unit tests with ^ in them
         #(adding 'm' to the options isn't it
         $token =~ s/\^%META/%META/g;
-        
+
         #turns out that the escaping of pipe is also off
         $token =~ s/\\\|/\\\\\|/g;
-        
+
         # scope can be 'topic' (default), 'text' or "all"
         # scope='topic', e.g. Perl search on topic name:
         if ( $options->{'scope'} ne 'text' ) {
@@ -297,25 +298,34 @@ sub _webQuery {
         $ixhQuery->Push( '$where' => $mongoJavascriptFunc );
         print STDERR "------$mongoJavascriptFunc\n" if MONITOR;
     }
-        
-    if (not $session->{users}->isAdmin( $session->{user} )) {
+
+    if ( not $session->{users}->isAdmin( $session->{user} ) ) {
+
         #add ACL filter
-        my $userIsIn = Foswiki::Plugins::MongoDBPlugin::getACLProfilesFor($session->{user}, $web, $session);
+        my $userIsIn =
+          Foswiki::Plugins::MongoDBPlugin::getACLProfilesFor( $session->{user},
+            $web, $session );
         ### ((_ACLProfile_ALLOWTOPICVIEW: $in(userIsIn, UNDEF)) AND (_ACLProfile.DENYTOPICVIEW: $NOTin(userIsIn)))
-        #TODO: this is incorrect, it needs to also have the logic for the web default (and be inverted if the web DENYs the user..
- 	    if ($session->access->haveAccess('VIEW', $session->{user}, $web)) { 
-	 	        #TODO: potential BUG - if user is in both allow and deny, the algo chooses allow 
-	 	        #$mongoQuery->{_ACLProfile_ALLOWTOPICVIEW} = {'$in' => [@$userIsIn, 'UNDEFINED']}; 
-	 	        #$mongoQuery->{_ACLProfile_DENYTOPICVIEW} = {'$nin' => $userIsIn}; 
-	 	        $ixhQuery->Push( '_ACLProfile_ALLOWTOPICVIEW' => {'$in' => [@$userIsIn, 'UNDEFINED']} ); 
-	 	        $ixhQuery->Push( '{_ACLProfile_DENYTOPICVIEW}' => {'$nin' => $userIsIn} ); 
-	 	    } else { 
-	 	        #user is already denied, so we only get view access _if_ the user is specifically ALLOWed 
-	 	        #$mongoQuery->{_ACLProfile_ALLOWTOPICVIEW} = {'$in' => [@$userIsIn]}; 
-	 	        $ixhQuery->Push( '_ACLProfile_ALLOWTOPICVIEW' => {'$in' => $userIsIn} ); 
-	 	    } 
+#TODO: this is incorrect, it needs to also have the logic for the web default (and be inverted if the web DENYs the user..
+        if ( $session->access->haveAccess( 'VIEW', $session->{user}, $web ) ) {
+
+#TODO: potential BUG - if user is in both allow and deny, the algo chooses allow
+#$mongoQuery->{_ACLProfile_ALLOWTOPICVIEW} = {'$in' => [@$userIsIn, 'UNDEFINED']};
+#$mongoQuery->{_ACLProfile_DENYTOPICVIEW} = {'$nin' => $userIsIn};
+            $ixhQuery->Push( '_ACLProfile_ALLOWTOPICVIEW' =>
+                  { '$in' => [ @$userIsIn, 'UNDEFINED' ] } );
+            $ixhQuery->Push(
+                '{_ACLProfile_DENYTOPICVIEW}' => { '$nin' => $userIsIn } );
+        }
+        else {
+
+#user is already denied, so we only get view access _if_ the user is specifically ALLOWed
+#$mongoQuery->{_ACLProfile_ALLOWTOPICVIEW} = {'$in' => [@$userIsIn]};
+            $ixhQuery->Push(
+                '_ACLProfile_ALLOWTOPICVIEW' => { '$in' => $userIsIn } );
+        }
     }
-    
+
     #limit, skip, sort_by
     my $SortDirection = Foswiki::isTrue( $options->{reverse} ) ? -1 : 1;
 

@@ -156,8 +156,7 @@ sub _update {
       Foswiki::Func::isTrue( $query->param('recurse'), ( $webParam eq 'all' ) );
     my $importTopicRevisions =
       Foswiki::Func::isTrue( $query->param('revision'), 1 );
-    my $fork =
-      Foswiki::Func::isTrue( $query->param('fork'), 0 );
+    my $fork = Foswiki::Func::isTrue( $query->param('fork'), 0 );
 
     my @webNames;
     if ($recurse) {
@@ -175,12 +174,15 @@ sub _update {
         $web =~ s/^\///;
         if ($fork) {
             my @topicList = Foswiki::Func::getTopicList($web);
-            print STDERR "FORKING a new /MongoDBPlugin/update for $web ($#topicList) -revision=$importTopicRevisions\n";
-            my $cmd = "time ./rest /MongoDBPlugin/update -updateweb=$web  -revision=$importTopicRevisions -recurse=0";
+            print STDERR
+"FORKING a new /MongoDBPlugin/update for $web ($#topicList) -revision=$importTopicRevisions\n";
+            my $cmd =
+"time ./rest /MongoDBPlugin/update -updateweb=$web  -revision=$importTopicRevisions -recurse=0";
             $cmd =~ /^(.*$)/;
             $cmd = $1;
             print STDERR `$cmd 2>&1`;
-        } else {
+        }
+        else {
             $result .= updateWebCache( $web, $importTopicRevisions );
         }
 
@@ -198,10 +200,12 @@ sub updateWebCache {
 
     my $query   = Foswiki::Func::getCgiQuery();
     my $session = $Foswiki::Plugins::SESSION;
-    
-    if (not getMongoDB()->databaseNameSafeToUse($web)) {
-        print STDERR "ERROR: sorry, $web cannot be cached to MongoDB as there is another web with the same spelling, but different case already cached\n";
-        return "ERROR: sorry, $web cannot be cached to MongoDB as there is another web with the same spelling, but different case already cached\n";
+
+    if ( not getMongoDB()->databaseNameSafeToUse($web) ) {
+        print STDERR
+"ERROR: sorry, $web cannot be cached to MongoDB as there is another web with the same spelling, but different case already cached\n";
+        return
+"ERROR: sorry, $web cannot be cached to MongoDB as there is another web with the same spelling, but different case already cached\n";
     }
 
 #we need to deactivate any listeners :/ () at least stop the loadTopic one from triggering
@@ -212,7 +216,8 @@ sub updateWebCache {
     _updateDatabase( $session, $web, $query );
 
     my @topicList = Foswiki::Func::getTopicList($web);
-    print STDERR "start web: $web ($#topicList) -> ".getMongoDB()->getDatabaseName($web)."\n";
+    print STDERR "start web: $web ($#topicList) -> "
+      . getMongoDB()->getDatabaseName($web) . "\n";
 
     my $count     = 0;
     my $rev_count = 0;
@@ -460,8 +465,8 @@ sub _updateTopic {
 ### ((_ACLProfile.ALLOWTOPICVIEW: $in(userIsIn, UNDEF)) AND (_ACLProfile.DENYTOPICVIEW: $NOTin(userIsIn)))
 ### this is not worth doing for the other ACL's, as they're not used implicitly for searches.... so i'm better off making an ACLSEarchProfiles field extra..
 sub getACLProfilesFor {
-    my $cUID = shift;
-    my $web  = shift;
+    my $cUID    = shift;
+    my $web     = shift;
     my $session = shift || $Foswiki::Func::SESSION;
 
     my %userIsIn;
@@ -469,22 +474,28 @@ sub getACLProfilesFor {
     #my $collection = getMongoDB()->_getCollection($web, 'ACLProfiles');
     my $cursor = getMongoDB()->query( $web, 'ACLProfiles', {} );
     while ( my $obj = $cursor->next ) {
+
         #{_id=>, list=>, ALLOWTOPICVIEW=> DENYTOPICVIEW=>}
         foreach my $mode (qw/ALLOWTOPICVIEW DENYTOPICVIEW/) {
             if ( defined( $obj->{$mode} ) ) {
-                  if ( $session->{users}->isInUserList( $cUID, [$obj->{list}] ) ) {
-                        $userIsIn{ $obj->{_id} } = 1;
-                        #print STDERR "$cUID is in ".$obj->{list}."\n";
-                    } else {
-                        #print STDERR "$cUID is not in ".$obj->{list}."\n";
-                    }
+                if (
+                    $session->{users}->isInUserList( $cUID, [ $obj->{list} ] ) )
+                {
+                    $userIsIn{ $obj->{_id} } = 1;
+
+                    #print STDERR "$cUID is in ".$obj->{list}."\n";
+                }
+                else {
+
+                    #print STDERR "$cUID is not in ".$obj->{list}."\n";
+                }
             }
         }
     }
     my @list = keys(%userIsIn);
-    
+
     #print STDERR "---- getACLProfilesFor($cUID, $web) ".join(',',@list)."\n";
-    
+
     return \@list;
 }
 

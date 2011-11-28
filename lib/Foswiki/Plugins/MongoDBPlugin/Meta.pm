@@ -82,27 +82,44 @@ sub reload {
     }
     $this->{FILEATTACHMENT} = [];
 
-
-    return unless (Foswiki::Plugins::MongoDBPlugin::getMongoDB->databaseExists($this->{_web}));
+    return
+      unless (
+        Foswiki::Plugins::MongoDBPlugin::getMongoDB->databaseExists(
+            $this->{_web}
+        )
+      );
 
     my $collection =
-          Foswiki::Plugins::MongoDBPlugin::getMongoDB->_getCollection(
-            $this->{_web}, 'current' );
+      Foswiki::Plugins::MongoDBPlugin::getMongoDB->_getCollection(
+        $this->{_web}, 'current' );
 
     my $data;
-    if ( defined($rev) and
-        ( defined( $Foswiki::cfg{Plugins}{MongoDBPlugin}{ExperimentalCode} )
-        and $Foswiki::cfg{Plugins}{MongoDBPlugin}{ExperimentalCode} )
-        )
+    if (
+        defined($rev)
+        and ( defined( $Foswiki::cfg{Plugins}{MongoDBPlugin}{ExperimentalCode} )
+            and $Foswiki::cfg{Plugins}{MongoDBPlugin}{ExperimentalCode} )
+      )
     {
         $data = $collection->find_one(
-            { _web => $this->{_web}, _topic => $this->{_topic}, 'TOPICINFO.rev' => int($rev) } );
-         #print STDERR "----- meta->reload(".join(',', ($this->{_web}, $this->{_topic}, $rev))."\n";
+            {
+                _web            => $this->{_web},
+                _topic          => $this->{_topic},
+                'TOPICINFO.rev' => int($rev)
+            }
+        );
+
+#print STDERR "----- meta->reload(".join(',', ($this->{_web}, $this->{_topic}, $rev))."\n";
     }
     else {
         $data = $collection->find_one(
-            { _web => $this->{_web}, _topic => $this->{_topic}, _history => {'$exists' => 0}} );
-         #print STDERR "----- meta->reload(".join(',', ($this->{_web}, $this->{_topic}, 'norev'))."\n";
+            {
+                _web     => $this->{_web},
+                _topic   => $this->{_topic},
+                _history => { '$exists' => 0 }
+            }
+        );
+
+#print STDERR "----- meta->reload(".join(',', ($this->{_web}, $this->{_topic}, 'norev'))."\n";
     }
 
     $this->loadFromBSONData($data);
@@ -147,7 +164,7 @@ sub loadFromBSONData {
 
     $this->{_loadedRev} =
       Foswiki::Store::cleanUpRevID( $this->{TOPICINFO}[0]->{version} );
-      
+
     $this->{_getRev1Info}->{rev1info} = $data->{'CREATEINFO'};
     delete $this->{CREATEINFO};
 
