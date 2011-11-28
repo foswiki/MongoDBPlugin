@@ -470,7 +470,7 @@ sub getACLProfilesFor {
     my $cursor = getMongoDB()->query( $web, 'ACLProfiles', {} );
     while ( my $obj = $cursor->next ) {
         #{_id=>, list=>, ALLOWTOPICVIEW=> DENYTOPICVIEW=>}
-        foreach my $mode qw/ALLOWTOPICVIEW DENYTOPICVIEW/ {
+        foreach my $mode (qw/ALLOWTOPICVIEW DENYTOPICVIEW/) {
             if ( defined( $obj->{$mode} ) ) {
                   if ( $session->{users}->isInUserList( $cUID, [$obj->{list}] ) ) {
                         $userIsIn{ $obj->{_id} } = 1;
