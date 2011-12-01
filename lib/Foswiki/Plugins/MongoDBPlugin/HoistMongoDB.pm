@@ -12,6 +12,8 @@ package Foswiki::Plugins::MongoDBPlugin::HoistMongoDB;
 
 use strict;
 use warnings;
+use 5.010;    # For regexp_pattern
+use re();
 
 use Foswiki::Infix::Node ();
 use Foswiki::Query::Node ();
@@ -744,10 +746,14 @@ sub convertToJavascript {
                   . ref($value) . "\n"
                   if MONITOR;
                 if ( ref($value) eq 'Regexp' ) {
-                    $value =~
-                      /\(\?[xism]*-[xism]*:(.*)\)/;    #TODO: er, regex options?
-                    $statement .=
-                      "( /$1/.test(" . convertStringToJS($js_key) . ") )";
+                    my ( $pattern, $mods ) = re::regexp_pattern($value);
+                    ASSERT(
+                        $mods =~ /^[igm]*$/,
+"Encountered Regexp modifiers in pattern: '$value' not supported in Javascript"
+                    );
+                    $value = $pattern;
+                    $statement .= "( /$value/$mods.test("
+                      . convertStringToJS($js_key) . ") )";
 
                 }
                 elsif ( $key =~ /^\#/ ) {

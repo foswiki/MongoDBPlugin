@@ -649,8 +649,11 @@ sub test_hoistLcLHSLikeName {
     my $this = shift;
     my $s    = "lc(name) ~ 'Web*'";
 
-    $this->do_Assert( $s,
-        { '$where' => "( /^Web.*\$/.test(foswiki_toLowerCase(this._topic)) )" }
+    $this->do_Assert(
+        $s,
+        {
+            '$where' => "( /^Web.*\$/m.test(foswiki_toLowerCase(this._topic)) )"
+        }
     );
 }
 
@@ -799,7 +802,7 @@ sub test_hoist_Item10323 {
 
             #TODO: why is this js?
             '$where' =>
-' ( ( (( /^.*TermForm$/.test(foswiki_getField(this, \'FORM.name\')) )) )  &&  (( /ant/.test(foswiki_toLowerCase(foswiki_getField(this, \'FIELD.Namespace.value\'))) )) )  &&  (( /bio/.test(foswiki_toLowerCase(foswiki_getField(this, \'FIELD.TermGroup.value\'))) )) '
+' ( ( (( /^.*TermForm$/m.test(foswiki_getField(this, \'FORM.name\')) )) )  &&  (( /ant/.test(foswiki_toLowerCase(foswiki_getField(this, \'FIELD.Namespace.value\'))) )) )  &&  (( /bio/.test(foswiki_toLowerCase(foswiki_getField(this, \'FIELD.TermGroup.value\'))) )) '
         }
     );
 }
@@ -1111,11 +1114,11 @@ sub test_hoist_dateAndRelationship {
 #          'FORM.name' => qr/(?-xism:^.*RelationshipForm$)/,
 #          '$where' => "(foswiki_getField(this, 'FIELD.NOW.value'))-(foswiki_getField(this, 'TOPICINFO.date')) < (((60)*(60))*(24))*(7)"
             '$where' =>
-' ( (( /^.*RelationshipForm$/.test(foswiki_getField(this, \'FORM.name\')) )) )  &&  ((foswiki_getField(this, \'FIELD.NOW.value\'))-(foswiki_getField(this, \'TOPICINFO.date\')) < (((60)*(60))*(24))*(7)) '
+' ( (( /^.*RelationshipForm$/m.test(foswiki_getField(this, \'FORM.name\')) )) )  &&  ((foswiki_getField(this, \'FIELD.NOW.value\'))-(foswiki_getField(this, \'TOPICINFO.date\')) < (((60)*(60))*(24))*(7)) '
         },
         {
             '$where' =>
-' ( (( /^.*RelationshipForm$/.test(foswiki_getField(this, \'FORM.name\')) )) )  &&  ((foswiki_getField(this, \'FIELD.NOW.value\'))-(foswiki_getField(this, \'TOPICINFO.date\')) < 604800) '
+' ( (( /^.*RelationshipForm$/m.test(foswiki_getField(this, \'FORM.name\')) )) )  &&  ((foswiki_getField(this, \'FIELD.NOW.value\'))-(foswiki_getField(this, \'TOPICINFO.date\')) < 604800) '
         }
     );
 }
