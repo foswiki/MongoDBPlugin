@@ -189,8 +189,7 @@ sub test_hoistSimple_OP_Like {
     my $this = shift;
     my $s    = "String~'.*rin.*'";
 
-    $this->do_Assert( $s,
-        { 'FIELD.String.value' => qr/(?-xism:\..*rin\..*)/ } );
+    $this->do_Assert( $s, { 'FIELD.String.value' => qr/^\..*rin\..*$/m } );
 }
 
 sub test_hoistSimple2 {
@@ -420,7 +419,7 @@ sub test_hoistCompound {
             'FIELD.number.value' => '99',
             '$or'                => [
                 { 'TOPICMOVED.by' => 'AlbertCamus' },
-                { 'TOPICMOVED.by' => qr/(?-xism:.*bert.*)/ }
+                { 'TOPICMOVED.by' => qr/^.*bert.*$/m }
             ],
             'FIELD.string.value' => 'String'
         }
@@ -440,7 +439,7 @@ sub test_hoistCompound2 {
             'FIELD.string.value' => 'String',
             '$or'                => [
                 { 'TOPICMOVED.by' => 'AlbertCamus' },
-                { 'TOPICMOVED.by' => qr/(?-xism:.*bert.*)/ }
+                { 'TOPICMOVED.by' => qr/^.*bert.*$/m }
             ]
         }
     );
@@ -464,14 +463,14 @@ sub test_hoistText {
     my $this = shift;
     my $s    = "text ~ '*Green*'";
 
-    $this->do_Assert( $s, { '_text' => qr/(?-xism:.*Green.*)/ } );
+    $this->do_Assert( $s, { '_text' => qr/^.*Green.*$/m } );
 }
 
 sub test_hoistName {
     my $this = shift;
     my $s    = "name ~ 'Web*'";
 
-    $this->do_Assert( $s, { '_topic' => qr/(?-xism:Web.*)/ } );
+    $this->do_Assert( $s, { '_topic' => qr/^Web.*$/m } );
 }
 
 sub test_hoistName2 {
@@ -483,8 +482,8 @@ sub test_hoistName2 {
 
         {
             '$or' => [
-                { '_topic' => qr/(?-xism:Web.*)/ },
-                { '_topic' => qr/(?-xism:A.*)/ },
+                { '_topic' => qr/^Web.*$/m },
+                { '_topic' => qr/^A.*$/m },
                 { '_topic' => 'Banana' }
             ]
         }
@@ -495,7 +494,7 @@ sub test_hoistOP_Match {
     my $this = shift;
     my $s    = "text =~ '.*Green.*'";
 
-    $this->do_Assert( $s, { '_text' => qr/(?-xism:.*Green.*)/ } );
+    $this->do_Assert( $s, { '_text' => qr/.*Green.*/ } );
 }
 
 sub test_hoistOP_Where {
@@ -643,7 +642,7 @@ sub DISABLEtest_hoistLcRHSLikeName {
     my $this = shift;
     my $s    = "name ~ lc('Web*')";
 
-    $this->do_Assert( $s, { '_topic' => qr/(?-xism:web.*)/ } );
+    $this->do_Assert( $s, { '_topic' => qr/^web.*/ } );
 }
 
 sub test_hoistLcLHSLikeName {
@@ -753,7 +752,7 @@ sub test_hoist_Item10323_2 {
 
 #           '$where' => " (Regex('bio'.toLowerCase(), '').test(this.FIELD.TermGroup.value.toLowerCase())) "
 #find a special case
-            'FIELD.TermGroup.value' => qr/(?i-xsm:.*bio.*)/i
+            'FIELD.TermGroup.value' => qr/bio/i
         },
         {
             '$where' =>
@@ -772,7 +771,7 @@ sub test_hoist_Item10323_2_not {
         {
 
 #          '$where' => "! (  ( (Regex('bio'.toLowerCase(), '').test(this.FIELD.TermGroup.value.toLowerCase())) )  ) "
-            'FIELD.TermGroup.value' => { '$not' => qr/(?i-xsm:bio)/ }
+            'FIELD.TermGroup.value' => { '$not' => qr/bio/i }
 
         },
         {
@@ -790,11 +789,11 @@ sub test_hoist_Item10323 {
     $this->do_Assert(
         $s,
         {
-            'FORM.name' => qr/(?-xism:^.*TermForm$)/,
+            'FORM.name' => qr/^.*TermForm$/m,
 
 #          '$where' => ' ( (Regex(\'ant\'.toLowerCase(), \'\').test(this.FIELD.Namespace.value.toLowerCase())) )  &&  ( (Regex(\'bio\'.toLowerCase(), \'\').test(this.FIELD.TermGroup.value.toLowerCase())) ) '
-            'FIELD.TermGroup.value' => qr/(?i-xsm:bio)/,
-            'FIELD.Namespace.value' => qr/(?i-xsm:ant)/
+            'FIELD.TermGroup.value' => qr/bio/i,
+            'FIELD.Namespace.value' => qr/ant/i
         },
         {
 
@@ -1043,8 +1042,8 @@ sub test_hoistTopicNameIncludeANDExclude {
 
             #          '$where' => '! ( this._topic == \'ItemTemplate\' ) ',
             '_topic' => {
-                '$nin' => [ 'ItemTemplate' ],
-                '$in'  => [ 'Item' ]
+                '$nin' => ['ItemTemplate'],
+                '$in'  => ['Item']
             }
         }
     );
@@ -1067,8 +1066,8 @@ sub test_hoistTopicNameIncludeRegANDExclude {
 
             #          '$where' => '! ( this._topic == \'ItemTemplate\' ) ',
             '_topic' => {
-                '$nin' => [ 'ItemTemplate' ],
-                '$in'  => [ qr/(?-xism:^Item.*$)/ ]
+                '$nin' => ['ItemTemplate'],
+                '$in'  => [qr/^Item.*$/m]
             }
         }
     );
@@ -1091,8 +1090,8 @@ sub test_hoistTopicNameIncludeRegANDExcludeReg {
 
            #          '$where' => '! ( ( /^.*Template$/.test(this._topic) ) ) ',
             '_topic' => {
-                '$nin' => [ qr/(?-xism:^.*Template$)/ ],
-                '$in'  => [ qr/(?-xism:^Item.*$)/ ]
+                '$nin' => [qr/^.*Template$/m],
+                '$in'  => [qr/^Item.*$/m]
             }
         }
     );
