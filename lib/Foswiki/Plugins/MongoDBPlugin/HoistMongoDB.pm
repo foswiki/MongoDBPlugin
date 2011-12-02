@@ -40,7 +40,7 @@ sub hoist {
     #yes, the simplifier will send an undef parse tree for a query="'1'"
     #ASSERT(defined($node)) if DEBUG;
 
-    writeDebug( "HoistMongoDB::hoist from: "
+    writeDebug( 'node: '
           . ( defined($node) ? $node->stringify() : 'undef' ) )
       if MONITOR
           or MONITOR_DETAIL;
@@ -81,7 +81,7 @@ sub hoist {
         #this can happen if the entire query is something like d2n(banana)
         #ideally, the parser should be converting that into a logical tree -
         #but for now, our parser is dumb, forcing hoisting code to suck
-        writeDebug("......final convert..........") if MONITOR;
+        writeDebug("final convert") if MONITOR;
         $mongoDBQuery = { '$where' => convertToJavascript($mongoDBQuery) };
     }
 
@@ -95,7 +95,7 @@ sub hoist {
 
 #TODO: sadly, the exception throwing wasn't working so I'm using a brutish propogate error
     if ( defined( $mongoDBQuery->{ERROR} ) ) {
-        writeDebug( "AAAAARGH " . $mongoDBQuery->{ERROR}, -1 );
+        writeDebug( "MongoDB ERROR: " . $mongoDBQuery->{ERROR}, -1 );
         return;
     }
 
@@ -171,13 +171,8 @@ sub _hoist {
 
     die 'node eq undef' unless defined($node);
 
-    writeDebug( "HoistMongoDB::hoist from: "
-          . $node->stringify()
-          . " (ref() == "
-          . ref($node)
-          . ")" )
-      if MONITOR
-          or MONITOR_DETAIL;
+    writeDebug( 'Node is a ' . ref($node) . ": " . $node->stringify())
+      if MONITOR or MONITOR_DETAIL;
 
     #forward propogate that we're inside a 'where' - eg lhs[rhs]
     #sadly, also need to treat a dot case : preferences[value=12].Red
@@ -192,10 +187,9 @@ sub _hoist {
           if ( defined( $node->{params}[1] )
             and ( ref( $node->{params}[1] ) ne '' ) );
     }
-    writeDebug( $level
-          . "???????"
-          . ref( $node->{op} ) . " "
-          . ( $node->{inWhere} ? 'inWhere' : '' ) )
+    writeDebug( "At level $level with op "
+          . ref( $node->{op} )
+          . ( $node->{inWhere} ? ' inWhere' : '' ) )
       if MONITOR
           or MONITOR_DETAIL;
 
@@ -227,7 +221,7 @@ sub _hoist {
     if ( not ref( $node->{op} ) ) {
 
         #use Data::Dumper;
-        writeDebug( "not an op (" . Dumper($node) . ")" ) if MONITOR;
+        writeDebug( 'Node is a ' . ref($node) . ' which is not an op: ' . Dumper($node) ) if MONITOR;
         return Foswiki::Query::OP_dot::hoistMongoDB( $node->{op}, $node );
     }
     my $unreality_arity = $node->{op}->{arity};
@@ -240,7 +234,7 @@ sub _hoist {
         if ( ref( $node->{params}[0]->{op} ) eq 'Foswiki::Query::OP_where' ) {
 
             #print STDERR "erkle ".Dumper($node->{params}[0])."\n";
-            writeDebug( "pre erkle::hoist from: " . $node->stringify() )
+            writeDebug( "PRE-erkle, node: " . $node->stringify() )
               if MONITOR
                   or MONITOR_DETAIL;
 
@@ -275,13 +269,13 @@ sub _hoist {
                 $node->{params}[0]->{params} =
                   [ $node->{params}[0]->{params}[0], $and_node ];
 
-                writeDebug( "POST erkle::hoist from: " . $node->stringify() )
+                writeDebug( "POST-erkle, node: " . $node->stringify() )
                   if MONITOR
                       or MONITOR_DETAIL;
             }
 
             my $query = _hoist( $node->{params}[0], $level . ' ' );
-            writeDebug("return 1") if MONITOR;
+            writeDebug("return 1; did something with an OP_dot node containing an OP_where") if MONITOR;
             return $query;
         }
         elsif ( ( ref( $node->{params}[0]->{op} ) eq '' )
@@ -289,7 +283,7 @@ sub _hoist {
         {
 
             #TODO: really should test for 'simple case' and barf elsewise
-            writeDebug("return 2") if MONITOR;
+            writeDebug("return 2; handing off to OP_dot") if MONITOR;
             return Foswiki::Query::OP_dot::hoistMongoDB( $node->{op}, $node );
         }
         else {
@@ -339,7 +333,7 @@ sub _hoist {
           )
         {
 
-            writeDebug("return 3") if MONITOR;
+            writeDebug("return 3; it's a maths OP") if MONITOR;
 
             return $node->{op}->hoistMongoDB($node);
 
@@ -364,8 +358,8 @@ sub _hoist {
         return $node;
     }
 
-    writeDebug( "GIBBER" . $node->stringify() ) if MONITOR;
-    writeDebug( "..............(" . Dumper($node) . ")" ) if MONITOR;
+    writeDebug( 'node: ' . $node->stringify() ) if MONITOR;
+    writeDebug( 'node: ' . Dumper($node)) if MONITOR;
 
     #need to convert to js for lc/uc/length  etc :(
     # '####need_function'
