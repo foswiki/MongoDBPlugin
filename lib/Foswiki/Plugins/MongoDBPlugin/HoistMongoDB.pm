@@ -25,8 +25,8 @@ use Assert;
 use Foswiki::Query::HoistREs ();
 use Foswiki::Plugins::MongoDBPlugin qw(writeDebug);
 
-use constant MONITOR        => 1;
-use constant MONITOR_DETAIL => 1;
+use constant MONITOR        => 0;
+use constant MONITOR_DETAIL => 0;
 
 =begin TML
 
