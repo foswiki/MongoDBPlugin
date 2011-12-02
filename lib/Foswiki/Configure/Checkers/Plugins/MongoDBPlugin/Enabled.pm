@@ -78,7 +78,6 @@ MESSAGE
 MESSAGE
         }
     }
-    print STDERR 'HELLO';
 
     return $e;
 }

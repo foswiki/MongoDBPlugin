@@ -1,7 +1,7 @@
 # See bottom of file for license and copyright information
 package Foswiki::Plugins::MongoDBPlugin::Listener;
 
-use Foswiki::Plugins::MongoDBPlugin       ();
+use Foswiki::Plugins::MongoDBPlugin qw(writeDebug);
 use Foswiki::Plugins::MongoDBPlugin::Meta ();
 use Foswiki::Search                       ();
 use Foswiki::Func                         ();
@@ -28,9 +28,9 @@ sub new {
     $Foswiki::cfg{Plugins}{MongoDBPlugin}{EnableOnSaveUpdates} = 0;
     $Foswiki::Plugins::MongoDBPlugin::enableOnSaveUpdates = 0;
 
-    print STDERR
-"***************************************MongoDB Listening****************************\n"
-      if MONITOR;
+    writeDebug(
+"***************************************MongoDB Listening****************************"
+    ) if MONITOR;
 
     return $self;
 }
@@ -46,10 +46,11 @@ sub insert {
     my $self = shift;
     my %args = @_;
 
-    print STDERR "inserting " . join( ',', keys(%args) ) . "\n" if MONITOR;
-    print STDERR "     ("
-      . $args{newmeta}->web . ", "
-      . ( $args{newmeta}->topic || 'UNDEF' ) . ")\n"
+    writeDebug( "inserting " . join( ',', keys(%args) ) ) if MONITOR;
+    writeDebug( "     ("
+          . $args{newmeta}->web . ", "
+          . ( $args{newmeta}->topic || 'UNDEF' )
+          . ")" )
       if MONITOR;
 
     return if ( defined( $args{newattachment} ) );
@@ -93,23 +94,27 @@ sub update {
         if ( defined( $args{oldmeta} ) ) {
             if ( $args{oldmeta}->web ne $args{newmeta}->web ) {
                 $self->remove( oldmeta => $args{oldmeta} );
-                print STDERR "Removed web (" . $args{oldmeta}->web . ")\n"
+                writeDebug( "Removed web (" . $args{oldmeta}->web . ")" )
                   if MONITOR;
 
                 #Force a full scan from filesystem
-                print STDERR "Scan new web (" . $args{newmeta}->web . ")\n"
+                writeDebug( "Scan new web (" . $args{newmeta}->web . ")" )
                   if MONITOR;
                 Foswiki::Plugins::MongoDBPlugin::updateWebCache(
                     $args{newmeta}->web );
 
                 return;
             }
-            print STDERR
-              "1. Not sure how we got to this point in updating the Listener\n";
+            writeDebug(
+                "1. Not sure how we got to this point in updating the Listener",
+                -1
+            );
         }
         else {
-            print STDERR
-              "2. Not sure how we got to this point in updating the Listener\n";
+            writeDebug(
+                "2. Not sure how we got to this point in updating the Listener",
+                -1
+            );
         }
 
         return;
@@ -142,10 +147,11 @@ sub remove {
     #lets not delete the topic if we're actually deleting an attachment
     return if ( defined( $args{oldattachment} ) );
 
-    print STDERR "removing " . join( ',', keys(%args) ) . "\n" if MONITOR;
-    print STDERR "     ("
-      . $args{oldmeta}->web . ", "
-      . ( $args{oldmeta}->topic || 'UNDEF' ) . ")\n"
+    writeDebug( "removing " . join( ',', keys(%args) ) ) if MONITOR;
+    writeDebug( "     ("
+          . $args{oldmeta}->web . ", "
+          . ( $args{oldmeta}->topic || 'UNDEF' )
+          . ")" )
       if MONITOR;
 
     #works for topics and webs
@@ -204,7 +210,7 @@ sub loadTopic {
         )
       )
     {
-        print STDERR "============ listener request for $_[2]\n" if MONITOR;
+        writeDebug("============ listener request for $_[2]") if MONITOR;
 
         #return;
         #query the versions collection - via  MongoDBPlugin::Meta
@@ -216,10 +222,10 @@ sub loadTopic {
 
     if ( $session->search->metacache->hasCached( $_[1]->web, $_[1]->topic ) ) {
         return;                    #bugger, infinite loop time
-        print STDERR "===== metacache hasCached("
-          . $_[1]->web . " , "
-          . $_[1]->topic
-          . ", version)\n"
+        writeDebug( "===== metacache hasCached("
+              . $_[1]->web . " , "
+              . $_[1]->topic
+              . ", version)" )
           if MONITOR;
         $_[1] =
           $session->search->metacache->getMeta( $_[1]->web, $_[1]->topic );
@@ -238,17 +244,17 @@ sub loadTopic {
         #return us to what we were..
         bless( $_[1], $metaClass );
 
-        print STDERR "------ rebless to $metaClass\n" if MONITOR;
+        writeDebug("------ rebless to $metaClass") if MONITOR;
     }
 
     #cache the metaObj
     $session->search->metacache->addMeta( $_[1]->web, $_[1]->topic, $_[1] );
 
-    print STDERR "===== loadTopic("
-      . $_[1]->web . " , "
-      . $_[1]->topic
-      . ", version)  => "
-      . $_[1]->getLoadedRev() . "\n"
+    writeDebug( "===== loadTopic("
+          . $_[1]->web . " , "
+          . $_[1]->topic
+          . ", version)  => "
+          . $_[1]->getLoadedRev() )
       if MONITOR;
 
     return ( $_[1]->getLoadedRev(), 1 );
@@ -280,10 +286,10 @@ sub getRevisionHistory {
     }
 
     if ( $session->search->metacache->hasCached( $meta->web, $meta->topic ) ) {
-        print STDERR "===== metacache hasCached("
-          . $meta->web . " , "
-          . $meta->topic
-          . ", version)\n"
+        writeDebug( "===== metacache hasCached("
+              . $meta->web . " , "
+              . $meta->topic
+              . ", version)" )
           if MONITOR;
         $meta =
           $session->search->metacache->getMeta( $meta->web, $meta->topic );
@@ -344,8 +350,8 @@ sub getVersionInfo {
     }
     if (MONITOR) {
         require Data::Dumper;
-        print STDERR "MongoDBPlugin::getVersionInfo() GOT: "
-          . Data::Dumper->Dump( [$info] );
+        writeDebug( "MongoDBPlugin::getVersionInfo() GOT: "
+              . Data::Dumper->Dump( [$info] ) );
     }
 
     return $info;

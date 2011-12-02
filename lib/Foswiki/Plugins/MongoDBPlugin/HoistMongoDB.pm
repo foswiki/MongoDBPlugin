@@ -23,14 +23,14 @@ use Error::Simple;
 use Assert;
 
 use Foswiki::Query::HoistREs ();
+use Foswiki::Plugins::MongoDBPlugin qw(writeDebug);
 
-use constant MONITOR        => 0;
-use constant MONITOR_DETAIL => 0;
+use constant MONITOR        => 1;
+use constant MONITOR_DETAIL => 1;
 
 =begin TML
 
 ---++ ObjectMethod hoist($query) -> $ref to IxHash
-
 
 =cut
 
@@ -40,10 +40,8 @@ sub hoist {
     #yes, the simplifier will send an undef parse tree for a query="'1'"
     #ASSERT(defined($node)) if DEBUG;
 
-    print STDERR "HoistMongoDB::hoist from: ",
-      ( defined($node) ? $node->stringify() : 'undef' ), "\n"
-
-      #print STDERR "HoistMongoDB::hoist from: ", Dumper($node), "\n"
+    writeDebug( "HoistMongoDB::hoist from: "
+          . ( defined($node) ? $node->stringify() : 'undef' ) )
       if MONITOR
           or MONITOR_DETAIL;
 
@@ -83,7 +81,7 @@ sub hoist {
         #this can happen if the entire query is something like d2n(banana)
         #ideally, the parser should be converting that into a logical tree -
         #but for now, our parser is dumb, forcing hoisting code to suck
-        print STDERR "\n......final convert..........\n" if MONITOR;
+        writeDebug("......final convert..........") if MONITOR;
         $mongoDBQuery = { '$where' => convertToJavascript($mongoDBQuery) };
     }
 
@@ -97,13 +95,16 @@ sub hoist {
 
 #TODO: sadly, the exception throwing wasn't working so I'm using a brutish propogate error
     if ( defined( $mongoDBQuery->{ERROR} ) ) {
-        print STDERR "AAAAARGH " . $mongoDBQuery->{ERROR} . "\n";
+        writeDebug( "AAAAARGH " . $mongoDBQuery->{ERROR}, -1 );
         return;
     }
 
-    print STDERR "Hoisted to:  ",    #$node->stringify(), " -> /",
-      Dumper($mongoDBQuery), "/\n"
-      if MONITOR or MONITOR_DETAIL;
+    writeDebug(
+        "Hoisted to:  "    #$node->stringify(), " -> /",
+          . Dumper($mongoDBQuery)
+      )
+      if MONITOR
+          or MONITOR_DETAIL;
 
     if ( defined( $Foswiki::cfg{Plugins}{MongoDBPlugin}{UseJavascriptQuery} )
         and $Foswiki::cfg{Plugins}{MongoDBPlugin}{UseJavascriptQuery} )
@@ -170,8 +171,11 @@ sub _hoist {
 
     die 'node eq undef' unless defined($node);
 
-    print STDERR "HoistMongoDB::hoist from: ", $node->stringify(),
-      " (ref() == " . ref($node) . ")\n"
+    writeDebug( "HoistMongoDB::hoist from: "
+          . $node->stringify()
+          . " (ref() == "
+          . ref($node)
+          . ")" )
       if MONITOR
           or MONITOR_DETAIL;
 
@@ -188,10 +192,10 @@ sub _hoist {
           if ( defined( $node->{params}[1] )
             and ( ref( $node->{params}[1] ) ne '' ) );
     }
-    print STDERR $level
-      . "???????"
-      . ref( $node->{op} ) . " "
-      . ( $node->{inWhere} ? 'inWhere' : '' ) . "\n"
+    writeDebug( $level
+          . "???????"
+          . ref( $node->{op} ) . " "
+          . ( $node->{inWhere} ? 'inWhere' : '' ) )
       if MONITOR
           or MONITOR_DETAIL;
 
@@ -223,20 +227,20 @@ sub _hoist {
     if ( not ref( $node->{op} ) ) {
 
         #use Data::Dumper;
-        print STDERR "not an op (" . Dumper($node) . ")\n" if MONITOR;
+        writeDebug( "not an op (" . Dumper($node) . ")" ) if MONITOR;
         return Foswiki::Query::OP_dot::hoistMongoDB( $node->{op}, $node );
     }
     my $unreality_arity = $node->{op}->{arity};
     $unreality_arity = scalar( @{ $node->{params} } )
       if ( $node->{op}->{canfold} );
-    print STDERR "unreality_arity (" . $unreality_arity . ")\n" if MONITOR;
+    writeDebug( "unreality_arity (" . $unreality_arity . ")" ) if MONITOR;
 
     if ( ref( $node->{op} ) eq 'Foswiki::Query::OP_dot' ) {
 
         if ( ref( $node->{params}[0]->{op} ) eq 'Foswiki::Query::OP_where' ) {
 
             #print STDERR "erkle ".Dumper($node->{params}[0])."\n";
-            print STDERR "pre erkle::hoist from: ", $node->stringify(), "\n"
+            writeDebug( "pre erkle::hoist from: " . $node->stringify() )
               if MONITOR
                   or MONITOR_DETAIL;
 
@@ -271,14 +275,13 @@ sub _hoist {
                 $node->{params}[0]->{params} =
                   [ $node->{params}[0]->{params}[0], $and_node ];
 
-                print STDERR "POST erkle::hoist from: ", $node->stringify(),
-                  "\n"
+                writeDebug( "POST erkle::hoist from: " . $node->stringify() )
                   if MONITOR
                       or MONITOR_DETAIL;
             }
 
             my $query = _hoist( $node->{params}[0], $level . ' ' );
-            print STDERR "return 1\n" if MONITOR;
+            writeDebug("return 1") if MONITOR;
             return $query;
         }
         elsif ( ( ref( $node->{params}[0]->{op} ) eq '' )
@@ -286,7 +289,7 @@ sub _hoist {
         {
 
             #TODO: really should test for 'simple case' and barf elsewise
-            print STDERR "return 2\n" if MONITOR;
+            writeDebug("return 2") if MONITOR;
             return Foswiki::Query::OP_dot::hoistMongoDB( $node->{op}, $node );
         }
         else {
@@ -300,12 +303,12 @@ sub _hoist {
     #TODO: if 2 constants(NUMBER,STRING) ASSERT
     #TODO: if the first is a constant, swap
     for ( my $i = 0 ; $i < $unreality_arity ; $i++ ) {
-        print STDERR "arity $i of $unreality_arity\n" if MONITOR;
+        writeDebug("arity $i of $unreality_arity") if MONITOR;
         $node->{ 'hoisted' . $i } = _hoist( $node->{params}[$i], $level . ' ' );
         if ( ref( $node->{ 'hoisted' . $i } ) ne '' ) {
 
-            print STDERR "ref($node->{'hoisted'.$i}) == "
-              . ref( $node->{ 'hoisted' . $i } ) . "\n"
+            writeDebug( "ref($node->{'hoisted'.$i}) == "
+                  . ref( $node->{ 'hoisted' . $i } ) )
               if MONITOR;
             $node->{ERROR} = $node->{ 'hoisted' . $i }->{ERROR}
               if ( defined( $node->{ 'hoisted' . $i }->{ERROR} ) );
@@ -336,7 +339,7 @@ sub _hoist {
           )
         {
 
-            print STDERR "return 3\n" if MONITOR;
+            writeDebug("return 3") if MONITOR;
 
             return $node->{op}->hoistMongoDB($node);
 
@@ -356,33 +359,33 @@ sub _hoist {
         $node->{ERROR} = 'can\'t Hoist ' . ref( $node->{op} );
     }
     if ( defined( $node->{ERROR} ) ) {
-        print STDERR "HOIST ERROR: " . $node->{ERROR};
+        writeDebug( "HOIST ERROR: " . $node->{ERROR}, -1 );
         die "HOIST ERROR: " . $node->{ERROR};
         return $node;
     }
 
-    print STDERR "GIBBER" . $node->stringify() . "\n" if MONITOR;
-    print STDERR "..............(" . Dumper($node) . ")\n" if MONITOR;
+    writeDebug( "GIBBER" . $node->stringify() ) if MONITOR;
+    writeDebug( "..............(" . Dumper($node) . ")" ) if MONITOR;
 
     #need to convert to js for lc/uc/length  etc :(
     # '####need_function'
     if ($containsQueryFunctions) {
         if ( ref( $node->{hoisted0} ) eq 'HASH' ) {
             if ( defined( $node->{hoisted0}->{'####delay_function'} ) ) {
-                print STDERR "--- qwe \n"
+                writeDebug("--- qwe")
                   if Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::MONITOR;
 
                 $node->{'####delay_function'} =
                   'k' . $node->{hoisted0}->{'####delay_function'};
             }
-            print STDERR "--- asd \n"
+            writeDebug("--- asd")
               if Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::MONITOR;
             $node->{hoisted0} = convertToJavascript( $node->{hoisted0} );
         }
 
         my $hoistedNode;
         if ( ref($node) eq 'Foswiki::Query::Node' ) {
-            print STDERR 'who ' . Dumper($node)
+            writeDebug( 'who ' . Dumper($node) )
               if Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::MONITOR;
             $hoistedNode = $node->{op}->hoistMongoDB($node);
         }
@@ -390,7 +393,7 @@ sub _hoist {
 
 #generally only happens if there is no rhs really (eg, a query that lookd like "d2n(SomeField)")
             $hoistedNode = $node;
-            print STDERR 'norhs ' . Dumper($hoistedNode)
+            writeDebug( 'norhs ' . Dumper($hoistedNode) )
               if Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::MONITOR;
             return $hoistedNode;
         }
@@ -398,14 +401,14 @@ sub _hoist {
 
             #could be a maths op - in which case, eeek?
             #shite - or maths inside braces
-            print STDERR 'notahash ' . Dumper($hoistedNode)
+            writeDebug( 'notahash ' . Dumper($hoistedNode) )
               if Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::MONITOR;
             return $hoistedNode;
         }
         else {
 
             #this is used to convert something like "lc(Subject)='webhome'"
-            print STDERR 'why ' . Dumper($hoistedNode)
+            writeDebug( 'why ' . Dumper($hoistedNode) )
               if Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::MONITOR;
 
 #TODO: need to minimise the #delay_function setting - atm its a little over-enthusiastic
@@ -426,25 +429,36 @@ sub _hoist {
 sub monitor {
     my $node = shift;
 
-    print STDERR "MONITOR Hoist node->op="
-      . Dumper( $node->{op} )
-      . " ref(node->op)="
-      . ref( $node->{op} ) . "\n";
+    writeDebug(
+        "MONITOR Hoist node->op="
+          . Dumper( $node->{op} )
+          . " ref(node->op)="
+          . ref( $node->{op} ),
+        0
+    );
 
-    print STDERR "\nparam0(" . $node->{params}[0]->{op} . "): ",
-      Data::Dumper::Dumper( $node->{params}[0] ), "\n";
+    writeDebug(
+        "param0("
+          . $node->{params}[0]->{op} . "): "
+          . Data::Dumper::Dumper( $node->{params}[0] ),
+        0
+    );
     if ( $node->{op}->{arity} > 1 ) {
-        print STDERR "\nparam1(" . $node->{params}[1]->{op} . "): ",
-          Data::Dumper::Dumper( $node->{params}[1] ), "\n";
+        writeDebug(
+            "param1("
+              . $node->{params}[1]->{op} . "): "
+              . Data::Dumper::Dumper( $node->{params}[1] ),
+            0
+        );
     }
 
     #TODO: mmm, do we only have unary and binary ops?
 
-    print STDERR "----lhs: " . Data::Dumper::Dumper( $node->{hoisted0} );
+    writeDebug( "----lhs: " . Data::Dumper::Dumper( $node->{hoisted0} ), 0 );
     if ( $node->{op}->{arity} > 1 ) {
-        print STDERR "----rhs: " . Data::Dumper::Dumper( $node->{hoisted1} );
+        writeDebug( "----rhs: " . Data::Dumper::Dumper( $node->{hoisted1} ),
+            0 );
     }
-    print STDERR " \n";
 
 }
 
@@ -532,7 +546,7 @@ sub convertFunction {
     die "$key and $value is not a string? " if ( ref($value) ne '' );
     die "$key is not in the js_func_map"
       if ( not defined( $js_func_map{$key} ) );
-    print STDERR "\t\tconvertfunction($value, $key) => \n" if MONITOR;
+    writeDebug("\t\tconvertfunction($value, $key) =>") if MONITOR;
     return convertStringToJS($value) . $js_func_map{$key};
 }
 
@@ -541,7 +555,7 @@ my $ops    = '(' . join( '|', values(%js_op_map) ) . ')';
 
 sub convertStringToJS {
     my $string = shift;
-    print STDERR "  convertStringToJS($string)\n" if MONITOR;
+    writeDebug("  convertStringToJS($string)") if MONITOR;
 
     return $string
       if ( $string =~ /^\(.*\)$/ )
@@ -609,7 +623,7 @@ sub convertToJavascript {
 #TODO: for some reason the Dumper call makes the HoistMongoDBsTests::test_hoistLcRHSName test succeed - have to work out what i've broken.
     my $dump = Dumper($node);
 
-    print STDERR "\n..............convertToJavascript " . Dumper($node) . "\n"
+    writeDebug( "..............convertToJavascript " . Dumper($node) )
       if MONITOR;
 
     while ( my ( $key, $value ) = each(%$node) ) {
@@ -627,9 +641,8 @@ sub convertToJavascript {
         my $js_key = $key;
 
         $js_key = $js_op_map{$key} if ( defined( $js_op_map{$key} ) );
-        print STDERR "key = $key ("
-          . ref($js_key)
-          . ", $js_key), value = $value\n"
+        writeDebug(
+            "key = $key (" . ref($js_key) . ", $js_key), value = $value" )
           if MONITOR;
 
         if ( ref($value) eq 'HASH' ) {
@@ -653,7 +666,7 @@ sub convertToJavascript {
             elsif ( $k eq '#match' ) {
 
                 #this is essentially an operator lookahead
-                print STDERR ">>>>>>>>>>>>>>>>>>>> lookahead $key -> $k\n"
+                writeDebug(">>>>>>>>>>>>>>>>>>>> lookahead $key -> $k")
                   if MONITOR;
                 $statement .=
                     convertToJavascript($value) . '('
@@ -669,7 +682,7 @@ sub convertToJavascript {
             {
 
                 #this is essentially an operator lookahead
-                print STDERR ">>>>>>>>>>>>>>>>>>>> lookahead $key -> $k\n"
+                writeDebug(">>>>>>>>>>>>>>>>>>>> lookahead $key -> $k")
                   if MONITOR;
                 $statement .= ($js_key) . ' ' . convertStringToJS($value);
 
@@ -742,8 +755,8 @@ sub convertToJavascript {
 
                 #value isa string..
                 #TODO: argh, string or number, er, or regex?
-                print STDERR "convertToJavascript - $key => $value is a "
-                  . ref($value) . "\n"
+                writeDebug(
+                    "convertToJavascript - $key => $value is a " . ref($value) )
                   if MONITOR;
                 if ( ref($value) eq 'Regexp' ) {
                     my ( $pattern, $mods ) = re::regexp_pattern($value);
@@ -757,7 +770,7 @@ sub convertToJavascript {
 
                 }
                 elsif ( $key =~ /^\#/ ) {
-                    print STDERR ">>>>>>>>>>>>>>>>>>>> #hash - $key \n"
+                    writeDebug(">>>>>>>>>>>>>>>>>>>> #hash - $key")
                       if MONITOR;
 
                     $statement .= convertFunction( $value, $key );
@@ -775,7 +788,7 @@ sub convertToJavascript {
             }
         }
     }
-    print STDERR "----returning $statement\n" if MONITOR;
+    writeDebug("----returning $statement") if MONITOR;
     $statement = "$statement";    #make sure we're a string at this point
     return $statement;
 }
@@ -804,8 +817,9 @@ sub convertOrToIn {
             or not( ( ref($firstVal) eq '' ) or ( ref($firstVal) eq 'Regexp' ) )
           )
         {
-            print STDERR "------ too complex ($firstKey,$firstVal == "
-              . ref($firstVal) . ")\n"
+            writeDebug( "------ too complex ($firstKey,$firstVal == "
+                  . ref($firstVal)
+                  . ")" )
               if MONITOR;
 
             #actually, if its an $in/$nin we could do something..
@@ -815,7 +829,7 @@ sub convertOrToIn {
         else {
 
             #just do $in for now
-            print STDERR "------ simple ($firstKey, $firstVal)\n" if MONITOR;
+            writeDebug("------ simple ($firstKey, $firstVal)") if MONITOR;
             push( @{ $keys->{$firstKey} }, $firstVal );
         }
     }
@@ -823,15 +837,15 @@ sub convertOrToIn {
     while ( my ( $k, $v ) = each(%$keys) ) {
         my @array = @$v;
 
-        print STDERR "------ erg $#array\n" if MONITOR;
+        writeDebug("------ erg $#array") if MONITOR;
 
         if ( $#array >= 1 ) {
-            print STDERR "------ $k => \$in @$v\n" if MONITOR;
+            writeDebug("------ $k => \$in @$v") if MONITOR;
 
             push( @complex, { $k => { '$in' => $v } } );
         }
         else {
-            print STDERR "------ $k => $v->[0]\n" if MONITOR;
+            writeDebug("------ $k => $v->[0]") if MONITOR;
             push( @complex, { $k => $v->[0] } );
         }
     }
@@ -868,13 +882,19 @@ hoist ~ into a mongoDB ixHash query
 =cut
 
 package Foswiki::Query::OP_eq;
+use strict;
+use warnings;
 use Assert;
+use Foswiki::Plugins::MongoDBPlugin qw(writeDebug);
 
 sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
 
-#print STDERR "OP_eq: $node => ".Dumper($node)."\n" if Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::MONITOR;
+    require Data::Dumper
+      if Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::MONITOR;
+    writeDebug( "OP_eq: $node => " . Data::Dumper->Dump( [$node] ) )
+      if Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::MONITOR;
 
     ASSERT( ref($node) eq 'Foswiki::Query::Node' );
     ASSERT( ref( $node->{hoisted0} ) eq '' );
@@ -903,7 +923,10 @@ sub hoistMongoDB {
 }
 
 package Foswiki::Query::OP_like;
+use strict;
+use warnings;
 use Assert;
+use Foswiki::Plugins::MongoDBPlugin qw(writeDebug);
 
 #hoist ~ into a mongoDB ixHash query
 
@@ -941,7 +964,10 @@ sub hoistMongoDB {
 }
 
 package Foswiki::Query::OP_match;
+use strict;
+use warnings;
 use Assert;
+use Foswiki::Plugins::MongoDBPlugin qw(writeDebug);
 
 #hoist =~ into a mongoDB ixHash query
 
@@ -992,8 +1018,11 @@ sub hoistMongoDB {
 =cut
 
 package Foswiki::Query::OP_dot;
-use Foswiki::Meta;
+use strict;
+use warnings;
 use Assert;
+use Foswiki::Meta();
+use Foswiki::Plugins::MongoDBPlugin qw(writeDebug);
 
 #mongo specific aliases
 our %aliases = (
@@ -1026,7 +1055,7 @@ sub hoistMongoDB {
     ASSERT( ref($node) eq 'Foswiki::Query::Node' );
 
     if ( not defined( $node->{op} ) ) {
-        print STDERR 'CONFUSED: ' . Data::Dumper::Dumper($node) . "\n"
+        writeDebug( 'CONFUSED: ' . Data::Dumper::Dumper($node) )
           if Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::MONITOR;
         die 'here';
 
@@ -1042,8 +1071,7 @@ sub hoistMongoDB {
         my $lhs = $node->{params}[0];
         my $rhs = $node->{params}[1];
         if ( ref( $rhs->{op} ) ne '' ) {
-            print STDERR "------------rhs =="
-              . Data::Dumper::Dumper($rhs) . "\n"
+            writeDebug( "------------rhs ==" . Data::Dumper::Dumper($rhs) )
               if Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::MONITOR;
             $rhs = $node->{hoisted1};
         }
@@ -1051,21 +1079,21 @@ sub hoistMongoDB {
             $rhs = $node->{params}[1]->{params}[0];
         }
         if ( ref( $lhs->{op} ) ne '' ) {
-            print STDERR "------------lhs =="
-              . Data::Dumper::Dumper($lhs)
-              . "\nOOO "
-              . ref( $lhs->{op} )
-              . " OOO \n"
+            writeDebug( "------------lhs =="
+                  . Data::Dumper::Dumper($lhs)
+                  . "\nOOO "
+                  . ref( $lhs->{op} )
+                  . " OOO" )
               if Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::MONITOR_DETAIL;
 
             #return $node->{op}->hoistMongoDB($node);
             if (    ref($lhs) ne ''
                 and ref( $lhs->{op} ) eq 'Foswiki::Query::OP_ref' )
             {    # and defined($node->{hoisted0}->{'#ref'})) {
-                print STDERR "+_+_+_+_+_+_+_+_+_+_+_+_+_+_GIMPLE($rhs)("
-                  . Data::Dumper::Dumper($lhs) . ") => "
-                  . $lhs->{hoisted1} . '.'
-                  . $node->{params}[1]->{params}[0] . "\n"
+                writeDebug( "+_+_+_+_+_+_+_+_+_+_+_+_+_+_GIMPLE($rhs)("
+                      . Data::Dumper::Dumper($lhs) . ") => "
+                      . $lhs->{hoisted1} . '.'
+                      . $node->{params}[1]->{params}[0] )
                   if Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::MONITOR;
                 return {
                     '#ref' => [
@@ -1094,11 +1122,12 @@ sub hoistMongoDB {
             }; #dereferencing an undef is FALSE.. (ie 'NonExistantTopic'/info.date == {}.date
         }
 
-        print STDERR "-------------------------------- hoist OP_dot("
-          . ref($lhs) . ", "
-          . ref($rhs) . ", "
-          . ref( $node->{op} ) . ", "
-          . Data::Dumper::Dumper($node) . ")\n"
+        writeDebug( "-------------------------------- hoist OP_dot("
+              . ref($lhs) . ", "
+              . ref($rhs) . ", "
+              . ref( $node->{op} ) . ", "
+              . Data::Dumper::Dumper($node)
+              . ")" )
           if Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::MONITOR;
 
         #an actual OP_dot
@@ -1107,7 +1136,7 @@ sub hoistMongoDB {
 
         my $mappedName = mapAlias($lhs);
 
-        print STDERR "-INTO " . $mappedName . '.' . $rhs . "\n"
+        writeDebug( "-INTO " . $mappedName . '.' . $rhs )
           if Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::MONITOR;
 
         if ( $mappedName ne $lhs ) {
@@ -1122,10 +1151,11 @@ sub hoistMongoDB {
     elsif ( $node->{op} == Foswiki::Infix::Node::NAME ) {
 
         #if we're in a where, this is a bit transmissive
-        print STDERR "============================= hoist OP_dot("
-          . $node->{op} . ", "
-          . $node->{params}[0] . ', '
-          . ( defined( $node->{inWhere} ) ? 'inwhere' : 'notinwhere' ) . ")\n"
+        writeDebug( "============================= hoist OP_dot("
+              . $node->{op} . ", "
+              . $node->{params}[0] . ', '
+              . ( defined( $node->{inWhere} ) ? 'inwhere' : 'notinwhere' )
+              . ")" )
           if Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::MONITOR;
 
       #if we're in a 'where' eg preferences[name = 'Summary'] then don't aliases
@@ -1158,8 +1188,11 @@ sub hoistMongoDB {
 }
 
 package Foswiki::Query::OP_and;
-use Foswiki::Plugins::MongoDBPlugin::HoistMongoDB;
+use strict;
+use warnings;
 use Assert;
+use Foswiki::Plugins::MongoDBPlugin qw(writeDebug);
+use Foswiki::Plugins::MongoDBPlugin::HoistMongoDB();
 
 sub hoistMongoDB {
     my $op   = shift;
@@ -1371,7 +1404,7 @@ sub hoistMongoDB {
                     }
                     else {
 
-                        print STDERR 'what are we ?';
+                        writeDebug( 'what are we ?', -1 );
                         die 'bonus2';
                     }
                 }
@@ -1409,7 +1442,10 @@ sub hoistMongoDB {
 }
 
 package Foswiki::Query::OP_or;
+use strict;
+use warnings;
 use Assert;
+use Foswiki::Plugins::MongoDBPlugin qw(writeDebug);
 
 sub hoistMongoDB {
     my $op   = shift;
@@ -1440,8 +1476,11 @@ sub hoistMongoDB {
 }
 
 package Foswiki::Query::OP_not;
-use Foswiki::Plugins::MongoDBPlugin::HoistMongoDB;
+use strict;
+use warnings;
 use Assert;
+use Foswiki::Plugins::MongoDBPlugin::HoistMongoDB();
+use Foswiki::Plugins::MongoDBPlugin qw(writeDebug);
 
 sub hoistMongoDB {
     my $op   = shift;
@@ -1531,7 +1570,10 @@ sub hoistMongoDB {
 }
 
 package Foswiki::Query::OP_gte;
+use strict;
+use warnings;
 use Assert;
+use Foswiki::Plugins::MongoDBPlugin qw(writeDebug);
 
 sub hoistMongoDB {
     my $op   = shift;
@@ -1544,7 +1586,10 @@ sub hoistMongoDB {
 }
 
 package Foswiki::Query::OP_gt;
+use strict;
+use warnings;
 use Assert;
+use Foswiki::Plugins::MongoDBPlugin qw(writeDebug);
 
 sub hoistMongoDB {
     my $op   = shift;
@@ -1555,7 +1600,10 @@ sub hoistMongoDB {
 }
 
 package Foswiki::Query::OP_lte;
+use strict;
+use warnings;
 use Assert;
+use Foswiki::Plugins::MongoDBPlugin qw(writeDebug);
 
 sub hoistMongoDB {
     my $op   = shift;
@@ -1568,7 +1616,10 @@ sub hoistMongoDB {
 }
 
 package Foswiki::Query::OP_lt;
+use strict;
+use warnings;
 use Assert;
+use Foswiki::Plugins::MongoDBPlugin qw(writeDebug);
 
 sub hoistMongoDB {
     my $op   = shift;
@@ -1582,7 +1633,10 @@ sub hoistMongoDB {
 }
 
 package Foswiki::Query::OP_ne;
+use strict;
+use warnings;
 use Assert;
+use Foswiki::Plugins::MongoDBPlugin qw(writeDebug);
 
 sub hoistMongoDB {
     my $op   = shift;
@@ -1596,7 +1650,10 @@ sub hoistMongoDB {
 }
 
 package Foswiki::Query::OP_ob;
+use strict;
+use warnings;
 use Assert;
+use Foswiki::Plugins::MongoDBPlugin qw(writeDebug);
 
 # ( )
 sub hoistMongoDB {
@@ -1608,7 +1665,10 @@ sub hoistMongoDB {
 }
 
 package Foswiki::Query::OP_where;
+use strict;
+use warnings;
 use Assert;
+use Foswiki::Plugins::MongoDBPlugin qw(writeDebug);
 
 sub hoistMongoDB {
     my $op   = shift;
@@ -1641,7 +1701,10 @@ sub hoistMongoDB {
 }
 
 package Foswiki::Query::OP_d2n;
+use strict;
+use warnings;
 use Assert;
+use Foswiki::Plugins::MongoDBPlugin qw(writeDebug);
 
 sub hoistMongoDB {
     my $op   = shift;
@@ -1652,7 +1715,10 @@ sub hoistMongoDB {
 }
 
 package Foswiki::Query::OP_lc;
+use strict;
+use warnings;
 use Assert;
+use Foswiki::Plugins::MongoDBPlugin qw(writeDebug);
 
 sub hoistMongoDB {
     my $op   = shift;
@@ -1663,7 +1729,10 @@ sub hoistMongoDB {
 }
 
 package Foswiki::Query::OP_length;
+use strict;
+use warnings;
 use Assert;
+use Foswiki::Plugins::MongoDBPlugin qw(writeDebug);
 
 sub hoistMongoDB {
     my $op   = shift;
@@ -1674,7 +1743,10 @@ sub hoistMongoDB {
 }
 
 package Foswiki::Query::OP_uc;
+use strict;
+use warnings;
 use Assert;
+use Foswiki::Plugins::MongoDBPlugin qw(writeDebug);
 
 sub hoistMongoDB {
     my $op   = shift;
@@ -1685,7 +1757,10 @@ sub hoistMongoDB {
 }
 
 package Foswiki::Query::OP_int;
+use strict;
+use warnings;
 use Assert;
+use Foswiki::Plugins::MongoDBPlugin qw(writeDebug);
 
 sub hoistMongoDB {
     my $op   = shift;
@@ -1697,7 +1772,10 @@ sub hoistMongoDB {
 
 #maths
 package Foswiki::Query::OP_div;
+use strict;
+use warnings;
 use Assert;
+use Foswiki::Plugins::MongoDBPlugin qw(writeDebug);
 
 sub hoistMongoDB {
     my $op   = shift;
@@ -1711,7 +1789,10 @@ sub hoistMongoDB {
 }
 
 package Foswiki::Query::OP_minus;
+use strict;
+use warnings;
 use Assert;
+use Foswiki::Plugins::MongoDBPlugin qw(writeDebug);
 
 sub hoistMongoDB {
     my $op   = shift;
@@ -1725,7 +1806,10 @@ sub hoistMongoDB {
 }
 
 package Foswiki::Query::OP_plus;
+use strict;
+use warnings;
 use Assert;
+use Foswiki::Plugins::MongoDBPlugin qw(writeDebug);
 
 sub hoistMongoDB {
     my $op   = shift;
@@ -1739,7 +1823,10 @@ sub hoistMongoDB {
 }
 
 package Foswiki::Query::OP_times;
+use strict;
+use warnings;
 use Assert;
+use Foswiki::Plugins::MongoDBPlugin qw(writeDebug);
 
 sub hoistMongoDB {
     my $op   = shift;
@@ -1753,7 +1840,10 @@ sub hoistMongoDB {
 }
 
 package Foswiki::Query::OP_neg;
+use strict;
+use warnings;
 use Assert;
+use Foswiki::Plugins::MongoDBPlugin qw(writeDebug);
 
 sub hoistMongoDB {
     my $op   = shift;
@@ -1768,7 +1858,10 @@ sub hoistMongoDB {
 }
 
 package Foswiki::Query::OP_pos;
+use strict;
+use warnings;
 use Assert;
+use Foswiki::Plugins::MongoDBPlugin qw(writeDebug);
 
 sub hoistMongoDB {
     my $op   = shift;
@@ -1783,7 +1876,10 @@ sub hoistMongoDB {
 }
 
 package Foswiki::Query::OP_empty;
+use strict;
+use warnings;
 use Assert;
+use Foswiki::Plugins::MongoDBPlugin qw(writeDebug);
 
 #TODO: not sure this is the right answer..
 sub hoistMongoDB {
@@ -1796,14 +1892,23 @@ sub hoistMongoDB {
 
 #array ops from versions.. (m3 work)
 package Foswiki::Query::OP_comma;
+use strict;
+use warnings;
+use Assert;
+use Foswiki::Plugins::MongoDBPlugin qw(writeDebug);
 
 #WARNING: this is now an nary op
 
 package Foswiki::Query::OP_in;
+use strict;
+use warnings;
 
 ######################################
 package Foswiki::Query::OP_ref;
+use strict;
+use warnings;
 use Assert;
+use Foswiki::Plugins::MongoDBPlugin qw(writeDebug);
 
 #use Data::Dumper;
 
@@ -1819,6 +1924,7 @@ sub hoistMongoDB {
         '#ref'               => [ $node->{hoisted0}, $node->{hoisted1} ]
     };
 }
+
 ######################################
 
 =pod

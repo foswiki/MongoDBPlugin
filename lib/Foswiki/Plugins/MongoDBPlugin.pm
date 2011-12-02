@@ -33,6 +33,8 @@ use Foswiki::Plugins ();    # For the API version
 use Data::Dumper;
 use Digest::MD5 qw(md5_hex);
 use Assert;
+use Exporter 'import';
+our @EXPORT_OK = qw(writeDebug);
 
 # Track every object including where they're created
 #use Devel::Leak::Object qw{ GLOBAL_bless };
@@ -590,6 +592,47 @@ sub _MONGODB {
             %$params              #over-ride the defaults
         }
     );
+}
+
+sub writeDebug {
+    my ( $msg, $level ) = @_;
+    my ( $package, $filename, $line, $subroutine ) = caller(1);
+    ( undef, undef, $filename ) = File::Spec->splitpath($filename);
+    my @pack       = split( '::', $subroutine );
+    my $abbr       = '';
+    my $context    = Foswiki::Func::getContext();
+    my $requestObj = Foswiki::Func::getRequestObject();
+
+    if ( $pack[0] eq 'Foswiki' ) {
+        $abbr = '..';
+        shift(@pack);
+        if ( $pack[0] eq 'Plugins' || $pack[0] eq 'Contrib' ) {
+            shift(@pack);
+        }
+    }
+    $abbr .= join( '::', @pack ) . '():' . $line;
+    if ( $filename !~ /^$pack[-2]\.pm$/ ) {
+        $abbr .= " in $filename";
+    }
+    $msg = "$abbr:\t$msg";
+    if (   !defined $context
+        || $requestObj->isa('Unit::Request')
+        || $context->{command_line} )
+    {
+        print STDERR $msg . "\n";
+        ASSERT( !defined $level || $level =~ /^[-]?\d+$/ ) if DEBUG;
+    }
+    else {
+        Foswiki::Func::writeDebug($msg);
+        if ( defined $level ) {
+            ASSERT( $level =~ /^[-]?\d+$/ ) if DEBUG;
+            if ( $level == -1 ) {
+                print STDERR $msg . "\n";
+            }
+        }
+    }
+
+    return;
 }
 
 1;

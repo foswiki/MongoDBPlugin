@@ -33,6 +33,7 @@ use Tie::IxHash ();
 use Foswiki::Func();
 use Digest::MD5 qw(md5_hex);
 use boolean();
+use Foswiki::Plugins::MongoDBPlugin qw(writeDebug);
 
 #lets declare it ok to run queries on slaves.
 #http://search.cpan.org/~kristina/MongoDB-0.42/lib/MongoDB/Cursor.pm#slave_okay
@@ -82,11 +83,11 @@ sub query {
     my $startTime = [Time::HiRes::gettimeofday];
 
     my $collection = $self->_getCollection( $web, $collectionName );
-    print STDERR "searching mongo ($web -> "
-      . $self->getDatabaseName($web)
-      . ". $collectionName) : "
-      . Dumper($ixhQuery) . " , "
-      . Dumper($queryAttrs) . "\n"
+    writeDebug( "searching mongo ($web -> "
+          . $self->getDatabaseName($web)
+          . ". $collectionName) : "
+          . Dumper($ixhQuery) . " , "
+          . Dumper($queryAttrs) )
       if MONITOR;
 
 #debugging for upstream
@@ -146,7 +147,7 @@ sub query {
     #end timer
     my $endTime = [Time::HiRes::gettimeofday];
     my $timeDiff = Time::HiRes::tv_interval( $startTime, $endTime );
-    print STDERR "query took $timeDiff\n" if MONITOR;
+    writeDebug("query took $timeDiff") if MONITOR;
     push( @{ $Foswiki::Func::SESSION->{MongoDB}->{lastQueryTime} }, $timeDiff );
 
     return $cursor;
@@ -169,8 +170,7 @@ sub update {
       ;  #set to true when importing so that we don't make a 'current rev' entry
 
     #    use Data::Dumper;
-    print STDERR "+++++ mongo update $web, $collectionName, $address \n"
-      if MONITOR;
+    writeDebug("+++++ mongo update $web, $collectionName, $address") if MONITOR;
 
     #print STDERR " == ".Dumper($hash)."\n" if MONITOR;
 
@@ -309,13 +309,13 @@ sub ensureIndex {
         }
     }
     if ( scalar( @{ $self->{mongoDBIndexes} } ) >= $MAX_NUM_INDEXES ) {
-        print STDERR
+        writeDebug(
 "*******************ouch. MongoDB can only have $MAX_NUM_INDEXES indexes per collection : "
-          . $options->{name} . "\n"
+              . $options->{name} )
           if MONITOR_INDEX;
         return;
     }
-    print STDERR "creating " . $options->{name} . " index\n" if MONITOR_INDEX;
+    writeDebug( "creating " . $options->{name} . " index" ) if MONITOR_INDEX;
 
     #TODO: consider doing these in a batch at the end of a request, or?
     $collection->ensure_index( $indexRef, $options );
@@ -333,7 +333,7 @@ sub remove {
     if ( scalar( keys( %{$mongoDbQuery} ) ) == 0 ) {
 
         #remove web - so drop database.
-        print STDERR "...........Dropping $web\n" if MONITOR;
+        writeDebug("...........Dropping $web") if MONITOR;
         my $db = $self->_getDatabase($web);
         $db->drop();
         $self->_primeDatabaseNames();
@@ -341,8 +341,8 @@ sub remove {
     }
     else {
         my $collection = $self->_getCollection( $web, $collectionName );
-        print STDERR "...........remove "
-          . join( ',', keys( %{$mongoDbQuery} ) ) . "\n"
+        writeDebug(
+            "...........remove " . join( ',', keys( %{$mongoDbQuery} ) ) )
           if MONITOR;
         $collection->remove($mongoDbQuery);
     }
@@ -408,8 +408,8 @@ sub _primeDatabaseNames {
         }
         if (MONITOR) {
             require Data::Dumper;
-            print STDERR "Primed database names: "
-              . Data::Dumper->Dump( [ $self->{dbsbywebname} ] );
+            writeDebug( "Primed database names: "
+                  . Data::Dumper->Dump( [ $self->{dbsbywebname} ] ) );
         }
     }
 

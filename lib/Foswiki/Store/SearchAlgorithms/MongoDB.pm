@@ -23,7 +23,7 @@ BEGIN {
       'Foswiki::Plugins::MongoDBPlugin';
     $Foswiki::cfg{Plugins}{MongoDBPlugin}{Enabled}             = 1;
     $Foswiki::cfg{Plugins}{MongoDBPlugin}{EnableOnSaveUpdates} = 1;
-    print STDERR "****** starting MongoDBPlugin..\n" if MONITOR;
+    writeDebug("****** starting MongoDBPlugin..") if MONITOR;
 
     $Foswiki::Plugins::SESSION->{store}
       ->setListenerPriority( 'Foswiki::Plugins::MongoDBPlugin::Listener', 1 );
@@ -296,7 +296,7 @@ sub _webQuery {
         $mongoJavascriptFunc =
           'function() {' . $mongoJavascriptFunc . 'return true;}';
         $ixhQuery->Push( '$where' => $mongoJavascriptFunc );
-        print STDERR "------$mongoJavascriptFunc\n" if MONITOR;
+        writeDebug("------$mongoJavascriptFunc") if MONITOR;
     }
 
     if ( not $session->{users}->isAdmin( $session->{user} ) ) {
