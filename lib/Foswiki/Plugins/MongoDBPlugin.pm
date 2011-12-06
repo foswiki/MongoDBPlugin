@@ -596,7 +596,8 @@ sub _MONGODB {
 
 sub writeDebug {
     my ( $msg, $level ) = @_;
-    my ( $package, $filename, $line, $subroutine ) = caller(1);
+    my ( $package, $filename, undef, $subroutine ) = caller(1);
+    my ( undef, undef, $line ) = caller(0);
     ( undef, undef, $filename ) = File::Spec->splitpath($filename);
     my @pack       = split( '::', $subroutine );
     my $abbr       = '';
