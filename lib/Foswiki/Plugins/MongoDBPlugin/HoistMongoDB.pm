@@ -40,8 +40,7 @@ sub hoist {
     #yes, the simplifier will send an undef parse tree for a query="'1'"
     #ASSERT(defined($node)) if DEBUG;
 
-    writeDebug( 'node: '
-          . ( defined($node) ? $node->stringify() : 'undef' ) )
+    writeDebug( 'node: ' . ( defined($node) ? $node->stringify() : 'undef' ) )
       if MONITOR
           or MONITOR_DETAIL;
 
@@ -171,8 +170,9 @@ sub _hoist {
 
     die 'node eq undef' unless defined($node);
 
-    writeDebug( 'Node is a ' . ref($node) . ": " . $node->stringify())
-      if MONITOR or MONITOR_DETAIL;
+    writeDebug( 'Node is a ' . ref($node) . ": " . $node->stringify() )
+      if MONITOR
+          or MONITOR_DETAIL;
 
     #forward propogate that we're inside a 'where' - eg lhs[rhs]
     #sadly, also need to treat a dot case : preferences[value=12].Red
@@ -187,9 +187,9 @@ sub _hoist {
           if ( defined( $node->{params}[1] )
             and ( ref( $node->{params}[1] ) ne '' ) );
     }
-    writeDebug( "At level $level with op "
+    writeDebug( "$level op: "
           . ref( $node->{op} )
-          . ( $node->{inWhere} ? ' inWhere' : '' ) )
+          . ( $node->{inWhere} ? ' inWhere' : ' not inWhere' ) )
       if MONITOR
           or MONITOR_DETAIL;
 
@@ -221,7 +221,11 @@ sub _hoist {
     if ( not ref( $node->{op} ) ) {
 
         #use Data::Dumper;
-        writeDebug( 'Node is a ' . ref($node) . ' which is not an op: ' . Dumper($node) ) if MONITOR;
+        writeDebug( 'Node is a '
+              . ref($node)
+              . ' which is not an op: '
+              . Dumper($node) )
+          if MONITOR;
         return Foswiki::Query::OP_dot::hoistMongoDB( $node->{op}, $node );
     }
     my $unreality_arity = $node->{op}->{arity};
@@ -275,7 +279,9 @@ sub _hoist {
             }
 
             my $query = _hoist( $node->{params}[0], $level . ' ' );
-            writeDebug("return 1; did something with an OP_dot node containing an OP_where") if MONITOR;
+            writeDebug(
+"return 1; did something with an OP_dot node containing an OP_where"
+            ) if MONITOR;
             return $query;
         }
         elsif ( ( ref( $node->{params}[0]->{op} ) eq '' )
@@ -359,7 +365,7 @@ sub _hoist {
     }
 
     writeDebug( 'node: ' . $node->stringify() ) if MONITOR;
-    writeDebug( 'node: ' . Dumper($node)) if MONITOR;
+    writeDebug( 'node: ' . Dumper($node) ) if MONITOR;
 
     #need to convert to js for lc/uc/length  etc :(
     # '####need_function'
@@ -885,10 +891,10 @@ sub hoistMongoDB {
     my $op   = shift;
     my $node = shift;
 
-    require Data::Dumper
-      if Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::MONITOR;
-    writeDebug( "OP_eq: $node => " . Data::Dumper->Dump( [$node] ) )
-      if Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::MONITOR;
+    if (Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::MONITOR) {
+        require Data::Dumper;
+        writeDebug( "OP_eq: $node => " . Data::Dumper->Dump( [$node] ) );
+    }
 
     ASSERT( ref($node) eq 'Foswiki::Query::Node' );
     ASSERT( ref( $node->{hoisted0} ) eq '' );
@@ -1145,10 +1151,10 @@ sub hoistMongoDB {
     elsif ( $node->{op} == Foswiki::Infix::Node::NAME ) {
 
         #if we're in a where, this is a bit transmissive
-        writeDebug( "============================= hoist OP_dot("
+        writeDebug( " ==== hoist OP_dot("
               . $node->{op} . ", "
               . $node->{params}[0] . ', '
-              . ( defined( $node->{inWhere} ) ? 'inwhere' : 'notinwhere' )
+              . ( defined( $node->{inWhere} ) ? 'inWhere' : 'not inWhere' )
               . ")" )
           if Foswiki::Plugins::MongoDBPlugin::HoistMongoDB::MONITOR;
 
