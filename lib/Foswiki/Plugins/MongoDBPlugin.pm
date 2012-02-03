@@ -322,7 +322,7 @@ sub _updateTopic {
                     );
                 }
 
-                $meta->{$key}{ $elem->{name} } = $elem;
+                $meta->{$key}{ $elem->{name} } = $elem if defined $elem->{name};
             }
         }
         else {
