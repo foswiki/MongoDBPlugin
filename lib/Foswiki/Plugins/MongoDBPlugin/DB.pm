@@ -43,7 +43,7 @@ $MongoDB::Cursor::slave_okay = 1;
 #use constant MONITOR => $Foswiki::cfg{MONITOR}{'Foswiki::Plugins::MongoDBPlugin'} || 0;
 use constant MONITOR       => 0;
 use constant MONITOR_INDEX => 0;
-my $MAX_NUM_INDEXES = 56;
+my $MAX_NUM_INDEXES = 64;
 
 sub new {
     my $class  = shift;
@@ -517,6 +517,10 @@ sub _MONGODB {
     return "\n<verbatim>\n" . Dumper($result) . "\n</verbatim>\n";
 
     #return join(', ', map { "$_: ".($data->{$_}||'UNDEF')."\n" } keys(%$data));
+}
+
+sub _MAX_NUM_INDEXES {
+    return $MAX_NUM_INDEXES;
 }
 
 1;
