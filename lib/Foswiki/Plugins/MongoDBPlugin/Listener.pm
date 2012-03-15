@@ -7,7 +7,7 @@ use Foswiki::Search                       ();
 use Foswiki::Func                         ();
 use Assert;
 
-use constant MONITOR => 0;
+use constant MONITOR => 1;
 
 =begin TML
 
