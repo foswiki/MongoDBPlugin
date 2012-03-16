@@ -69,7 +69,6 @@ sub test_too_many_indexes {
       $MongoDBPluginDB->_getCollection( $topicObject->web(), 'current' );
     my %indexed = map { %{ $_->{key} || {} } } $mongo_collection->get_indexes();
 
-    print "Indexes: " . Data::Dumper->Dump( [ [ keys %indexed ] ] ) if TRACE;
     foreach my $field (
         qw(_topic address TOPICINFO.rev TOPICINFO.author TOPICINFO.date TOPICPARENT.name CREATEINFO.date CREATEINFO.author)
       )
