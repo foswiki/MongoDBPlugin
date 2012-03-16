@@ -384,11 +384,17 @@ sub _updateTopic {
 #Item10611: Paul found that the date, rev and version TOPICINFO is sometimes a string and other times a number
 #rectify to always a string atm
                     $meta->{'TOPICINFO'}->{version} =
-                      int( $meta->{'TOPICINFO'}->{version} );
+                      defined $meta->{'TOPICINFO'}->{version}
+                      ? int( $meta->{'TOPICINFO'}->{version} )
+                      : undef;
                     $meta->{'TOPICINFO'}->{date} =
-                      int( $meta->{'TOPICINFO'}->{date} );
+                      defined $meta->{'TOPICINFO'}->{date}
+                      ? int( $meta->{'TOPICINFO'}->{date} )
+                      : undef;
                     $meta->{'TOPICINFO'}->{rev} =
-                      int( $meta->{'TOPICINFO'}->{rev} );
+                      defined $meta->{'TOPICINFO'}->{rev}
+                      ? int( $meta->{'TOPICINFO'}->{rev} )
+                      : undef;
                 }
             }
         }
@@ -402,9 +408,12 @@ sub _updateTopic {
         $meta->{'TOPICINFO'}->{author}          = 'BaseUserMapping_999';
         $meta->{'TOPICINFO'}->{_authorWikiName} = 'UnknownUser';
     }
-    $meta->{'TOPICINFO'}->{rev} = 1 if ( $meta->{'TOPICINFO'}->{rev} < 1 );
+    $meta->{'TOPICINFO'}->{rev} = 1
+      if ( !defined $meta->{'TOPICINFO'}{rev}
+        || $meta->{'TOPICINFO'}{rev} < 1 );
     $meta->{'TOPICINFO'}->{version} = 1
-      if ( $meta->{'TOPICINFO'}->{version} < 1 );
+      if ( !defined $meta->{'TOPICINFO'}{version}
+        || $meta->{'TOPICINFO'}{version} < 1 );
 
     $meta->{_raw_text} = $savedMeta->getEmbeddedStoreForm();
 
