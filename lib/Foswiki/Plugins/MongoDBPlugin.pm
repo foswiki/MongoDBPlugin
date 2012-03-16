@@ -386,15 +386,15 @@ sub _updateTopic {
                     $meta->{'TOPICINFO'}->{version} =
                       defined $meta->{'TOPICINFO'}->{version}
                       ? int( $meta->{'TOPICINFO'}->{version} )
-                      : undef;
+                      : 1;
                     $meta->{'TOPICINFO'}->{date} =
                       defined $meta->{'TOPICINFO'}->{date}
                       ? int( $meta->{'TOPICINFO'}->{date} )
-                      : undef;
+                      : 0;
                     $meta->{'TOPICINFO'}->{rev} =
                       defined $meta->{'TOPICINFO'}->{rev}
                       ? int( $meta->{'TOPICINFO'}->{rev} )
-                      : undef;
+                      : 1;
                 }
             }
         }
