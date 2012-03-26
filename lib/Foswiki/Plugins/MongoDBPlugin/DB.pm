@@ -313,10 +313,12 @@ sub ensureIndex {
             # Clear cache
             delete $self->{mongoDBIndexes}{ $collection->full_name() };
         }
-        else {
+        elsif ( !exists $self->{cannot_index}{$collection}{ $options->{name} } )
+        {
             writeDebug( "$MAX_NUM_INDEXES indexes already set in "
                   . $collection->full_name
                   . ", refusing to create another for $options->{name}" );
+            $self->{cannot_index}{$collection}{ $options->{name} } = 1;
         }
     }
 
