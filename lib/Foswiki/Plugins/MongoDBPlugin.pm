@@ -519,16 +519,18 @@ sub _updateDatabase {
     my $query   = Foswiki::Func::getCgiQuery();
 
     #TODO: actually, should do all webs if not specified..
-    my $web = shift;
+    my $web = $query->param('updateweb') || shift;
     if ( not defined($web) or ( $web eq 'MongoDBPlugin' ) ) {
         my $count = 0;
+        my $progress = '';
 
         #do all webs..
         my @webNames = Foswiki::Func::getListOfWebs( '', undef );
         foreach $web (@webNames) {
+            $progress .= "$web\n";
             $count += _updateDatabase( $session, $web );
         }
-        return $count;
+        return $progress."\n".$count;
     }
 
     #print STDERR "loading js into $web\n";
@@ -570,7 +572,19 @@ sub _updateDatabase {
       ->updateSystemJS( $web, 'foswiki_getDatabaseName',
         $foswiki_getDatabaseName_js );
 
-    return 1;
+    my $writeDebug_js =
+      Foswiki::Func::expandTemplate('writeDebug_js');
+    getMongoDB()
+      ->updateSystemJS( $web, 'writeDebug',
+        $writeDebug_js );
+
+      
+    getMongoDB()
+      ->updateSystemJS( $web, 'foswiki_isTrue',
+        Foswiki::Func::expandTemplate('foswiki_isTrue_js') );
+
+
+    return $web."\n".1;
 }
 
 # The function used to handle the %EXAMPLETAG{...}% macro
@@ -613,8 +627,13 @@ sub writeDebug {
     ( undef, undef, $filename ) = File::Spec->splitpath($filename);
     my @pack       = split( '::', $subroutine );
     my $abbr       = '';
-    my $context    = Foswiki::Func::getContext();
-    my $requestObj = Foswiki::Func::getRequestObject();
+    my ($context, $requestObj);
+    if (defined($Foswiki::Plugins::SESSION)) {
+        #can't call these when Foswiki's not quite created, or when its been destroyed
+        #for eg, in the cleanup of a unit test
+        $context    = Foswiki::Func::getContext();
+        $requestObj = Foswiki::Func::getRequestObject();
+    }
 
     ( undef, undef, $filename ) = File::Spec->splitpath($filename);
     if ( $pack[0] eq 'Foswiki' ) {

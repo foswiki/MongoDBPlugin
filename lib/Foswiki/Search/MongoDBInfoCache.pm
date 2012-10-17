@@ -149,12 +149,38 @@ sub convertTopicPatternToRegex {
     return '^(' . join( '|', @arr ) . ')$';
 }
 
+
+=begin TML
+
+---++ filterByDate( $date )
+
+Filter the list by date interval; see System.TimeSpecifications.
+
+<verbatim>
+$infoCache->filterByDate( $date );
+</verbatim>
+
+this can either be implemented using mongodb side things, or as a filterIterator
+but as the API does not return a new iterator, its iffy
+
+method here only to prevent foswiki crashes
+
+=cut
+
+sub filterByDate {
+    my ( $this, $date ) = @_;
+
+#not implemented.
+
+}
+
+
 1;
 __END__
 
 # Plugin for Foswiki - The Free and Open Source Wiki, http://foswiki.org/
 #
-# Copyright 2010-2011 - SvenDowideit@fosiki.com
+# Copyright 2010-2012 - SvenDowideit@fosiki.com
 #
 # MongoDBPlugin is # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of

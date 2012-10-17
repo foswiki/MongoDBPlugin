@@ -81,15 +81,17 @@ sub hoist {
         #ideally, the parser should be converting that into a logical tree -
         #but for now, our parser is dumb, forcing hoisting code to suck
         writeDebug("final convert") if MONITOR;
-        $mongoDBQuery = { '$where' => convertToJavascript($mongoDBQuery) };
+        $mongoDBQuery = { 
+                            '$where' => 
+                            #'writeDebug("~~~ oneo");'.
+                            #'return 1;'.
+                            'foswiki_isTrue('.convertToJavascript($mongoDBQuery).')'
+                        };
     }
 
     if ( ref($mongoDBQuery) eq '' ) {
-        return { '$where' => convertToJavascript($mongoDBQuery) };
-
-        #node simplified() to hell?
-        return { '$where' => $mongoDBQuery };
-
+        writeDebug("final convert - surprise") if MONITOR;
+        return { '$where' => 'foswiki_isTrue('.convertToJavascript($mongoDBQuery).')' };
     }
 
 #TODO: sadly, the exception throwing wasn't working so I'm using a brutish propogate error
@@ -519,9 +521,8 @@ sub convertFunction {
 
         #TODO: like all accessses, this needs alot of undef protection.
         my $addr = '(' . convertStringToJS( $$value[1] ) . ')';
-##%TMPL:DEF{foswiki_getRef_js}%function(host, collection, currentqueryweb, topic) {
         my $ref =
-'foswiki_getRef(\'localhost\', foswiki_getDatabaseName(this._web), \'current\', this._web, '
+'foswiki_getRef(\'localhost\', this._web, \'current\', this._web, '
           . convertStringToJS( $$value[0] ) . ')';
 
         ASSERT( $addr =~ /this/ ) if DEBUG

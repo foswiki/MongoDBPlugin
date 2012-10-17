@@ -79,7 +79,7 @@ sub query {
             $ixhQuery->{_history} = { '$exists' => 0 };
         }
     }
-
+    
     my $startTime = [Time::HiRes::gettimeofday];
 
     my $collection = $self->_getCollection( $web, $collectionName );
@@ -110,9 +110,9 @@ sub query {
 
 #use Devel::Peek;
 #Dump($long_count);
-#print STDERR "----------------------------------------------------------------------------------\n";
-#print STDERR Dumper($long_count)."\n";
-#print STDERR "----------------------------------------------------------------------------------\n";
+#writeDebug "----------------------------------------------------------------------------------\n";
+#writeDebug Dumper($long_count)."\n";
+#writeDebug "----------------------------------------------------------------------------------\n";
 #die $long_count if ($long_count =~ /assert/);
 
     my $cursor = $collection->query( $ixhQuery, $queryAttrs );
@@ -353,7 +353,9 @@ sub haveIndexFor {
     return $self->{mongoDBIndexes}{$collection_name}{$key};
 }
 
+#TODO: BUG: if I drop a web, i need to drop its children too!
 sub remove {
+    #return;
     my $self           = shift;
     my $web            = shift;
     my $collectionName = shift;
@@ -395,6 +397,11 @@ sub updateSystemJS {
     my $collection = $self->_getCollection( $web, 'system.js' );
 
     use MongoDB::Code;
+    
+    #remove the // comment from in front of any print statements
+    $sourcecode =~ s|//print|print|gm if MONITOR;
+    
+    
     my $code = MongoDB::Code->new( 'code' => $sourcecode );
 
     $collection->save(
@@ -403,6 +410,22 @@ sub updateSystemJS {
             value => $code
         }
     );
+
+{
+    #and a debug_ version of the function too
+    #remove the // comment from in front of any print statements
+    $sourcecode =~ s|//print|print|gm;
+    my $code = MongoDB::Code->new( 'code' => $sourcecode );
+
+    $collection->save(
+        {
+            _id   => 'debug_'.$functionname,
+            value => $code
+        }
+    );
+
+}
+
 
     #update our webmap.
     $self->_primeDatabaseNames();

@@ -2,18 +2,18 @@
 %TMPL:DEF{foswiki_getField_js}%function(obj, address) {
     var ptr = obj;
 //address is of the form 'this.TOPICINFO.version' and needs to be separated into individual return undefined if this['TOPICINFO'] == undefined etc
-//print('getField('+address);
+writeDebug('getField('+address);
     var addrs = address.split('.');
     for (var i in addrs) {
-        var name = addrs[i];
-        //print(i+' => '+name);
         if (ptr == undefined) {
-            //print('return ptr undefined');
+            writeDebug('return ptr undefined');
             return ptr;
         }
+        var name = addrs[i];
+        writeDebug(i+' => '+name);
         ptr = ptr[name];
     }
-    //print('return '+ptr);
+    writeDebug('return '+ptr);
     return ptr;
 }%TMPL:END%
 %TMPL:DEF{foswiki_toLowerCase_js}%function(value) {
@@ -35,7 +35,7 @@
     }
     //return value.length;
     var size=0, key;
-    //print('getLength');
+    writeDebug('getLength');
     for (key in value) {
         if (
             (value.hasOwnProperty(key)) &&
@@ -43,7 +43,7 @@
             (key != '_authorWikiName')
             ){ 
                 size++;
-                //print(key)
+                writeDebug(key)
              }
     }
     return size;
@@ -63,6 +63,7 @@
     
     var current = db.getSisterDB('webs').getCollection('map');
     var map = current.findOne({'_id':web});
+    writeDebug("foswiki_getDatabaseName("+web+") -> "+map.hash);
     return map.hash;
     
     web = web.replace(/\//, '__');
@@ -71,11 +72,9 @@
 }%TMPL:END%
 
 %TMPL:DEF{foswiki_getRef_js}%function(host, dbname, collection, web, topic) {
-    //first stab at JOIN to other DB - but this was a v1.5 idea
-    //conn = new Mongo(host);
-    //current = conn.getCollection(dbname+'.'+collection); //collection is actually database.collection
-    //newer sister
-    current = db.getSisterDB(dbname).getCollection(collection);
+    //JOIN to other DB / collection
+    writeDebug("foswiki_getRef("+host+','+dbname+','+collection+','+web+','+topic);
+    //TODO: could compare web to dbname to avoid getting sister if its a join to self
     
     if (topic ==undefined) {
         return topic;
@@ -84,6 +83,18 @@
     web = arr[0];
     topic = arr[1];
 
+    var ref_web_name = foswiki_getDatabaseName(web);
+
+    if (ref_web_name == db) {
+        writeDebug('----same-----'+db);
+        current = db;
+    } else {
+        current = db.getSisterDB(ref_web_name).getCollection(collection);
+        writeDebug('---------'+db);
+        writeDebug('=========='+current);
+    }
+
+    writeDebug("foswiki_getRef .. normalised("+host+','+dbname+','+collection+','+web+','+topic);
     return current.findOne({_web:web, _topic: topic});
 }%TMPL:END%
 %TMPL:DEF{foswiki_d2n_js}%function(dateString) {
@@ -272,4 +283,20 @@
         return 0;
     }
     return parsedDate.getTime(); //return seconds since 1970
+}%TMPL:END%
+%TMPL:DEF{writeDebug_js}%function(string) {
+    print('-------::::'+string);
+    //crashes, db in readonly mode
+    //db.getSisterDB('webs').LOGS.insert({message: string});
+    //whereas THIS gives me crashdumps!
+    //var conn = new Mongo("localhost");
+    //db = conn.getDB("webs");
+    //db.LOGS.insert({message: string});
+}%TMPL:END%
+%{convert to perl falsism}%
+%TMPL:DEF{foswiki_isTrue_js}%function(string) {
+    if (string == null) return 0;
+    if (string == '') return 0;
+    if (string == '0') return 0;
+    return string;
 }%TMPL:END%

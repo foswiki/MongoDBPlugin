@@ -114,6 +114,7 @@ sudo dpkg -i libmongodb*</verbatim>
 
 After [[#InstallingMongoDB][installing MongoDB]] and [[#LoadBrowser][loading your data]] you will also need to use [[%SCRIPTURLPATH{"configure"}%][configure]] to:
    * Access the [[%SCRIPTURLPATH{"configure"}%#Store][Store]] tab
+   * enable the MongoDBPlugin
    * Change ={Store}{SearchAlgorithm}= to use =Foswiki::Store::SearchAlgorithms::MongoDB=
    * Change ={Store}{QueryAlgorithm}= to use =Foswiki::Store::QueryAlgorithms::MongoDB=
    * Show expert settings
