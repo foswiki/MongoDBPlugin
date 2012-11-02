@@ -70,7 +70,7 @@ sub recordChange {
 
     writeDebug( $args{verb} . join( ',', keys(%args) ) ) if MONITOR;
 
-    if ( $args{verb} = 'remove' ) {
+    if ( $args{verb} eq 'remove' ) {
 
         #works for topics and webs
         Foswiki::Plugins::MongoDBPlugin::_remove( $args{oldmeta}->web,
@@ -171,7 +171,7 @@ sub readTopic {
 #die 'here' if ($_[0]->{count}{$_[1]->web}{$_[1]->topic} > 10); #sometime there is recursion, and this way i can track it down
 
 #allow the MongoDBPlugin to disable the listener when running a web update resthandler
-    if ( $this->enabled() && ( not defined($attachment) ) ) {
+    if ( $_[0]->enabled() && ( not defined($attachment) ) ) {
 
         if (
             Foswiki::Plugins::MongoDBPlugin::getMongoDB->databaseExists(
@@ -243,7 +243,7 @@ sub readTopic {
     }
     else {
         #chain on to other caches and real store
-        return $this->SUPER::readTopic( $_[1], $_[2] );
+        return $_[0]->SUPER::readTopic( $_[1], $_[2] );
     }
 }
 
