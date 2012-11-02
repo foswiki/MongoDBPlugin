@@ -47,8 +47,11 @@ our $SHORTDESCRIPTION =
 our $NO_PREFS_IN_TOPIC = 1;
 our $pluginName        = 'MongoDBPlugin';
 
-#this can also be disabled by the listener
+#this can also be disabled by the MongoDBStore cache
 our $enableOnSaveUpdates = 0;
+
+#this disabled the MongoDBStore cache replies (not the syncing to the cache)
+our $disableMongoDBStoreFilter = 0;
 
 =begin TML
 
@@ -79,25 +82,6 @@ sub initPlugin {
     Foswiki::Func::registerRESTHandler( 'updateDatabase', \&_updateDatabase );
 
     return 1;
-}
-
-=begin TML
-
----++ earlyInitPlugin()
-
-This handler is called before any other handler, and before it has been
-determined if the plugin is enabled or not. Use it with great care!
-
-If it returns a non-null error string, the plugin will be disabled.
-
-=cut
-
-sub earlyInitPlugin {
-    ## Foswiki 2.0 Store Listener now used all the time
-    $Foswiki::Plugins::SESSION->{store}
-      ->setListenerPriority( 'Foswiki::Plugins::MongoDBPlugin::Listener', 1 );
-
-    return undef;
 }
 
 =begin TML
@@ -210,9 +194,8 @@ sub updateWebCache {
 "ERROR: sorry, $web cannot be cached to MongoDB as there is another web with the same spelling, but different case already cached\n";
     }
 
-#we need to deactivate any listeners :/ () at least stop the loadTopic one from triggering
-    $session->{store}
-      ->setListenerPriority( 'Foswiki::Plugins::MongoDBPlugin::Listener', 0 );
+    #we need to deactivate the MongoDBStore updater
+    $disableMongoDBStoreFilter = 1;
 
     #lets make sure we have the javascript we'll rely on later
     _updateDatabase( $session, $web, $query );
@@ -256,8 +239,7 @@ sub updateWebCache {
     print STDERR "imported $count.$rev_count\n";
     $result .= $web . ': ' . $count . '.' . $rev_count . "\n";
 
-    $session->{store}
-      ->setListenerPriority( 'Foswiki::Plugins::MongoDBPlugin::Listener', 1 );
+    $disableMongoDBStoreFilter = 0;
 
     return $result;
 }
@@ -521,7 +503,7 @@ sub _updateDatabase {
     #TODO: actually, should do all webs if not specified..
     my $web = $query->param('updateweb') || shift;
     if ( not defined($web) or ( $web eq 'MongoDBPlugin' ) ) {
-        my $count = 0;
+        my $count    = 0;
         my $progress = '';
 
         #do all webs..
@@ -530,7 +512,7 @@ sub _updateDatabase {
             $progress .= "$web\n";
             $count += _updateDatabase( $session, $web );
         }
-        return $progress."\n".$count;
+        return $progress . "\n" . $count;
     }
 
     #print STDERR "loading js into $web\n";
@@ -572,19 +554,14 @@ sub _updateDatabase {
       ->updateSystemJS( $web, 'foswiki_getDatabaseName',
         $foswiki_getDatabaseName_js );
 
-    my $writeDebug_js =
-      Foswiki::Func::expandTemplate('writeDebug_js');
-    getMongoDB()
-      ->updateSystemJS( $web, 'writeDebug',
-        $writeDebug_js );
+    my $writeDebug_js = Foswiki::Func::expandTemplate('writeDebug_js');
+    getMongoDB()->updateSystemJS( $web, 'writeDebug', $writeDebug_js );
 
-      
     getMongoDB()
       ->updateSystemJS( $web, 'foswiki_isTrue',
         Foswiki::Func::expandTemplate('foswiki_isTrue_js') );
 
-
-    return $web."\n".1;
+    return $web . "\n" . 1;
 }
 
 # The function used to handle the %EXAMPLETAG{...}% macro
@@ -625,12 +602,13 @@ sub writeDebug {
     my ( $package, $filename, undef, $subroutine ) = caller(1);
     my ( undef, undef, $line ) = caller(0);
     ( undef, undef, $filename ) = File::Spec->splitpath($filename);
-    my @pack       = split( '::', $subroutine );
-    my $abbr       = '';
-    my ($context, $requestObj);
-    if (defined($Foswiki::Plugins::SESSION)) {
-        #can't call these when Foswiki's not quite created, or when its been destroyed
-        #for eg, in the cleanup of a unit test
+    my @pack = split( '::', $subroutine );
+    my $abbr = '';
+    my ( $context, $requestObj );
+    if ( defined($Foswiki::Plugins::SESSION) ) {
+
+  #can't call these when Foswiki's not quite created, or when its been destroyed
+  #for eg, in the cleanup of a unit test
         $context    = Foswiki::Func::getContext();
         $requestObj = Foswiki::Func::getRequestObject();
     }

@@ -1,3 +1,11 @@
+
+#---+ Store -- TABS
+#---++ Store Implementation
+# **NUMBER EXPERT**
+# The number of milliseconds an operation should wait for w slaves to replicate it.
+$Foswiki::cfg{Store}{ImplementationClasses}{'Foswiki::Plugins::MongoDBPlugin::MongoDBStore'} = 1;
+
+
 # ---+ Extensions
 # ---++ MongoDBPlugin
 # host information for mongodb server

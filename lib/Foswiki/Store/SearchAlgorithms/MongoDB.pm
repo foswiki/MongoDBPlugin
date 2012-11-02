@@ -24,10 +24,6 @@ BEGIN {
     $Foswiki::cfg{Plugins}{MongoDBPlugin}{Enabled}             = 1;
     $Foswiki::cfg{Plugins}{MongoDBPlugin}{EnableOnSaveUpdates} = 1;
     writeDebug("****** starting MongoDBPlugin..") if MONITOR;
-
-    $Foswiki::Plugins::SESSION->{store}
-      ->setListenerPriority( 'Foswiki::Plugins::MongoDBPlugin::Listener', 1 );
-
 }
 
 =begin TML

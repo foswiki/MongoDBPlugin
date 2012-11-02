@@ -28,13 +28,9 @@ sub _topicObjectTooManyFields {
       Foswiki::Plugins::MongoDBPlugin::DB->_MAX_NUM_INDEXES() + 10;
 
     writeDebug("Creating a topic with $num_fields formfields\n") if TRACE;
-    $this->assert(
-        $Foswiki::cfg{Store}{Listeners}
-          {'Foswiki::Plugins::MongoDBPlugin::Listener'},
-        'MongoDBPlugin is listening to Foswiki store events'
-    );
-    $this->{session}{store}
-      ->setListenerPriority( 'Foswiki::Plugins::MongoDBPlugin::Listener', 0 );
+
+    $Foswiki::Plugins::MongoDBPlugin::disableMongoDBStoreFilter = 1;
+
     Foswiki::Func::createWeb( $test_toomany_web, '_default' );
     my ($topicObject) =
       Foswiki::Func::readTopic( $test_toomany_web, $this->{test_topic} );
@@ -45,8 +41,8 @@ sub _topicObjectTooManyFields {
     writeDebug("Before save...\n") if TRACE;
     $topicObject->save();
     writeDebug("After save.\n") if TRACE;
-    $this->{session}{store}
-      ->setListenerPriority( 'Foswiki::Plugins::MongoDBPlugin::Listener', 1 );
+
+    $Foswiki::Plugins::MongoDBPlugin::disableMongoDBStoreFilter = 0;
 
     return $topicObject;
 }

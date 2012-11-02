@@ -33,9 +33,6 @@ BEGIN {
       'Foswiki::Plugins::MongoDBPlugin';
     $Foswiki::cfg{Plugins}{MongoDBPlugin}{Enabled} = 1;
     writeDebug("****** starting MongoDBPlugin..") if MONITOR;
-
-    $Foswiki::Plugins::SESSION->{store}
-      ->setListenerPriority( 'Foswiki::Plugins::MongoDBPlugin::Listener', 1 );
 }
 
 use Foswiki::Search::Node ();
@@ -358,7 +355,7 @@ sub convertTopicPatternToLonghandQuery {
             else {
                 "name='" . $_ . "'";
             }
-          } @arr
+        } @arr
     );
 }
 

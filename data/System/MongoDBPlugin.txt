@@ -12,9 +12,9 @@ prefer.
 %TOC%
 
 ---++ Usage
-This is an experimental attempt to utilise [[http://mongodb.org][MongoDB]] to cache and search/query all topics stored in Foswiki. This is achieved by:
+This Plugin uses [[http://mongodb.org][MongoDB]] to cache and search/query all topics stored in Foswiki. This is achieved by:
    * Bulk-loading topics for the first time with the =%TOPIC%/update= restHandler (see below)
-   * Maintaining any new or changed topics by way of a [[%SCRIPTURLPATH{"configure"}%/configure#Store][Store]] listener (={Store}{Listeners}= expert setting in configure)
+   * Maintaining any new or changed topics by way of a [[%SCRIPTURLPATH{"configure"}%/configure#Store][Store]] shim (={Store}{ImplementationClasses}= expert setting in configure)
    * Executing all searches and queries with !MongoDB instead of the traditional !BruteForce/grep approach by providing new search and query algorithms (={Store}{SearchAlgorithm}=, ={Store}{QueryAlgorithm}= in configure)
 
 To check on progress and bugs please visit Foswikitask:%TOPIC%.
@@ -118,10 +118,9 @@ After [[#InstallingMongoDB][installing MongoDB]] and [[#LoadBrowser][loading you
    * Change ={Store}{SearchAlgorithm}= to use =Foswiki::Store::SearchAlgorithms::MongoDB=
    * Change ={Store}{QueryAlgorithm}= to use =Foswiki::Store::QueryAlgorithms::MongoDB=
    * Show expert settings
-   * Enter the following text in the ={Store}{Listeners}= setting:
-   <verbatim> {
-   'Foswiki::Plugins::MongoDBPlugin::Listener' => 1
- }</verbatim>
+   * Enter the following text in the *EXPERT* ={Store}{ImplementationClasses}= setting:
+   <verbatim> ['Foswiki::Plugins::MongoDBPlugin::MongoDBStore']
+   </verbatim>
 
 If you are using a replica set, don't forget to list all replSet members in the =[[%SCRIPTURLPATH{"configure"}%#MongoDBPlugin$Extensions][{MongoDBPlugin}{host}]]= setting, for example:
 <verbatim>mongodb://mongo1.example.org:27017,mongo2.example.org:27017,mongo3.example.org:27017</verbatim>

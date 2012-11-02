@@ -14,17 +14,14 @@ sub check {
 
     if ( $Foswiki::cfg{Plugins}{MongoDBPlugin}{Enabled} ) {
         if (
-            not $Foswiki::cfg{Store}{Listeners}
-            {'Foswiki::Plugins::MongoDBPlugin::Listener'} )
+            not $Foswiki::cfg{Store}{ImplementationClasses}
+            {'Foswiki::Plugins::MongoDBPlugin::MongoDBStore'} )
         {
             $e .= $this->WARN(<<'MESSAGE');
 You need
-<code>{Store}{Listeners}</code> (expert setting) to contain
-<code>'Foswiki::Plugins::MongoDBPlugin::Listener' => 1</code>
- so that MongoDBPlugin can keep its data synchronised with Foswiki's Store. For
-example: <pre>{
-    'Foswiki::Plugins::MongoDBPlugin::Listener' => 1
-}</pre>
+<code>{Store}{ImplementationClasses}</code> (expert setting) to contain
+<code>'Foswiki::Plugins::MongoDBPlugin::MongoDBStore' => 1</code>
+ so that MongoDBPlugin can keep its data synchronised with Foswiki's Store. 
 MESSAGE
         }
         if ( $Foswiki::cfg{Store}{QueryAlgorithm} ne
@@ -49,16 +46,16 @@ MESSAGE
         }
     }
     else {
-        if ( $Foswiki::cfg{Store}{Listeners}
-            {'Foswiki::Plugins::MongoDBPlugin::Listener'} )
+        if ( $Foswiki::cfg{Store}{ImplementationClasses}
+            {'Foswiki::Plugins::MongoDBPlugin::MongoDBStore'} )
         {
             $e .= $this->ERROR(<<'MESSAGE');
-<code>{Store}{Listeners}</code> is using
-<code>Foswiki::Plugins::MongoDBPlugin::Listener</code>
+<code>{Store}{ImplementationClasses}</code> is using
+<code>Foswiki::Plugins::MongoDBPlugin::MongoDBStore</code>
  but MongoDBPlugin is disabled. It should perhaps contain no listeners, which
 would mean a value of <code>{}</code> or, if you have other listeners
 configured apart from MongoDBPlugin, just remove the
- <code>'Foswiki::Plugins::MongoDBPlugin::Listener' => 1</code> part
+ <code>'Foswiki::Plugins::MongoDBPlugin::MongoDBStore' => 1</code> part
 MESSAGE
         }
         if ( $Foswiki::cfg{Store}{QueryAlgorithm} eq
