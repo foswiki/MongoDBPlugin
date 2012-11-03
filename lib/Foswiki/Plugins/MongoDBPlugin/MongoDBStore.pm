@@ -220,17 +220,20 @@ sub readTopic {
                 $loadedRev               = $_[1]->getLoadedRev();
                 $_[1]->{_latestIsLoaded} = defined($loadedRev);
                 $isLatest                = $_[1]->{_latestIsLoaded};
-                if ( $metaClass ne 'Foswiki::Meta' ) {
+                if ($isLatest) {
 
-                    #return us to what we were..
-                    bless( $_[1], $metaClass );
+                    if ( $metaClass ne 'Foswiki::Meta' ) {
 
-                    writeDebug("------ rebless to $metaClass") if MONITOR;
+                        #return us to what we were..
+                        bless( $_[1], $metaClass );
+
+                        writeDebug("------ rebless to $metaClass") if MONITOR;
+                    }
+
+                    #cache the metaObj
+                    $session->search->metacache->addMeta( $_[1]->web,
+                        $_[1]->topic, $_[1] );
                 }
-
-                #cache the metaObj
-                $session->search->metacache->addMeta( $_[1]->web, $_[1]->topic,
-                    $_[1] );
 
                 writeDebug( "===== loadTopic("
                       . $_[1]->web . " , "
