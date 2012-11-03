@@ -61,18 +61,18 @@ $Foswiki::Cfg{Store}{ImplementationClasses} to chain in to eveavesdrop on Store 
 sub recordChange {
     my ( $this, %args ) = @_;
 
-    #doing it first to make sure the recod is chained
-    $this->SUPER::recordChange(%args);
-
     #TODO: I'm not doing attachments yet
-    return if ( defined( $args{newattachment} ) );
-    return if ( defined( $args{oldattachment} ) );
+    if ( defined( $args{newattachment} ) || defined( $args{oldattachment} ) ) {
+        $this->SUPER::recordChange(%args);
+        return;
+    }
 
     writeDebug( $args{verb} . join( ',', keys(%args) ) ) if MONITOR;
 
     if ( $args{verb} eq 'remove' ) {
 
-        #works for topics and webs
+      #works for topics and webs
+      #TODO: consider removing the webs.maps web->hash pointer if removing a web
         Foswiki::Plugins::MongoDBPlugin::_remove( $args{oldmeta}->web,
             $args{oldmeta}->topic );
     }
@@ -94,7 +94,10 @@ sub recordChange {
 
             if ( defined( $args{oldmeta} ) ) {
                 if ( $args{oldmeta}->web ne $args{newmeta}->web ) {
-                    $self->remove( oldmeta => $args{oldmeta} );
+
+                    #$self->remove( oldmeta => $args{oldmeta} );
+                    Foswiki::Plugins::MongoDBPlugin::_remove(
+                        $args{oldmeta}->web, $args{oldmeta}->topic );
                     writeDebug( "Removed web (" . $args{oldmeta}->web . ")" )
                       if MONITOR;
 
@@ -103,8 +106,6 @@ sub recordChange {
                       if MONITOR;
                     Foswiki::Plugins::MongoDBPlugin::updateWebCache(
                         $args{newmeta}->web );
-
-                    return;
                 }
                 writeDebug(
 "1. Not sure how we got to this point in updating the Store",
@@ -117,24 +118,27 @@ sub recordChange {
                     -1
                 );
             }
-
-            return;
         }
+        else {
+            #TODO: do this differently when we support previous revs
+            if ( defined( $args{oldmeta} ) ) {
 
-        #TODO: do this differently when we support previous revs
-        if ( defined( $args{oldmeta} ) ) {
-
-            #move topic is (currently) a delete&insert
-            $self->remove( oldmeta => $args{oldmeta} );
-        }
-        if ( defined( $args{newmeta}->topic ) ) {
-            Foswiki::Plugins::MongoDBPlugin::_updateTopic( $args{newmeta}->web,
-                $args{newmeta}->topic, $args{newmeta} );
+                #move topic is (currently) a delete&insert
+                #$self->remove( oldmeta => $args{oldmeta} );
+                Foswiki::Plugins::MongoDBPlugin::_remove( $args{oldmeta}->web,
+                    $args{oldmeta}->topic );
+            }
+            if ( defined( $args{newmeta}->topic ) ) {
+                Foswiki::Plugins::MongoDBPlugin::_updateTopic(
+                    $args{newmeta}->web,
+                    $args{newmeta}->topic, $args{newmeta} );
+            }
         }
     }
     else {
         writeDebug("UNHANDLED store change");
     }
+    $this->SUPER::recordChange(%args);
 }
 
 =pod
@@ -213,7 +217,9 @@ sub readTopic {
                 my $metaClass = ref( $_[1] );
                 bless( $_[1], 'Foswiki::Plugins::MongoDBPlugin::Meta' );
                 $_[1]->reload();    #get the latest version
-                $_[1]->{_latestIsLoaded} = 1;
+                $loadedRev               = $_[1]->getLoadedRev();
+                $_[1]->{_latestIsLoaded} = defined($loadedRev);
+                $isLatest                = $_[1]->{_latestIsLoaded};
                 if ( $metaClass ne 'Foswiki::Meta' ) {
 
                     #return us to what we were..
@@ -230,10 +236,8 @@ sub readTopic {
                       . $_[1]->web . " , "
                       . $_[1]->topic
                       . ", version)  => "
-                      . $_[1]->getLoadedRev() )
+                      . $loadedRev )
                   if MONITOR;
-
-                ( $gotRev, $isLatest ) = ( $_[1]->getLoadedRev(), 1 );
             }
         }
     }

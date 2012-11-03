@@ -15,6 +15,8 @@
 
 ---+ package Foswiki::Plugins::MongoDBPlugin::Meta
 
+TODO: remove this, with the new 1.2.0 store replacement for the listeners,
+the reload function can go directly into the MongoDBStore::readTopic
 
 =cut
 
@@ -129,7 +131,7 @@ sub reload {
           if TRACE;
     }
 
-    $this->loadFromBSONData($data);
+    $this->loadFromBSONData($data) if ( keys(%$data) );
     writeDebug("loadedRev: $this->{_loadedRev}") if TRACE;
 
     return;
