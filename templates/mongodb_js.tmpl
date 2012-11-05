@@ -62,6 +62,9 @@ writeDebug('getField('+address);
 %TMPL:DEF{foswiki_getDatabaseName_js}%function(web) {
     
     var current = db.getSisterDB('webs').getCollection('map');
+    if (current == undefined) {
+        writeDebug("FAILED to foswiki_getDatabaseName("+web+")");
+    }
     var map = current.findOne({'_id':web});
     writeDebug("foswiki_getDatabaseName("+web+") -> "+map.hash);
     return map.hash;
@@ -85,16 +88,20 @@ writeDebug('getField('+address);
 
     var ref_web_name = foswiki_getDatabaseName(web);
 
-    if (ref_web_name == db) {
-        writeDebug('----same-----'+db);
-        current = db;
-    } else {
+//    if (ref_web_name == db) {
+//        writeDebug('----same-----'+db);
+//        current = db.getCollection(collection);
+//    } else {
         current = db.getSisterDB(ref_web_name).getCollection(collection);
         writeDebug('---------'+db);
         writeDebug('=========='+current);
-    }
+//    }
 
     writeDebug("foswiki_getRef .. normalised("+host+','+dbname+','+collection+','+web+','+topic);
+    if (current == undefined) {
+        writeDebug("FAILED to getSisterDB...("+web+")");
+        return;
+    }
     return current.findOne({_web:web, _topic: topic});
 }%TMPL:END%
 %TMPL:DEF{foswiki_d2n_js}%function(dateString) {
