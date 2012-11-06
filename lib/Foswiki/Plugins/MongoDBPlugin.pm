@@ -34,6 +34,7 @@ use Data::Dumper;
 use Digest::MD5 qw(md5_hex);
 use Assert;
 use Exporter 'import';
+use Scalar::Util qw(blessed);
 our @EXPORT_OK = qw(writeDebug);
 
 # Track every object including where they're created
@@ -111,7 +112,7 @@ sub completePageHandler {
 
 ################################################################################################################
 sub getMongoDB {
-    if ( not defined( $Foswiki::Func::SESSION->{MongoDB} ) ) {
+    if ( not blessed ( $Foswiki::Func::SESSION->{MongoDB} ) ) {
         require Foswiki::Plugins::MongoDBPlugin::DB;
 
         #need to remove undes username and pwd
@@ -129,6 +130,7 @@ sub getMongoDB {
         my $mongoDB = new Foswiki::Plugins::MongoDBPlugin::DB(
             { cfg => $Foswiki::cfg{MongoDBPlugin} } );
     }
+
     return $Foswiki::Func::SESSION->{MongoDB};
 }
 
