@@ -610,7 +610,10 @@ sub test_hoistLcRHSName {
 
     $this->do_Assert(
         $s,
-        { '$where' => "this._topic == foswiki_toLowerCase('WebHome')" },
+        {
+            '$where' =>
+              "foswiki_isTrue(this._topic == foswiki_toLowerCase('WebHome'))"
+        },
         { '_topic' => 'webhome' }
     );
 }
@@ -623,7 +626,7 @@ sub test_hoistLcLHSField {
         $s,
         {
             '$where' =>
-"foswiki_toLowerCase(foswiki_getField(this, 'FIELD.Subject.value')) == 'WebHome'"
+"foswiki_isTrue(foswiki_toLowerCase(foswiki_getField(this, 'FIELD.Subject.value')) == 'WebHome')"
         }
     );
 }
@@ -632,8 +635,13 @@ sub test_hoistLcLHSName {
     my $this = shift;
     my $s    = "lc(name) = 'WebHome'";
 
-    $this->do_Assert( $s,
-        { '$where' => "foswiki_toLowerCase(this._topic) == 'WebHome'" } );
+    $this->do_Assert(
+        $s,
+        {
+            '$where' =>
+              "foswiki_isTrue(foswiki_toLowerCase(this._topic) == 'WebHome')"
+        }
+    );
 }
 
 sub DISABLEtest_hoistLcRHSLikeName {
@@ -652,7 +660,8 @@ sub test_hoistLcLHSLikeName {
     $this->do_Assert(
         $s,
         {
-            '$where' => "( /^Web.*\$/m.test(foswiki_toLowerCase(this._topic)) )"
+            '$where' =>
+"foswiki_isTrue(( /^Web.*\$/m.test(foswiki_toLowerCase(this._topic)) ))"
         }
     );
 }
@@ -661,14 +670,16 @@ sub test_hoistLengthLHSName {
     my $this = shift;
     my $s    = "length(name) = 12";
 
-    $this->do_Assert( $s, { '$where' => "foswiki_length(this._topic) == 12" } );
+    $this->do_Assert( $s,
+        { '$where' => "foswiki_isTrue(foswiki_length(this._topic) == 12)" } );
 }
 
 sub test_hoistLengthLHSString {
     my $this = shift;
     my $s    = "length('something') = 9";
 
-    $this->do_Assert( $s, { '$where' => "foswiki_length('something') == 9" },
+    $this->do_Assert( $s,
+        { '$where' => "foswiki_isTrue(foswiki_length('something') == 9)" },
         {} );
 }
 
@@ -678,7 +689,7 @@ sub test_hoistLengthLHSString_false {
 
     $this->do_Assert(
         $s,
-        { '$where' => "foswiki_length('FALSEsomething') == 9" },
+        { '$where' => "foswiki_isTrue(foswiki_length('FALSEsomething') == 9)" },
         { '1'      => '0' }
     );
 }
@@ -687,7 +698,8 @@ sub test_hoistLengthLHSNameGT {
     my $this = shift;
     my $s    = "length(name) < 12";
 
-    $this->do_Assert( $s, { '$where' => "foswiki_length(this._topic) < 12" } );
+    $this->do_Assert( $s,
+        { '$where' => "foswiki_isTrue(foswiki_length(this._topic) < 12)" } );
 }
 
 sub test_hoist_d2n_value {
@@ -698,7 +710,7 @@ sub test_hoist_d2n_value {
         $s,
         {
             '$where' =>
-              "foswiki_d2n(foswiki_getField(this, 'FIELD.noatime.value'))"
+"foswiki_isTrue(foswiki_d2n(foswiki_getField(this, 'FIELD.noatime.value')))"
         }
     );
 }
@@ -713,7 +725,7 @@ sub test_hoist_d2n_valueAND {
 
             #TODO: need to figure out how to not make both into js
             '$where' =>
-" ( (foswiki_d2n(foswiki_getField(this, 'FIELD.noatime.value'))) )  && foswiki_getField(this, 'FIELD.topic.value') == 'WebHome'"
+"foswiki_isTrue( ( (foswiki_d2n(foswiki_getField(this, 'FIELD.noatime.value'))) )  && foswiki_getField(this, 'FIELD.topic.value') == 'WebHome')"
 
               #          '$where' => 'foswiki_d2n(this.FIELD.noatime.value)',
               #          'FIELD.topic.value' => 'WebHome'
@@ -727,8 +739,11 @@ sub test_hoist_d2n {
 
     $this->do_Assert(
         $s,
-        { '$where' => "foswiki_d2n(this._topic) < foswiki_d2n('1998-11-23')" },
-        { '$where' => "foswiki_d2n(this._topic) < 911743200" }
+        {
+            '$where' =>
+"foswiki_isTrue(foswiki_d2n(this._topic) < foswiki_d2n('1998-11-23'))"
+        },
+        { '$where' => "foswiki_isTrue(foswiki_d2n(this._topic) < 911743200)" }
     );
 }
 
@@ -740,7 +755,7 @@ sub test_hoist_Item10323_1 {
         $s,
         {
             '$where' =>
-"( /bio/.test(foswiki_toLowerCase(foswiki_getField(this, 'FIELD.TermGroup.value'))) )"
+"foswiki_isTrue(( /bio/.test(foswiki_toLowerCase(foswiki_getField(this, 'FIELD.TermGroup.value'))) ))"
         }
     );
 }
@@ -759,7 +774,7 @@ sub test_hoist_Item10323_2 {
         },
         {
             '$where' =>
-'( /bio/.test(foswiki_toLowerCase(foswiki_getField(this, \'FIELD.TermGroup.value\'))) )'
+'foswiki_isTrue(( /bio/.test(foswiki_toLowerCase(foswiki_getField(this, \'FIELD.TermGroup.value\'))) ))'
         }
 
     );
@@ -779,7 +794,7 @@ sub test_hoist_Item10323_2_not {
         },
         {
             '$where' =>
-'! ( /bio/.test(foswiki_toLowerCase(foswiki_getField(this, \'FIELD.TermGroup.value\'))) )'
+'foswiki_isTrue(! ( /bio/.test(foswiki_toLowerCase(foswiki_getField(this, \'FIELD.TermGroup.value\'))) ))'
         }
     );
 }
@@ -802,7 +817,7 @@ sub test_hoist_Item10323 {
 
             #TODO: why is this js?
             '$where' =>
-' ( ( (( /^.*TermForm$/m.test(foswiki_getField(this, \'FORM.name\')) )) )  &&  (( /ant/.test(foswiki_toLowerCase(foswiki_getField(this, \'FIELD.Namespace.value\'))) )) )  &&  (( /bio/.test(foswiki_toLowerCase(foswiki_getField(this, \'FIELD.TermGroup.value\'))) )) '
+'foswiki_isTrue( ( ( (( /^.*TermForm$/m.test(foswiki_getField(this, \'FORM.name\')) )) )  &&  (( /ant/.test(foswiki_toLowerCase(foswiki_getField(this, \'FIELD.Namespace.value\'))) )) )  &&  (( /bio/.test(foswiki_toLowerCase(foswiki_getField(this, \'FIELD.TermGroup.value\'))) )) )'
         }
     );
 }
@@ -816,11 +831,11 @@ sub test_hoist_maths {
         $s,
         {
             '$where' =>
-" ( ((12)-(foswiki_getField(this, 'FIELD.Namespace.value')) < (((24)*(60))*(60))-(5)) )  &&  ((foswiki_getField(this, 'FIELD.TermGroup.value'))/(12) > (foswiki_getField(this, 'FIELD.WebScale.value'))*(42.8)) "
+"foswiki_isTrue( ( ((12)-(foswiki_getField(this, 'FIELD.Namespace.value')) < (((24)*(60))*(60))-(5)) )  &&  ((foswiki_getField(this, 'FIELD.TermGroup.value'))/(12) > (foswiki_getField(this, 'FIELD.WebScale.value'))*(42.8)) )"
         },
         {
             '$where' =>
-" ( ((12)-(foswiki_getField(this, 'FIELD.Namespace.value')) < 86395) )  &&  ((foswiki_getField(this, 'FIELD.TermGroup.value'))/(12) > (foswiki_getField(this, 'FIELD.WebScale.value'))*(42.8)) "
+"foswiki_isTrue( ( ((12)-(foswiki_getField(this, 'FIELD.Namespace.value')) < 86395) )  &&  ((foswiki_getField(this, 'FIELD.TermGroup.value'))/(12) > (foswiki_getField(this, 'FIELD.WebScale.value'))*(42.8)) )"
         }
     );
 }
@@ -829,7 +844,8 @@ sub test_hoist_concat {
     my $this = shift;
     my $s    = "'asd' + 'qwe' = 'asdqwe'";
 
-    $this->do_Assert( $s, { '$where' => '(\'asd\')+(\'qwe\') == \'asdqwe\'' },
+    $this->do_Assert( $s,
+        { '$where' => 'foswiki_isTrue((\'asd\')+(\'qwe\') == \'asdqwe\')' },
         {} );
 }
 
@@ -838,14 +854,14 @@ sub test_hoist_concat2 {
     my $this = shift;
     my $s    = "'2' + '3' = '5'";
 
-    $this->do_Assert( $s, { '$where' => '(2)+(3) == 5' }, {} );
+    $this->do_Assert( $s, { '$where' => 'foswiki_isTrue((2)+(3) == 5)' }, {} );
 }
 
 sub test_hoist_concat3 {
     my $this = shift;
     my $s    = "2 + 3 = 5";
 
-    $this->do_Assert( $s, { '$where' => '(2)+(3) == 5' }, {} );
+    $this->do_Assert( $s, { '$where' => 'foswiki_isTrue((2)+(3) == 5)' }, {} );
 }
 
 sub test_hoist_concat_false {
@@ -854,8 +870,10 @@ sub test_hoist_concat_false {
 
     $this->do_Assert(
         $s,
-        { '$where' => '(\'FALSEasd\')+(\'qwe\') == \'asdqwe\'' },
-        { '1'      => '0' }
+        {
+            '$where' => 'foswiki_isTrue((\'FALSEasd\')+(\'qwe\') == \'asdqwe\')'
+        },
+        { '1' => '0' }
     );
 }
 
@@ -864,14 +882,22 @@ sub test_hoist_concat2_false {
     my $this = shift;
     my $s    = "'9' + '3' = '5'";
 
-    $this->do_Assert( $s, { '$where' => '(9)+(3) == 5' }, { '1' => '0' } );
+    $this->do_Assert(
+        $s,
+        { '$where' => 'foswiki_isTrue((9)+(3) == 5)' },
+        { '1'      => '0' }
+    );
 }
 
 sub test_hoist_concat3_false {
     my $this = shift;
     my $s    = "9 + 3 = 5";
 
-    $this->do_Assert( $s, { '$where' => '(9)+(3) == 5' }, { '1' => '0' } );
+    $this->do_Assert(
+        $s,
+        { '$where' => 'foswiki_isTrue((9)+(3) == 5)' },
+        { '1'      => '0' }
+    );
 }
 
 sub UNTRUE_test_hoist_shorthandPref {
@@ -1114,11 +1140,11 @@ sub test_hoist_dateAndRelationship {
 #          'FORM.name' => qr/(?-xism:^.*RelationshipForm$)/,
 #          '$where' => "(foswiki_getField(this, 'FIELD.NOW.value'))-(foswiki_getField(this, 'TOPICINFO.date')) < (((60)*(60))*(24))*(7)"
             '$where' =>
-' ( (( /^.*RelationshipForm$/m.test(foswiki_getField(this, \'FORM.name\')) )) )  &&  ((foswiki_getField(this, \'FIELD.NOW.value\'))-(foswiki_getField(this, \'TOPICINFO.date\')) < (((60)*(60))*(24))*(7)) '
+'foswiki_isTrue( ( (( /^.*RelationshipForm$/m.test(foswiki_getField(this, \'FORM.name\')) )) )  &&  ((foswiki_getField(this, \'FIELD.NOW.value\'))-(foswiki_getField(this, \'TOPICINFO.date\')) < (((60)*(60))*(24))*(7)) )'
         },
         {
             '$where' =>
-' ( (( /^.*RelationshipForm$/m.test(foswiki_getField(this, \'FORM.name\')) )) )  &&  ((foswiki_getField(this, \'FIELD.NOW.value\'))-(foswiki_getField(this, \'TOPICINFO.date\')) < 604800) '
+'foswiki_isTrue( ( (( /^.*RelationshipForm$/m.test(foswiki_getField(this, \'FORM.name\')) )) )  &&  ((foswiki_getField(this, \'FIELD.NOW.value\'))-(foswiki_getField(this, \'TOPICINFO.date\')) < 604800) )'
         }
     );
 }
@@ -1217,7 +1243,7 @@ sub test_hoist_ref {
 
         {
             '$where' =>
-"(foswiki_getField(foswiki_getRef(\'localhost\', foswiki_getDatabaseName(this._web), \'current\', this._web, 'AnotherTopic'), 'FIELD.number.value')) == 12"
+"foswiki_isTrue((foswiki_getField(foswiki_getRef('localhost', this._web, 'current', this._web, 'AnotherTopic'), 'FIELD.number.value')) == 12)"
         },
         { '1' => '0' }
     );
@@ -1234,7 +1260,7 @@ sub test_hoist_ref2 {
 
         {
             '$where' =>
-'(foswiki_getField(foswiki_getRef(\'localhost\', foswiki_getDatabaseName(this._web), \'current\', this._web, foswiki_getField(this, \'FIELD.Source.value\')), \'TOPICINFO.rev\')) != foswiki_getField(this, \'FIELD.SourceRev.value\')'
+'foswiki_isTrue((foswiki_getField(foswiki_getRef(\'localhost\', this._web, \'current\', this._web, foswiki_getField(this, \'FIELD.Source.value\')), \'TOPICINFO.rev\')) != foswiki_getField(this, \'FIELD.SourceRev.value\'))'
 
         }
     );
@@ -1251,7 +1277,7 @@ sub test_hoist_ref3 {
 
         {
             '$where' =>
-'foswiki_getField(this, \'FIELD.SourceRev.value\') > (foswiki_getField(foswiki_getRef(\'localhost\', foswiki_getDatabaseName(this._web), \'current\', this._web, foswiki_getField(this, \'FIELD.Source.value\')), \'TOPICINFO.rev\'))'
+"foswiki_isTrue(foswiki_getField(this, 'FIELD.SourceRev.value') > (foswiki_getField(foswiki_getRef('localhost', this._web, 'current', this._web, foswiki_getField(this, 'FIELD.Source.value')), 'TOPICINFO.rev')))"
         }
     );
 }
@@ -1266,7 +1292,7 @@ sub test_hoist_ref4 {
 
         {
             '$where' =>
-' ( (foswiki_getField(this, \'FORM.name\') == \'TaxonProfile.Relationships.RelationshipForm\') )  &&  ((foswiki_getField(foswiki_getRef(\'localhost\', foswiki_getDatabaseName(this._web), \'current\', this._web, foswiki_getField(this, \'FIELD.Source.value\')), \'TOPICINFO.rev\')) != foswiki_getField(this, \'FIELD.SourceRev.value\')) '
+"foswiki_isTrue( ( (foswiki_getField(this, 'FORM.name') == 'TaxonProfile.Relationships.RelationshipForm') )  &&  ((foswiki_getField(foswiki_getRef('localhost', this._web, 'current', this._web, foswiki_getField(this, 'FIELD.Source.value')), 'TOPICINFO.rev')) != foswiki_getField(this, 'FIELD.SourceRev.value')) )"
         }
     );
 }
@@ -1281,7 +1307,7 @@ sub test_hoist_ref4_or {
 
         {
             '$where' =>
-' ( foswiki_getField(this, \'FORM.name\') == \'TaxonProfile.Relationships.RelationshipForm\' || (foswiki_getField(foswiki_getRef(\'localhost\', foswiki_getDatabaseName(this._web), \'current\', this._web, foswiki_getField(this, \'FIELD.Source.value\')), \'TOPICINFO.rev\')) != foswiki_getField(this, \'FIELD.SourceRev.value\') ) '
+"foswiki_isTrue( ( foswiki_getField(this, 'FORM.name') == 'TaxonProfile.Relationships.RelationshipForm' || (foswiki_getField(foswiki_getRef('localhost', this._web, 'current', this._web, foswiki_getField(this, 'FIELD.Source.value')), 'TOPICINFO.rev')) != foswiki_getField(this, 'FIELD.SourceRev.value') ) )"
         }
     );
 }
@@ -1296,7 +1322,7 @@ sub test_hoist_ref4_longhand {
 
         {
             '$where' =>
-' ( (foswiki_getField(this, \'FORM.name\') == \'TaxonProfile.Relationships.RelationshipForm\') )  &&  ((foswiki_getField(foswiki_getRef(\'localhost\', foswiki_getDatabaseName(this._web), \'current\', this._web, foswiki_getField(this, \'FIELD.Source.value\')), \'TOPICINFO.rev\')) != foswiki_getField(this, \'FIELD.SourceRev.value\')) '
+'foswiki_isTrue( ( (foswiki_getField(this, \'FORM.name\') == \'TaxonProfile.Relationships.RelationshipForm\') )  &&  ((foswiki_getField(foswiki_getRef(\'localhost\', this._web, \'current\', this._web, foswiki_getField(this, \'FIELD.Source.value\')), \'TOPICINFO.rev\')) != foswiki_getField(this, \'FIELD.SourceRev.value\')) )'
         }
     );
 }
@@ -1332,11 +1358,11 @@ sub test_hoist_Item10515 {
 
         {
             '$where' =>
-'foswiki_toLowerCase(foswiki_getField(this, \'FIELD.Firstname.value\')) == foswiki_toLowerCase(\'JOHN\')'
+'foswiki_isTrue(foswiki_toLowerCase(foswiki_getField(this, \'FIELD.Firstname.value\')) == foswiki_toLowerCase(\'JOHN\'))'
         },
         {
             '$where' =>
-'foswiki_toLowerCase(foswiki_getField(this, \'FIELD.Firstname.value\')) == \'john\''
+'foswiki_isTrue(foswiki_toLowerCase(foswiki_getField(this, \'FIELD.Firstname.value\')) == \'john\')'
         }
     );
 }
@@ -1400,7 +1426,10 @@ sub test_hoist_ImplicitFormNameBUG {
     $this->do_Assert(
         $s,
 
-        { '$where' => 'foswiki_getField(this, \'FIELD.FormName.value\')' }
+        {
+            '$where' =>
+              'foswiki_isTrue(foswiki_getField(this, \'FIELD.FormName.value\'))'
+        }
     );
 }
 
@@ -1414,7 +1443,10 @@ sub test_formQuery3 {
     $this->do_Assert(
         $s,
 
-        { '$where' => 'foswiki_getField(this, \'FIELD.FormName.value\')' }
+        {
+            '$where' =>
+              'foswiki_isTrue(foswiki_getField(this, \'FIELD.FormName.value\'))'
+        }
     );
 
 }
@@ -1439,7 +1471,7 @@ sub test_hoist_ref_TOPICINFO_longhand {
         $s,
         {
             '$where' =>
-'(foswiki_getField(foswiki_getRef(\'localhost\', foswiki_getDatabaseName(this._web), \'current\', this._web, \'Main.WebHome\'), \'TOPICINFO.date\'))'
+'foswiki_isTrue((foswiki_getField(foswiki_getRef(\'localhost\', this._web, \'current\', this._web, \'Main.WebHome\'), \'TOPICINFO.date\')))'
         },
         { '$where' => 1231502400 }
     );
@@ -1455,7 +1487,7 @@ sub test_hoist_ref_TOPICINFO_longhand_plus_WEBHome {
 
         {
             '$where' =>
-" ( ((! ( this._topic == 'AnotherTopic' || this._topic == 'WebHome' || this._topic == 'BarnicalBob' ) )) )  &&  ((foswiki_getField(foswiki_getRef('localhost', foswiki_getDatabaseName(this._web), 'current', this._web, 'Main.WebChanges'), 'TOPICINFO.date'))) "
+"foswiki_isTrue( ( ((! ( this._topic == 'AnotherTopic' || this._topic == 'WebHome' || this._topic == 'BarnicalBob' ) )) )  &&  ((foswiki_getField(foswiki_getRef('localhost', this._web, 'current', this._web, 'Main.WebChanges'), 'TOPICINFO.date'))) )"
         },
         {
             '$where' => 1231502400,
@@ -1483,7 +1515,7 @@ sub test_hoist_ref_TOPICINFO_longhand_plus {
 
         {
             '$where' =>
-" ( ((! ( this._topic == 'AnotherTopic' || this._topic == 'WebHome' || this._topic == 'BarnicalBob' ) )) )  &&  ((foswiki_getField(foswiki_getRef('localhost', foswiki_getDatabaseName(this._web), 'current', this._web, 'AnotherTopic'), 'TOPICINFO.date'))) "
+"foswiki_isTrue( ( ((! ( this._topic == 'AnotherTopic' || this._topic == 'WebHome' || this._topic == 'BarnicalBob' ) )) )  &&  ((foswiki_getField(foswiki_getRef('localhost', this._web, 'current', this._web, 'AnotherTopic'), 'TOPICINFO.date'))) )"
         },
         {
             '1'    => '0',    #our false
@@ -1516,11 +1548,11 @@ sub test_hoist_ref_CREATEINFO_longhand {
 
         {
             '$where' =>
-'(foswiki_getField(foswiki_getRef(\'localhost\', foswiki_getDatabaseName(this._web), \'current\', this._web, \'AnotherTopic\'), \'CREATEINFO.date\'))'
+'foswiki_isTrue((foswiki_getField(foswiki_getRef(\'localhost\', this._web, \'current\', this._web, \'AnotherTopic\'), \'CREATEINFO.date\')))'
         },
 
         #that topic does not exist, so we're false.
-        { '$where' => '0' }
+        { '$where' => 'foswiki_isTrue(0)' }
     );
 }
 
